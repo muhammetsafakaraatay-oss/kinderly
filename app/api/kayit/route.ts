@@ -10,7 +10,17 @@ type SignupBody = {
   sifre?: string
 }
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const EMAIL_REGEX = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$/
+
+function normalizeEmail(value: unknown) {
+  if (typeof value !== 'string') return ''
+
+  return value
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim()
+    .toLowerCase()
+}
 
 export async function POST(request: Request) {
   try {
@@ -28,7 +38,7 @@ export async function POST(request: Request) {
     const okulAdi = body.okulAdi?.trim() ?? ''
     const adSoyad = body.adSoyad?.trim() ?? ''
     const rawEmail = typeof body.email === 'string' ? body.email : ''
-    const email = rawEmail.trim().toLowerCase()
+    const email = normalizeEmail(body.email)
     const sifre = body.sifre?.trim() ?? ''
     const normalizedSlug = slugifySchoolName(body.slug ?? '')
 
@@ -37,6 +47,7 @@ export async function POST(request: Request) {
       slug: normalizedSlug,
       adSoyad,
       email,
+      rawEmail,
     })
 
     if (!okulAdi || !adSoyad || !email || !sifre || !normalizedSlug) {
