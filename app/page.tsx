@@ -1,205 +1,429 @@
 import Link from 'next/link'
+import { DM_Sans, Instrument_Serif } from 'next/font/google'
+import { RoiCalculator } from '@/components/roi-calculator'
+
+const instrumentSerif = Instrument_Serif({
+  subsets: ['latin'],
+  weight: '400',
+})
+
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+})
+
+const schools = ['Ata Cocuk Akademisi', 'Mavi Dusler Anaokulu', 'Mini Kasmir Kids', 'Orman Evim', 'Gunes Kampusu']
+
+const features = [
+  {
+    title: 'Yoklama akisini dakikalara indir',
+    body: 'Sabah karsilama, sinif bazli durum takibi ve veli bilgilendirmesi ayni akista ilerler.',
+    icon: '✓',
+    span: 'md:col-span-2',
+  },
+  {
+    title: 'Gunluk aktivite kayitlari',
+    body: 'Yemek, uyku, ilac, not ve gunluk raporlar tek panelden kaydolur.',
+    icon: '⚡',
+  },
+  {
+    title: 'Mesajlasma tek yerde',
+    body: 'Ogretmen, veli ve yonetim ayni konusma duzeninde iletisim kurar.',
+    icon: '💬',
+  },
+  {
+    title: 'Fotograf paylasimi',
+    body: 'Sinif anlarini guvenli sekilde velilere ulastir, arsivi da kaybetme.',
+    icon: '📷',
+  },
+  {
+    title: 'Aidat takibi ve tahsilat',
+    body: 'Geciken odemeleri gor, veliyi bilgilendir, okul gelirini anlik takip et.',
+    icon: '₺',
+    span: 'md:col-span-2',
+  },
+]
+
+const personas = [
+  {
+    title: 'Yonetici',
+    body: 'Tum okul operasyonunu, siniflari, personeli ve geliri tek dashboard uzerinden gorur.',
+  },
+  {
+    title: 'Ogretmen',
+    body: 'Gun icindeki her kaydi telefonundan girer, veliyi ekstra efor harcamadan bilgilendirir.',
+  },
+  {
+    title: 'Veli',
+    body: 'Cocugunun gununu, fotograflarini, mesajlarini ve odemelerini tek uygulamada takip eder.',
+  },
+]
+
+const testimonials = [
+  {
+    quote: 'Kinderly ile sabah yoklama ve veli bilgilendirmesi icin ayirdigimiz sure yari yariya azaldi.',
+    author: 'Seda Hanim',
+    role: 'Kurucu Mudur',
+  },
+  {
+    quote: 'Ogretmenler artik WhatsApp ile kaybolmuyor. Tum iletisim okulun kendi akisinda toplandi.',
+    author: 'Mert Bey',
+    role: 'Kampus Yoneticisi',
+  },
+  {
+    quote: 'Veliler en cok fotograf ve gunluk rapor akisindan memnun. Destek talebi de ciddi sekilde dustu.',
+    author: 'Elif Hanim',
+    role: 'Anaokulu Sahibi',
+  },
+]
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[#faf8f3] text-[#1e2d25] font-sans">
-      {/* NAV */}
-      <nav className="fixed top-0 left-0 right-0 z-50 h-[72px] flex items-center justify-between px-[5%] bg-[rgba(250,248,243,0.85)] backdrop-blur-xl border-b border-[rgba(13,92,58,0.12)]">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-[#0d5c3a] rounded-[10px] flex items-center justify-center text-lg">🌱</div>
-          <span className="font-bold text-xl text-[#0f1a14] tracking-tight">Kinderly</span>
+    <main className={`min-h-screen bg-[#060a06] text-white ${dmSans.className}`}>
+      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,rgba(74,222,128,0.14),transparent_32%),radial-gradient(circle_at_80%_20%,rgba(74,222,128,0.08),transparent_24%)]" />
+
+      <nav className="sticky top-0 z-50 border-b border-[rgba(74,222,128,0.16)] bg-[rgba(6,10,6,0.82)] backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 md:px-8">
+          <Link href="/" className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[rgba(74,222,128,0.25)] bg-[rgba(74,222,128,0.10)] text-[#4ade80]">
+              ✦
+            </div>
+            <div>
+              <div className="text-sm font-semibold tracking-[0.24em] text-[#4ade80]">KINDERLY</div>
+              <div className={`${instrumentSerif.className} text-xl leading-none text-white`}>School OS</div>
+            </div>
+          </Link>
+
+          <div className="hidden items-center gap-8 text-sm text-white/68 md:flex">
+            <a href="#features" className="transition-colors hover:text-[#4ade80]">Ozellikler</a>
+            <a href="#roller" className="transition-colors hover:text-[#4ade80]">Roller</a>
+            <a href="#pricing" className="transition-colors hover:text-[#4ade80]">Fiyatlar</a>
+            <a href="#yorumlar" className="transition-colors hover:text-[#4ade80]">Yorumlar</a>
+          </div>
+
+          <Link
+            href="/kayit"
+            className="rounded-full border border-[#4ade80] bg-[#4ade80] px-5 py-2.5 text-sm font-bold text-[#060a06] transition-transform hover:-translate-y-0.5"
+          >
+            Ucretsiz Basla
+          </Link>
         </div>
-        <div className="hidden md:flex items-center gap-8">
-          <a href="#ozellikler" className="text-sm text-[#5a7265] hover:text-[#0d5c3a] font-medium transition-colors">Özellikler</a>
-          <a href="#fiyatlar" className="text-sm text-[#5a7265] hover:text-[#0d5c3a] font-medium transition-colors">Fiyatlar</a>
-        </div>
-        <Link href="/giris" className="bg-[#0d5c3a] text-white px-5 py-2.5 rounded-[10px] text-sm font-semibold hover:bg-[#1a7a50] transition-all hover:-translate-y-px">
-          Panele Gir
-        </Link>
       </nav>
 
-      {/* HERO */}
-      <section className="min-h-screen flex items-center pt-[120px] pb-20 px-[5%] relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_60%_40%,rgba(46,204,138,0.08)_0%,transparent_70%)] pointer-events-none" />
-        <div className="max-w-[620px] relative z-10">
-          <div className="inline-flex items-center gap-2 bg-[#e8f5ef] border border-[rgba(13,92,58,0.2)] rounded-full px-4 py-1.5 mb-7">
-            <div className="w-1.5 h-1.5 bg-[#2ecc8a] rounded-full animate-pulse" />
-            <span className="text-xs font-bold text-[#0d5c3a] uppercase tracking-wide">Türkiye&apos;nin #1 Anaokulu Platformu</span>
+      <section className="relative overflow-hidden px-5 pb-20 pt-16 md:px-8 md:pt-24">
+        <div className="absolute inset-0 opacity-[0.18] [background-image:linear-gradient(rgba(74,222,128,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(74,222,128,0.12)_1px,transparent_1px)] [background-size:42px_42px]" />
+        <div className="relative mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[1.05fr_0.95fr]">
+          <div>
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[rgba(74,222,128,0.18)] bg-[rgba(74,222,128,0.08)] px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#92f2b3]">
+              Premium okul yonetim platformu
+            </div>
+            <h1 className={`${instrumentSerif.className} max-w-4xl text-[clamp(54px,8vw,102px)] leading-[0.95] tracking-tight text-white`}>
+              Anaokulunu
+              <br />
+              karanlikta degil,
+              <br />
+              veriyle yonet.
+            </h1>
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-white/68 md:text-xl">
+              Kinderly; yoklama, veli iletisimi, fotograf paylasimi ve aidat takibini tek akista birlestirir.
+              Ekibin daha az zaman kaybeder, veliler daha guvenli hisseder.
+            </p>
+            <div className="mt-10 flex flex-wrap gap-4">
+              <Link
+                href="/kayit"
+                className="rounded-full bg-[#4ade80] px-7 py-4 text-sm font-bold text-[#060a06] transition-transform hover:-translate-y-0.5"
+              >
+                Ucretsiz Basla
+              </Link>
+              <Link
+                href="/kayit"
+                className="rounded-full border border-[rgba(74,222,128,0.22)] bg-[rgba(255,255,255,0.03)] px-7 py-4 text-sm font-bold text-white transition-colors hover:border-[#4ade80] hover:text-[#4ade80]"
+              >
+                Demo Talep Et
+              </Link>
+            </div>
           </div>
-          <h1 className="text-[clamp(42px,6vw,72px)] font-black leading-[1.05] text-[#0f1a14] mb-6 tracking-tight">
-            Anaokulunu<br />
-            <em className="not-italic text-[#0d5c3a]">akıllıca</em><br />
-            yönet.
-          </h1>
-          <p className="text-lg text-[#5a7265] leading-relaxed mb-10 max-w-[500px] font-light">
-            Yoklama, aktivite takibi, veli iletişimi ve aidat yönetimi — hepsi tek platformda. Öğretmenler için tasarlandı, veliler için sevindi.
-          </p>
-          <div className="flex items-center gap-4 flex-wrap">
-            <Link href="/giris" className="bg-[#0d5c3a] text-white px-8 py-4 rounded-[14px] text-base font-semibold hover:bg-[#1a7a50] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(13,92,58,0.25)] inline-flex items-center gap-2">
-              Ücretsiz Dene →
-            </Link>
-            <a href="#ozellikler" className="text-[#1e2d25] text-sm font-medium hover:text-[#0d5c3a] transition-colors">
-              Nasıl Çalışır? ↓
-            </a>
+
+          <div className="relative">
+            <div className="absolute -inset-6 rounded-[36px] bg-[radial-gradient(circle,rgba(74,222,128,0.16),transparent_65%)] blur-2xl" />
+            <div className="relative rounded-[28px] border border-[rgba(74,222,128,0.18)] bg-[#0b120b] p-4 shadow-[0_40px_120px_rgba(0,0,0,0.45)]">
+              <div className="flex items-center justify-between rounded-[22px] border border-[rgba(74,222,128,0.16)] bg-[#0f170f] px-5 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full bg-[#f87171]" />
+                  <span className="h-3 w-3 rounded-full bg-[#facc15]" />
+                  <span className="h-3 w-3 rounded-full bg-[#4ade80]" />
+                </div>
+                <div className="rounded-full border border-[rgba(74,222,128,0.16)] px-4 py-1 text-xs text-white/54">
+                  panel.kinderly.app
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-[24px] border border-[rgba(74,222,128,0.14)] bg-[#081008] p-5">
+                <div className="grid gap-4 md:grid-cols-[0.9fr_1.1fr]">
+                  <div className="rounded-[22px] border border-[rgba(74,222,128,0.14)] bg-[#0d150d] p-4">
+                    <div className="text-xs uppercase tracking-[0.16em] text-[#92f2b3]">Bugun</div>
+                    <div className="mt-2 text-5xl font-black text-white">87%</div>
+                    <p className="mt-2 text-sm leading-6 text-white/58">Devam orani 26/30 ogrenci. 3 aile yeni duyuruyu okudu.</p>
+                    <div className="mt-5 grid gap-3">
+                      {[
+                        ['Mesajlar', '12'],
+                        ['Fotograf', '24'],
+                        ['Aidat', '4'],
+                      ].map(([label, value]) => (
+                        <div key={label} className="flex items-center justify-between rounded-2xl border border-[rgba(74,222,128,0.10)] bg-[#101910] px-4 py-3">
+                          <span className="text-sm text-white/64">{label}</span>
+                          <span className="text-lg font-bold text-[#4ade80]">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[22px] border border-[rgba(74,222,128,0.14)] bg-[#0d150d] p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-xs uppercase tracking-[0.16em] text-[#92f2b3]">Canli akis</div>
+                        <div className="mt-1 text-xl font-bold text-white">Mavi Kelebekler Sinifi</div>
+                      </div>
+                      <div className="rounded-full border border-[rgba(74,222,128,0.14)] px-3 py-1 text-xs text-[#4ade80]">
+                        2 dk once
+                      </div>
+                    </div>
+                    <div className="mt-5 space-y-3">
+                      {[
+                        ['✓', 'Yoklama tamamlandi', '3 veliye bildirim gitti'],
+                        ['📷', 'Fotograf paylasildi', 'Ayse ogleden sonra etkinligi'],
+                        ['💬', 'Yeni mesaj geldi', 'Ogretmen veli sorusunu yanitladi'],
+                      ].map(([icon, title, body]) => (
+                        <div key={title} className="rounded-2xl border border-[rgba(74,222,128,0.10)] bg-[#101910] p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[rgba(74,222,128,0.10)] text-[#4ade80]">
+                              {icon}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-white">{title}</div>
+                              <div className="text-sm text-white/54">{body}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+      </section>
 
-        {/* Mockup */}
-        <div className="hidden lg:block absolute right-[5%] top-1/2 -translate-y-1/2 w-[45%] max-w-[520px]">
-          <div className="bg-white rounded-3xl p-6 shadow-[0_40px_120px_rgba(13,92,58,0.15),0_8px_32px_rgba(0,0,0,0.06)] border border-[rgba(13,92,58,0.08)]">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-[#0d5c3a] rounded-lg flex items-center justify-center text-sm">🌱</div>
-                <span className="font-bold text-sm text-[#0f1a14]">Kinderly</span>
-              </div>
-              <span className="text-xs text-[#5a7265]">11 Nisan, Cuma</span>
-            </div>
-            <div className="bg-[#e8f5ef] rounded-2xl p-4 flex items-center justify-between mb-4">
-              <div>
-                <div className="text-3xl font-black text-[#0d5c3a]">87%</div>
-                <div className="text-xs text-[#5a7265] mt-1">Bugün Devam Oranı — 26/30 öğrenci</div>
-              </div>
-              <div className="w-11 h-11 bg-white rounded-xl flex items-center justify-center text-xl">🏫</div>
-            </div>
-            <div className="grid grid-cols-4 gap-2 mb-4">
-              {[['26','Geldi','#e8f5ef'],['14','Aktivite','#e8f0ff'],['3','Mesaj','#fef9e8'],['2','Duyuru','#fce8f3']].map(([v,l,bg]) => (
-                <div key={l} className="rounded-xl p-3" style={{backgroundColor: bg}}>
-                  <div className="text-lg font-black text-[#0f1a14]">{v}</div>
-                  <div className="text-[10px] text-[#5a7265] mt-0.5">{l}</div>
+      <section className="px-5 py-10 md:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 rounded-[28px] border border-[rgba(74,222,128,0.16)] bg-[#0b120b] px-6 py-6 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-sm uppercase tracking-[0.18em] text-[#92f2b3]">Guvenilen okullar</div>
+            <div className="mt-2 text-white/64">Turkiye genelinde modern okul ekipleri tarafindan kullaniliyor.</div>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm font-medium text-white/72">
+            {schools.map((school) => (
+              <span key={school}>{school}</span>
+            ))}
+            <span className="rounded-full border border-[rgba(74,222,128,0.18)] bg-[rgba(74,222,128,0.08)] px-4 py-2 text-[#4ade80]">
+              ★ 4.9 / 5 okul memnuniyeti
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" className="px-5 py-24 md:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-12 max-w-3xl">
+            <div className="text-sm uppercase tracking-[0.18em] text-[#92f2b3]">Ozellikler</div>
+            <h2 className={`${instrumentSerif.className} mt-4 text-[clamp(40px,6vw,72px)] leading-[0.96] text-white`}>
+              Okulun tum akislarini
+              <br />
+              tek panelde birlestir.
+            </h2>
+          </div>
+          <div className="grid gap-5 md:grid-cols-2">
+            {features.map((feature) => (
+              <div
+                key={feature.title}
+                className={`rounded-[28px] border border-[rgba(74,222,128,0.14)] bg-[#0b120b] p-7 ${feature.span ?? ''}`}
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[rgba(74,222,128,0.16)] bg-[rgba(74,222,128,0.10)] text-xl text-[#4ade80]">
+                  {feature.icon}
                 </div>
-              ))}
-            </div>
-            {[['🍎','Ayşe Kaya','Öğle yemeği — hepsini yedi','12:30'],['😴','Ali Demir','Uyku — 90 dakika','13:15'],['⭐','Zeynep Çelik','Tebrik — Çok yardımsever!','14:00']].map(([emoji,name,desc,time]) => (
-              <div key={name} className="flex items-center gap-3 py-2.5 border-b border-[rgba(13,92,58,0.06)] last:border-0">
-                <div className="w-9 h-9 rounded-xl bg-[#e8f5ef] flex items-center justify-center text-base flex-shrink-0">{emoji}</div>
-                <div className="flex-1">
-                  <div className="text-xs font-bold text-[#0f1a14]">{name}</div>
-                  <div className="text-[10px] text-[#5a7265]">{desc}</div>
-                </div>
-                <div className="text-[10px] text-[#5a7265]">{time}</div>
+                <h3 className="mt-6 text-2xl font-bold text-white">{feature.title}</h3>
+                <p className="mt-3 max-w-xl text-base leading-7 text-white/62">{feature.body}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* FEATURES */}
-      <section id="ozellikler" className="py-24 px-[5%]">
-        <div className="text-xs font-bold text-[#0d5c3a] uppercase tracking-[1.5px] mb-4">Özellikler</div>
-        <div className="text-[clamp(32px,4vw,48px)] font-black text-[#0f1a14] leading-tight mb-4 tracking-tight">Her şey tek ekranda.</div>
-        <div className="text-lg text-[#5a7265] font-light max-w-[500px] leading-relaxed mb-14">
-          Artık farklı araçlar arasında gidip gelmek yok. Kinderly ile okulunuzun tüm operasyonunu tek noktadan yönetin.
+      <section id="roller" className="px-5 py-24 md:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-12 max-w-3xl">
+            <div className="text-sm uppercase tracking-[0.18em] text-[#92f2b3]">Kimler icin</div>
+            <h2 className={`${instrumentSerif.className} mt-4 text-[clamp(40px,6vw,68px)] leading-[0.98] text-white`}>
+              Her rol icin ayrilmis,
+              <br />
+              ortak bir deneyim.
+            </h2>
+          </div>
+          <div className="grid gap-5 md:grid-cols-3">
+            {personas.map((persona) => (
+              <div key={persona.title} className="rounded-[28px] border border-[rgba(74,222,128,0.14)] bg-[#0b120b] p-7">
+                <div className="text-sm uppercase tracking-[0.18em] text-[#92f2b3]">{persona.title}</div>
+                <p className="mt-5 text-lg leading-8 text-white/68">{persona.body}</p>
+                <Link
+                  href="/kayit"
+                  className="mt-8 inline-flex items-center rounded-full border border-[rgba(74,222,128,0.18)] px-5 py-3 text-sm font-bold text-white transition-colors hover:border-[#4ade80] hover:text-[#4ade80]"
+                >
+                  Ucretsiz basla
+                </Link>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      </section>
+
+      <section className="px-5 py-24 md:px-8">
+        <div className="mx-auto grid max-w-7xl gap-5 md:grid-cols-4">
           {[
-            ['✅','Yoklama','Saniyeler içinde yoklama alın. Geldi, gelmedi, izinli — tek dokunuşla. Veliler anında bildirim alır.','#e8f5ef'],
-            ['⚡','Aktivite Takibi','Yemek, uyku, tuvalet, sağlık — her aktiviteyi kaydedin. Veliler günün her anından haberdar olsun.','#e8f0ff'],
-            ['💬','Veli İletişimi','Öğretmen-veli mesajlaşması, toplu duyurular ve anlık bildirimler.','#fce8f3'],
-            ['📷','Fotoğraf Paylaşımı','Gün içindeki özel anları doğrudan velilerle paylaşın.','#fef9e8'],
-            ['💰','Aidat Yönetimi','Aidat takibi, ödeme geçmişi, gecikmiş ödemeler — hepsini tek panelden.','#e8f5ef'],
-            ['📊','Raporlar','Günlük, haftalık ve aylık raporlar. Okul performansını analiz edin.','#e8eeff'],
-          ].map(([icon,title,desc,bg]) => (
-            <div key={title} className="bg-white rounded-[20px] p-7 border border-[rgba(13,92,58,0.08)] hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(13,92,58,0.1)] transition-all duration-300 group">
-              <div className="w-12 h-12 rounded-[14px] flex items-center justify-center text-2xl mb-5" style={{backgroundColor: bg}}>{icon}</div>
-              <h3 className="text-lg font-bold text-[#0f1a14] mb-2.5">{title}</h3>
-              <p className="text-sm text-[#5a7265] leading-relaxed font-light">{desc}</p>
+            ['500+', 'aktif okul'],
+            ['50K+', 'ogrenci'],
+            ['98%', 'memnuniyet'],
+            ['20sa', 'haftalik tasarruf'],
+          ].map(([value, label]) => (
+            <div key={label} className="rounded-[28px] border border-[rgba(74,222,128,0.14)] bg-[#0b120b] p-7 text-center">
+              <div className={`${instrumentSerif.className} text-6xl leading-none text-[#4ade80]`}>{value}</div>
+              <div className="mt-4 text-sm uppercase tracking-[0.18em] text-white/52">{label}</div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* STATS */}
-      <section className="bg-[#0d5c3a] py-16">
-        <div className="grid grid-cols-2 md:grid-cols-4">
-          {[['500+','Aktif Okul'],['50K+','Öğrenci'],['98%','Memnuniyet'],['2M+','Aktivite']].map(([val,label],i) => (
-            <div key={label} className={`py-10 text-center ${i < 3 ? 'border-r border-white/15' : ''}`}>
-              <div className="text-4xl md:text-5xl font-black text-white mb-2">{val}</div>
-              <div className="text-sm text-white/60">{label}</div>
+      <RoiCalculator />
+
+      <section id="yorumlar" className="px-5 py-24 md:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-12 max-w-3xl">
+            <div className="text-sm uppercase tracking-[0.18em] text-[#92f2b3]">Yorumlar</div>
+            <h2 className={`${instrumentSerif.className} mt-4 text-[clamp(40px,6vw,68px)] leading-[0.98] text-white`}>
+              Ekibin hissettigi fark
+              <br />
+              raporlardan da buyuk.
+            </h2>
+          </div>
+          <div className="grid gap-5 md:grid-cols-3">
+            {testimonials.map((item) => (
+              <div key={item.author} className="rounded-[28px] border border-[rgba(74,222,128,0.14)] bg-[#0b120b] p-7">
+                <div className="text-[#4ade80]">★★★★★</div>
+                <p className={`${instrumentSerif.className} mt-5 text-3xl leading-[1.18] text-white`}>
+                  “{item.quote}”
+                </p>
+                <div className="mt-8 text-sm text-white/58">
+                  <div className="font-bold text-white">{item.author}</div>
+                  <div>{item.role}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="pricing" className="px-5 py-24 md:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-12 max-w-3xl">
+            <div className="text-sm uppercase tracking-[0.18em] text-[#92f2b3]">Fiyatlandirma</div>
+            <h2 className={`${instrumentSerif.className} mt-4 text-[clamp(40px,6vw,68px)] leading-[0.98] text-white`}>
+              Kucuk okuldan
+              <br />
+              kurumsal yapilara kadar.
+            </h2>
+          </div>
+          <div className="grid gap-5 md:grid-cols-3">
+            <div className="rounded-[28px] border border-[rgba(74,222,128,0.14)] bg-[#0b120b] p-8">
+              <div className="text-sm uppercase tracking-[0.18em] text-[#92f2b3]">Ucretsiz</div>
+              <div className={`${instrumentSerif.className} mt-5 text-6xl text-white`}>₺0</div>
+              <div className="mt-2 text-white/48">Temel baslangic paketi</div>
+              <ul className="mt-8 space-y-3 text-white/68">
+                <li>50 ogrenciye kadar</li>
+                <li>Yoklama takibi</li>
+                <li>Temel mesajlasma</li>
+                <li>Mobil erisim</li>
+              </ul>
+              <Link href="/kayit" className="mt-8 inline-flex rounded-full border border-[rgba(74,222,128,0.18)] px-5 py-3 text-sm font-bold text-white transition-colors hover:border-[#4ade80] hover:text-[#4ade80]">
+                Basla
+              </Link>
             </div>
-          ))}
-        </div>
-      </section>
 
-      {/* PRICING */}
-      <section id="fiyatlar" className="py-24 px-[5%]">
-        <div className="text-xs font-bold text-[#0d5c3a] uppercase tracking-[1.5px] mb-4">Fiyatlandırma</div>
-        <div className="text-[clamp(32px,4vw,48px)] font-black text-[#0f1a14] leading-tight mb-4 tracking-tight">Şeffaf fiyatlar.</div>
-        <div className="text-lg text-[#5a7265] font-light mb-14">Gizli ücret yok. İstediğiniz zaman iptal edin.</div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-5xl">
-          <div className="bg-white rounded-3xl p-8 border border-[rgba(13,92,58,0.08)]">
-            <div className="text-xs font-bold text-[#5a7265] uppercase tracking-widest mb-3">Başlangıç</div>
-            <div className="text-5xl font-black text-[#0f1a14] mb-1">Ücretsiz</div>
-            <div className="text-sm text-[#5a7265] mb-6">sonsuza kadar</div>
-            <ul className="space-y-3 mb-8">
-              {['50 öğrenciye kadar','Yoklama takibi','Temel mesajlaşma','Mobil uygulama'].map(f => (
-                <li key={f} className="flex items-center gap-2 text-sm text-[#1e2d25]">
-                  <span className="text-[#2ecc8a] font-bold">✓</span>{f}
-                </li>
-              ))}
-            </ul>
-            <Link href="/giris" className="block w-full py-3.5 rounded-xl text-sm font-bold text-center border-2 border-[rgba(13,92,58,0.15)] text-[#1e2d25] hover:border-[#0d5c3a] hover:text-[#0d5c3a] transition-colors">
-              Ücretsiz Başla
-            </Link>
-          </div>
+            <div className="rounded-[28px] border border-[#4ade80] bg-[linear-gradient(180deg,#101a10_0%,#0b120b_100%)] p-8 shadow-[0_24px_80px_rgba(74,222,128,0.10)]">
+              <div className="inline-flex rounded-full bg-[#4ade80] px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-[#060a06]">
+                En populer
+              </div>
+              <div className="mt-4 text-sm uppercase tracking-[0.18em] text-[#92f2b3]">Pro</div>
+              <div className={`${instrumentSerif.className} mt-5 text-6xl text-white`}>₺499</div>
+              <div className="mt-2 text-white/48">aylik tam paket</div>
+              <ul className="mt-8 space-y-3 text-white/68">
+                <li>Sinirsiz ogrenci</li>
+                <li>Fotograf ve duyuru akisi</li>
+                <li>Aidat yonetimi</li>
+                <li>Raporlar ve oncelikli destek</li>
+              </ul>
+              <Link href="/kayit" className="mt-8 inline-flex rounded-full bg-[#4ade80] px-5 py-3 text-sm font-bold text-[#060a06] transition-transform hover:-translate-y-0.5">
+                Hemen basla
+              </Link>
+            </div>
 
-          <div className="bg-[#0f1a14] rounded-3xl p-8 border border-[#0d5c3a] relative">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#2ecc8a] text-[#0f1a14] text-xs font-black px-4 py-1 rounded-full uppercase tracking-wide whitespace-nowrap">En Popüler</div>
-            <div className="text-xs font-bold text-white/50 uppercase tracking-widest mb-3">Pro</div>
-            <div className="text-5xl font-black text-white mb-1">₺499</div>
-            <div className="text-sm text-white/40 mb-6">/ ay · tüm özellikler</div>
-            <ul className="space-y-3 mb-8">
-              {['Sınırsız öğrenci','Tüm aktivite türleri','Fotoğraf paylaşımı','Aidat yönetimi','Raporlar ve analizler','Öncelikli destek'].map(f => (
-                <li key={f} className="flex items-center gap-2 text-sm text-white/70">
-                  <span className="text-[#2ecc8a] font-bold">✓</span>{f}
-                </li>
-              ))}
-            </ul>
-            <Link href="/giris" className="block w-full py-3.5 rounded-xl text-sm font-bold text-center bg-[#0d5c3a] text-white hover:bg-[#1a7a50] transition-colors">
-              Hemen Başla
-            </Link>
-          </div>
-
-          <div className="bg-white rounded-3xl p-8 border border-[rgba(13,92,58,0.08)]">
-            <div className="text-xs font-bold text-[#5a7265] uppercase tracking-widest mb-3">Kurumsal</div>
-            <div className="text-5xl font-black text-[#0f1a14] mb-1">Özel</div>
-            <div className="text-sm text-[#5a7265] mb-6">çok şubeli kurumlar</div>
-            <ul className="space-y-3 mb-8">
-              {['Çoklu şube yönetimi','Özel entegrasyonlar','SLA garantisi','Dedicated destek'].map(f => (
-                <li key={f} className="flex items-center gap-2 text-sm text-[#1e2d25]">
-                  <span className="text-[#2ecc8a] font-bold">✓</span>{f}
-                </li>
-              ))}
-            </ul>
-            <a href="mailto:info@kinderly.app" className="block w-full py-3.5 rounded-xl text-sm font-bold text-center border-2 border-[rgba(13,92,58,0.15)] text-[#1e2d25] hover:border-[#0d5c3a] hover:text-[#0d5c3a] transition-colors">
-              Teklif Al
-            </a>
+            <div className="rounded-[28px] border border-[rgba(74,222,128,0.14)] bg-[#0b120b] p-8">
+              <div className="text-sm uppercase tracking-[0.18em] text-[#92f2b3]">Kurumsal</div>
+              <div className={`${instrumentSerif.className} mt-5 text-6xl text-white`}>Ozel</div>
+              <div className="mt-2 text-white/48">Cok subeli yapilar icin</div>
+              <ul className="mt-8 space-y-3 text-white/68">
+                <li>Coklu sube yonetimi</li>
+                <li>Ozel onboarding</li>
+                <li>Raporlama ve entegrasyon</li>
+                <li>Dedicated destek</li>
+              </ul>
+              <Link href="/kayit" className="mt-8 inline-flex rounded-full border border-[rgba(74,222,128,0.18)] px-5 py-3 text-sm font-bold text-white transition-colors hover:border-[#4ade80] hover:text-[#4ade80]">
+                Teklif al
+              </Link>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-24 px-[5%] text-center">
-        <div className="max-w-xl mx-auto">
-          <h2 className="text-[clamp(36px,5vw,56px)] font-black text-[#0f1a14] leading-tight mb-5 tracking-tight">
-            Okulunuzu bugün dönüştürün.
+      <section className="px-5 py-24 md:px-8">
+        <div className="mx-auto max-w-7xl rounded-[36px] border border-[rgba(74,222,128,0.16)] bg-[#0b120b] px-8 py-16 text-center md:px-14">
+          <div className="text-sm uppercase tracking-[0.18em] text-[#92f2b3]">Son adim</div>
+          <h2 className={`${instrumentSerif.className} mt-5 text-[clamp(42px,6vw,74px)] leading-[0.96] text-white`}>
+            Okulun icin daha premium
+            <br />
+            bir isletim sistemi kur.
           </h2>
-          <p className="text-lg text-[#5a7265] mb-10 font-light">Kurulum 5 dakika. Kredi kartı gerekmez. İlk 30 gün ücretsiz.</p>
-          <Link href="/giris" className="inline-flex items-center gap-2 bg-[#0d5c3a] text-white px-10 py-4 rounded-[14px] text-base font-semibold hover:bg-[#1a7a50] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(13,92,58,0.25)]">
-            Ücretsiz Başla →
+          <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-white/64">
+            Kinderly ile ekibin zamani geri kazanir, velin daha hizli bilgilendirilir ve okulun daha duzenli buyur.
+          </p>
+          <Link
+            href="/kayit"
+            className="mt-10 inline-flex rounded-full bg-[#4ade80] px-8 py-4 text-sm font-bold text-[#060a06] transition-transform hover:-translate-y-0.5"
+          >
+            Ucretsiz Basla
           </Link>
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="px-[5%] py-12 border-t border-[rgba(13,92,58,0.12)] flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 bg-[#0d5c3a] rounded-lg flex items-center justify-center text-sm">🌱</div>
-          <span className="text-sm text-[#5a7265]">© 2026 Kinderly. Tüm hakları saklıdır.</span>
-        </div>
-        <div className="flex gap-6">
-          <a href="#" className="text-sm text-[#5a7265] hover:text-[#0d5c3a] transition-colors">Gizlilik</a>
-          <a href="#" className="text-sm text-[#5a7265] hover:text-[#0d5c3a] transition-colors">Kullanım Koşulları</a>
-          <a href="mailto:info@kinderly.app" className="text-sm text-[#5a7265] hover:text-[#0d5c3a] transition-colors">İletişim</a>
+      <footer className="border-t border-[rgba(74,222,128,0.12)] px-5 py-10 md:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-sm uppercase tracking-[0.18em] text-[#92f2b3]">Kinderly</div>
+            <div className="mt-2 text-white/52">© 2026 Kinderly. Tum haklari saklidir.</div>
+          </div>
+          <div className="flex flex-wrap gap-6 text-sm text-white/54">
+            <Link href="/kayit" className="transition-colors hover:text-[#4ade80]">Kayit Ol</Link>
+            <Link href="/giris" className="transition-colors hover:text-[#4ade80]">Panele Gir</Link>
+            <a href="mailto:info@kinderly.app" className="transition-colors hover:text-[#4ade80]">Iletisim</a>
+          </div>
         </div>
       </footer>
     </main>
