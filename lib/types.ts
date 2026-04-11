@@ -65,7 +65,7 @@ export interface Aktivite {
   ogrenci_id: number
   tarih: string
   tur: string
-  detay: Record<string, any>
+  detay: Record<string, unknown>
   kaydeden?: string
   veli_gosterilsin?: boolean
   olusturuldu?: string

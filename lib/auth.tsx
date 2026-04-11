@@ -66,55 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<Role>(null)
   const [okul, setOkul] = useState<OkulInfo | null>(null)
   const [personel, setPersonel] = useState<PersonelInfo | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    let active = true
-
-    if (!hasSupabaseEnv) {
-      setLoading(false)
-      return () => {
-        active = false
-      }
-    }
-
-    async function hydrateSession() {
-      const { data } = await supabase.auth.getSession()
-      if (!active) return
-
-      setSession(data.session)
-
-      if (data.session?.user) {
-        await fetchRole(data.session.user)
-      } else {
-        setLoading(false)
-      }
-    }
-
-    hydrateSession()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
-      if (!active) return
-
-      setSession(nextSession)
-
-      if (nextSession?.user) {
-        await fetchRole(nextSession.user)
-      } else {
-        setRole(null)
-        setOkul(null)
-        setPersonel(null)
-        setLoading(false)
-      }
-    })
-
-    return () => {
-      active = false
-      subscription.unsubscribe()
-    }
-  }, [])
+  const [loading, setLoading] = useState(hasSupabaseEnv)
 
   async function fetchRole(user: User) {
     setLoading(true)
@@ -210,6 +162,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    let active = true
+
+    if (!hasSupabaseEnv) {
+      return () => {
+        active = false
+      }
+    }
+
+    async function hydrateSession() {
+      const { data } = await supabase.auth.getSession()
+      if (!active) return
+
+      setSession(data.session)
+
+      if (data.session?.user) {
+        await fetchRole(data.session.user)
+      } else {
+        setLoading(false)
+      }
+    }
+
+    hydrateSession()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+      if (!active) return
+
+      setSession(nextSession)
+
+      if (nextSession?.user) {
+        await fetchRole(nextSession.user)
+      } else {
+        setRole(null)
+        setOkul(null)
+        setPersonel(null)
+        setLoading(false)
+      }
+    })
+
+    return () => {
+      active = false
+      subscription.unsubscribe()
+    }
+  }, [])
 
   return (
     <AuthContext.Provider

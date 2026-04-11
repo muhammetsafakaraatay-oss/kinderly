@@ -1,10 +1,11 @@
 'use client'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
-import { Ogrenci, Sinif } from '@/lib/types'
+import { Ogrenci } from '@/lib/types'
 
 export default function OgretmenPage({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter()
@@ -13,7 +14,6 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
   const [okul, setOkul] = useState<any>(null)
   const [ad, setAd] = useState('')
   const [sinifSec, setSinifSec] = useState('')
-  const [siniflar, setSiniflar] = useState<Sinif[]>([])
   const [ogrenciler, setOgrenciler] = useState<Ogrenci[]>([])
   const [yoklama, setYoklama] = useState<Record<number, string>>({})
   const [activePage, setActivePage] = useState('messages')
@@ -67,8 +67,6 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
 
     async function bootstrapTeacher() {
       setOkul(currentOkul)
-      await loadSiniflar(Number(currentOkul.id))
-
       const { data: personel } = await supabase
         .from('personel')
         .select('ad_soyad, sinif')
@@ -85,12 +83,8 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
     }
 
     bootstrapTeacher()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authOkul, loading, role, router, session, slug])
-
-  async function loadSiniflar(okulId: number) {
-    const { data: sinifData } = await supabase.from('siniflar').select('*').eq('okul_id', okulId).order('ad')
-    setSiniflar(sinifData || [])
-  }
 
   async function loadData(okulId: number, sinif: string) {
     const { data: ogr } = await supabase.from('ogrenciler').select('*').eq('okul_id', okulId).eq('aktif', true).order('ad_soyad')

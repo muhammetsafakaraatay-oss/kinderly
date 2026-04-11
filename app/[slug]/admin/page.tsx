@@ -1,10 +1,13 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
-import { Ogrenci, Sinif, Okul, Aidat, Aktivite, GunlukRapor, Gelisim, Servis } from '@/lib/types'
+import { Ogrenci, Sinif, Okul } from '@/lib/types'
 
 export default function AdminPage({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter()
@@ -16,6 +19,15 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   const [activePage, setActivePage] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [dark, setDark] = useState(false)
+
+  async function loadAll(okulId: number) {
+    const [{ data: ogr }, { data: sinif }] = await Promise.all([
+      supabase.from('ogrenciler').select('*').eq('okul_id', okulId).eq('aktif', true).order('ad_soyad'),
+      supabase.from('siniflar').select('*').eq('okul_id', okulId).order('ad'),
+    ])
+    if (ogr) setOgrenciler(ogr)
+    if (sinif) setSiniflar(sinif)
+  }
 
   useEffect(() => { params.then(p => setSlug(p.slug)) }, [params])
 
@@ -52,15 +64,6 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
     const next = !dark; setDark(next)
     localStorage.setItem('kinderly_dark', String(next))
     document.documentElement.classList.toggle('dark', next)
-  }
-
-  async function loadAll(okulId: number) {
-    const [{ data: ogr }, { data: sinif }] = await Promise.all([
-      supabase.from('ogrenciler').select('*').eq('okul_id', okulId).eq('aktif', true).order('ad_soyad'),
-      supabase.from('siniflar').select('*').eq('okul_id', okulId).order('ad')
-    ])
-    if (ogr) setOgrenciler(ogr)
-    if (sinif) setSiniflar(sinif)
   }
 
   if (loading || !session || !okul) {
@@ -178,16 +181,6 @@ function Modal({ open, onClose, title, children, dark }: any) {
   )
 }
 
-function Input({ label, value, onChange, type = 'text', placeholder = '', full = false, dark }: any) {
-  return (
-    <div className={full ? 'col-span-2' : ''}>
-      {label && <label className="block text-xs font-semibold text-gray-500 mb-1">{label}</label>}
-      <input type={type} value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500 ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
-    </div>
-  )
-}
-
 const AKT_TYPES = [
   { id: 'food', label: 'Yemek', emoji: '🍎', color: '#00b884' },
   { id: 'nap', label: 'Uyku', emoji: '😴', color: '#3d4eb8' },
@@ -202,7 +195,6 @@ const AKT_TYPES = [
 
 function today() { return new Date().toISOString().split('T')[0] }
 function fmtM(n: number) { return '₺' + (Number(n) || 0).toLocaleString('tr-TR') }
-function fmt(d: string) { if (!d) return '—'; return new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' }) }
 
 // ── DASHBOARD ──
 function Dashboard({ okul, ogrenciler, dark, setActivePage }: any) {
@@ -211,6 +203,7 @@ function Dashboard({ okul, ogrenciler, dark, setActivePage }: any) {
   const [debts, setDebts] = useState<any[]>([])
   const [activities, setActivities] = useState<any[]>([])
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (okul) loadDash() }, [okul])
 
   async function loadDash() {
@@ -593,6 +586,7 @@ function Yoklama({ ogrenciler, siniflar, okul, dark }: any) {
   const [sinifFilter, setSinifFilter] = useState('')
   const [state, setState] = useState<Record<number, string>>({})
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (okul) load() }, [tarih, okul])
 
   async function load() {
@@ -670,6 +664,7 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
   const [form, setForm] = useState<any>({})
   const [search, setSearch] = useState('')
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (selected && okul) loadFeed() }, [selected, tarih])
 
   async function loadFeed() {
@@ -807,6 +802,7 @@ function GunlukRaporPage({ ogrenciler, siniflar, okul, dark }: any) {
   const [sinifFilter, setSinifFilter] = useState('')
   const [raporlar, setRaporlar] = useState<Record<number, any>>({})
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (okul) load() }, [tarih, okul])
 
   async function load() {
@@ -904,6 +900,7 @@ function GelisimPage({ ogrenciler, okul, dark }: any) {
   const [puanlar, setPuanlar] = useState<Record<string, number>>({})
   const [genelNot, setGenelNot] = useState('')
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (selectedOgr && okul) load() }, [selectedOgr, donem])
 
   async function load() {
@@ -1002,6 +999,7 @@ function Fotograflar({ siniflar, okul, dark }: any) {
   const [uploading, setUploading] = useState(false)
   const [viewer, setViewer] = useState<string | null>(null)
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (okul) load() }, [okul])
 
   async function load() {
@@ -1027,7 +1025,7 @@ function Fotograflar({ siniflar, okul, dark }: any) {
     setUploading(false); setModal(false); load()
   }
 
-  async function deleteFoto(id: number, url: string) {
+  async function deleteFoto(id: number) {
     if (!confirm('Sil?')) return
     await supabase.from('fotograflar').delete().eq('id', id)
     load()
@@ -1037,7 +1035,9 @@ function Fotograflar({ siniflar, okul, dark }: any) {
     <div>
       {viewer && (
         <div className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center p-4" onClick={() => setViewer(null)}>
-          <img src={viewer} className="max-w-full max-h-[80vh] rounded-lg" />
+          {/* Fullscreen preview stays as img because it uses an arbitrary runtime URL and viewport-constrained sizing. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={viewer} alt="Buyuk fotograf onizleme" className="max-w-full max-h-[80vh] rounded-lg" />
           <button className="mt-4 bg-white/20 text-white px-6 py-2 rounded-lg font-semibold" onClick={() => setViewer(null)}>Kapat</button>
         </div>
       )}
@@ -1047,11 +1047,18 @@ function Fotograflar({ siniflar, okul, dark }: any) {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {fotos.map(f => (
           <div key={f.id} className="relative aspect-square rounded-xl overflow-hidden group cursor-pointer" onClick={() => setViewer(f.url)}>
-            <img src={f.url} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+            <Image
+              src={f.url}
+              alt={f.aciklama || 'Okul fotografi'}
+              fill
+              sizes="(max-width: 1024px) 50vw, 25vw"
+              className="object-cover transition-transform group-hover:scale-105"
+              unoptimized
+            />
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
               <p className="text-white text-xs">{f.aciklama || ''}</p>
             </div>
-            <button onClick={e => { e.stopPropagation(); deleteFoto(f.id, f.url) }}
+            <button onClick={e => { e.stopPropagation(); deleteFoto(f.id) }}
               className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">×</button>
           </div>
         ))}
@@ -1096,6 +1103,7 @@ function AidatPage({ ogrenciler, okul, dark }: any) {
   const [ay, setAy] = useState(today().slice(0, 7))
   const [data, setData] = useState<any[]>([])
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (okul) load() }, [ay, okul])
 
   async function load() {
@@ -1194,6 +1202,7 @@ function YemekListesi({ okul, dark }: any) {
 
   const [hafta, setHafta] = useState(getHaftaBasi())
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (okul) load() }, [hafta, okul])
 
   async function load() {
@@ -1289,6 +1298,7 @@ function Personel({ siniflar, okul, dark }: any) {
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState<any>({ rol: 'ogretmen' })
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (okul) load() }, [okul])
   async function load() { const { data: d } = await supabase.from('personel').select('*').eq('okul_id', okul.id).eq('aktif', true).order('ad_soyad'); setData(d || []) }
 
@@ -1370,6 +1380,7 @@ function ServisPage({ ogrenciler, siniflar, okul, dark }: any) {
   const [sinifFilter, setSinifFilter] = useState('')
   const [state, setState] = useState<Record<number, string>>({})
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (okul) load() }, [tarih, okul])
 
   async function load() {
@@ -1443,7 +1454,9 @@ function MesajlarPage({ ogrenciler, okul, dark }: any) {
   const [icerik, setIcerik] = useState('')
   const [thread, setThread] = useState<any[]>([])
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (okul) loadMesajlar() }, [okul])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (selected && okul) loadThread() }, [selected])
 
   async function loadMesajlar() {
@@ -1536,6 +1549,7 @@ function Duyurular({ okul, dark }: any) {
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState<any>({})
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (okul) load() }, [okul])
   async function load() { const { data: d } = await supabase.from('duyurular').select('*').eq('okul_id', okul.id).order('tarih', { ascending: false }); setData(d || []) }
 
@@ -1601,6 +1615,7 @@ function Etkinlikler({ siniflar, okul, dark }: any) {
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState<any>({})
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (okul) load() }, [okul])
   async function load() { const { data: d } = await supabase.from('etkinlikler').select('*').eq('okul_id', okul.id).order('tarih'); setData(d || []) }
 

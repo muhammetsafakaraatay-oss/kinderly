@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
-function formatCurrency(value: number) {
+function formatMoney(value: number) {
   return new Intl.NumberFormat('tr-TR', {
     style: 'currency',
     currency: 'TRY',
@@ -17,156 +17,205 @@ function formatNumber(value: number) {
   }).format(value)
 }
 
+type ConfettiPiece = {
+  id: number
+  left: string
+  delay: string
+  rotate: string
+  duration: string
+}
+
 export function RoiCalculator() {
-  const [studentCount, setStudentCount] = useState(85)
-  const [hourlyCost, setHourlyCost] = useState(325)
-  const [dailySavedHours, setDailySavedHours] = useState(2.5)
+  const [studentCount, setStudentCount] = useState(120)
+  const [hourlyCost, setHourlyCost] = useState(420)
+  const [savedHours, setSavedHours] = useState(2.8)
+  const [confetti, setConfetti] = useState<ConfettiPiece[]>([])
 
   const roi = useMemo(() => {
-    const scale = Math.max(studentCount / 75, 0.6)
-    const monthlyHoursSaved = dailySavedHours * 22 * scale
-    const yearlyHoursSaved = monthlyHoursSaved * 12
-    const yearlySavings = yearlyHoursSaved * hourlyCost
+    const teamFactor = Math.max(studentCount / 70, 0.8)
+    const monthlyHours = savedHours * 22 * teamFactor
+    const yearlyHours = monthlyHours * 12
+    const yearlyValue = yearlyHours * hourlyCost
+    const yearlySubscription = 1000 * 12
 
     return {
-      monthlyHoursSaved,
-      yearlyHoursSaved,
-      yearlySavings,
+      monthlyHours,
+      yearlyHours,
+      yearlyValue,
+      roiMultiplier: yearlySubscription > 0 ? yearlyValue / yearlySubscription : 0,
+      monthlyRecovered: monthlyHours * hourlyCost,
     }
-  }, [dailySavedHours, hourlyCost, studentCount])
+  }, [hourlyCost, savedHours, studentCount])
+
+  useEffect(() => {
+    if (!confetti.length) return
+    const timeout = window.setTimeout(() => setConfetti([]), 2200)
+    return () => window.clearTimeout(timeout)
+  }, [confetti])
+
+  function fireConfetti() {
+    const next = Array.from({ length: 18 }, (_, index) => ({
+      id: index + Date.now(),
+      left: `${8 + index * 5}%`,
+      delay: `${index * 0.04}s`,
+      rotate: `${-24 + index * 4}deg`,
+      duration: `${1.5 + (index % 5) * 0.14}s`,
+    }))
+    setConfetti(next)
+  }
 
   return (
     <section id="roi" className="px-[5%] py-24">
-      <div className="rounded-[36px] bg-[#0f1a14] overflow-hidden border border-[rgba(46,204,138,0.18)] shadow-[0_40px_120px_rgba(15,26,20,0.24)]">
-        <div className="grid lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="p-8 md:p-12 lg:p-14">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[rgba(46,204,138,0.12)] border border-[rgba(46,204,138,0.24)] px-4 py-1.5 mb-6">
-              <span className="h-2 w-2 rounded-full bg-[#2ecc8a]" />
-              <span className="text-xs font-bold uppercase tracking-[1.5px] text-[#9de7c2]">
-                ROI Hesaplayici
-              </span>
+      <style>{`
+        @keyframes roi-confetti {
+          0% {
+            transform: translate3d(0, -20px, 0) rotate(0deg);
+            opacity: 0;
+          }
+          12% {
+            opacity: 1;
+          }
+          100% {
+            transform: translate3d(0, 260px, 0) rotate(560deg);
+            opacity: 0;
+          }
+        }
+      `}</style>
+
+      <div className="mx-auto max-w-[1400px] rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-6 backdrop-blur-xl md:p-8 lg:p-10">
+        <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="relative overflow-hidden rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(74,222,128,0.1),rgba(74,222,128,0.03))] p-7">
+            <div className="mb-5 inline-flex items-center gap-3 rounded-full border border-[var(--border)] bg-[var(--green-dim)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--green)]">
+              <span className="h-2 w-2 rounded-full bg-[var(--green)]" />
+              ROI Hesaplayici
             </div>
-
-            <h2 className="text-[clamp(32px,4vw,54px)] font-black leading-[1.05] tracking-tight text-white mb-4">
-              Kinderly size
+            <h2 className="serif text-[clamp(2.4rem,4vw,4.3rem)] leading-[0.96] tracking-[-0.04em] text-white">
+              Kinderly ekibinize
               <br />
-              ne kadar zaman kazandirir?
+              ne kadar zaman ve
+              <br />
+              gelir geri kazandirir?
             </h2>
-
-            <p className="max-w-[540px] text-base md:text-lg leading-relaxed text-white/68 mb-10 font-light">
-              Ortalama bir anaokulunda yoklama, veli bilgilendirmesi, fotograf paylasimi ve gunluk kayitlar
-              icin harcanan zamani hesaplayin. Ciktiniz dogrudan okul yonetimi ve personel maliyeti uzerinden
-              hazirlandi.
+            <p className="mt-4 max-w-[620px] text-base leading-relaxed text-[var(--muted)] md:text-lg">
+              Ogrenci sayisi, ekip maliyeti ve gunluk kurtarilan sureye gore tahmini yillik geri donusu canli olarak gorun.
             </p>
 
-            <div className="space-y-6">
+            <div className="mt-10 space-y-7">
               <label className="block">
-                <div className="flex items-center justify-between gap-4 mb-2">
-                  <span className="text-sm font-semibold text-white/80">Ogrenci sayiniz</span>
-                  <span className="text-lg font-black text-[#9de7c2]">{studentCount}</span>
+                <div className="mb-3 flex items-center justify-between gap-4">
+                  <span className="text-sm font-medium text-white">Ogrenci sayisi</span>
+                  <span className="text-sm font-semibold text-[var(--green)]">{studentCount}</span>
                 </div>
                 <input
                   type="range"
-                  min="20"
-                  max="300"
+                  min="40"
+                  max="500"
                   step="5"
                   value={studentCount}
                   onChange={(event) => setStudentCount(Number(event.target.value))}
-                  className="w-full accent-[#2ecc8a]"
+                  className="w-full accent-[#4ade80]"
                 />
               </label>
 
               <label className="block">
-                <div className="flex items-center justify-between gap-4 mb-2">
-                  <span className="text-sm font-semibold text-white/80">Personel saatlik maliyeti</span>
-                  <span className="text-lg font-black text-[#9de7c2]">{formatCurrency(hourlyCost)}</span>
+                <div className="mb-3 flex items-center justify-between gap-4">
+                  <span className="text-sm font-medium text-white">Saatlik ekip maliyeti</span>
+                  <span className="text-sm font-semibold text-[var(--green)]">{formatMoney(hourlyCost)}</span>
                 </div>
                 <input
                   type="range"
-                  min="150"
-                  max="800"
-                  step="25"
+                  min="180"
+                  max="900"
+                  step="20"
                   value={hourlyCost}
                   onChange={(event) => setHourlyCost(Number(event.target.value))}
-                  className="w-full accent-[#2ecc8a]"
+                  className="w-full accent-[#4ade80]"
                 />
               </label>
 
               <label className="block">
-                <div className="flex items-center justify-between gap-4 mb-2">
-                  <span className="text-sm font-semibold text-white/80">Gunde kurtaracaginiz sure</span>
-                  <span className="text-lg font-black text-[#9de7c2]">{formatNumber(dailySavedHours)} saat</span>
+                <div className="mb-3 flex items-center justify-between gap-4">
+                  <span className="text-sm font-medium text-white">Gunluk kazanilan sure</span>
+                  <span className="text-sm font-semibold text-[var(--green)]">{formatNumber(savedHours)} saat</span>
                 </div>
                 <input
                   type="range"
                   min="0.5"
                   max="5"
-                  step="0.5"
-                  value={dailySavedHours}
-                  onChange={(event) => setDailySavedHours(Number(event.target.value))}
-                  className="w-full accent-[#2ecc8a]"
+                  step="0.1"
+                  value={savedHours}
+                  onChange={(event) => setSavedHours(Number(event.target.value))}
+                  className="w-full accent-[#4ade80]"
                 />
               </label>
             </div>
           </div>
 
-          <div className="bg-[linear-gradient(180deg,rgba(46,204,138,0.10)_0%,rgba(46,204,138,0.02)_100%)] p-8 md:p-12 lg:p-14 border-t lg:border-t-0 lg:border-l border-[rgba(46,204,138,0.16)]">
-            <div className="rounded-[28px] bg-white p-7 md:p-8 shadow-[0_30px_80px_rgba(0,0,0,0.18)]">
-              <div className="text-xs font-bold uppercase tracking-[1.5px] text-[#0d5c3a] mb-4">
-                Tahmini Kazanc
+          <div className="relative overflow-hidden rounded-[20px] border border-[var(--border)] bg-black/20 p-7">
+            {confetti.map((piece) => (
+              <span
+                key={piece.id}
+                className="pointer-events-none absolute top-0 h-3 w-2 rounded-full bg-[var(--green)]"
+                style={{
+                  left: piece.left,
+                  animation: `roi-confetti ${piece.duration} ease-out ${piece.delay} forwards`,
+                  transform: `rotate(${piece.rotate})`,
+                  boxShadow: '0 0 18px rgba(74,222,128,0.35)',
+                }}
+              />
+            ))}
+
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">Tahmini geri donus</div>
+                <div className="mt-2 serif text-5xl text-[var(--green)]">{formatMoney(roi.yearlyValue)}</div>
               </div>
-
-              <div className="grid gap-4 mb-8">
-                <div className="rounded-2xl bg-[#f4fbf7] p-5 border border-[rgba(13,92,58,0.08)]">
-                  <div className="text-sm text-[#5a7265] mb-1">Aylik tasarruf</div>
-                  <div className="text-3xl font-black text-[#0f1a14]">
-                    {formatNumber(roi.monthlyHoursSaved)} saat
-                  </div>
-                </div>
-
-                <div className="rounded-2xl bg-[#fff7ea] p-5 border border-[rgba(181,118,20,0.10)]">
-                  <div className="text-sm text-[#7b5a1a] mb-1">Yillik personel maliyeti kazanci</div>
-                  <div className="text-3xl font-black text-[#0f1a14]">
-                    {formatCurrency(roi.yearlySavings)}
-                  </div>
-                </div>
-              </div>
-
-              <p className="text-sm leading-relaxed text-[#5a7265] mb-6">
-                Bu hesap; yoklama, gunluk aktivite girisi, veli mesajlasmasi ve fotograf paylasimindaki manuel isi
-                azaltarak elde edilen zaman kazancina gore tahmini olarak hesaplanir.
-              </p>
-
-              <div className="space-y-3">
-                <Link
-                  href="/kayit"
-                  className="flex items-center justify-center rounded-2xl bg-[#0d5c3a] px-5 py-4 text-sm font-bold text-white transition-colors hover:bg-[#1a7a50]"
-                >
-                  Hesabimla denemeye basla
-                </Link>
-                <a
-                  href="mailto:info@kinderly.app?subject=Kinderly%20ROI%20Demo"
-                  className="flex items-center justify-center rounded-2xl border border-[rgba(13,92,58,0.14)] px-5 py-4 text-sm font-bold text-[#0f1a14] transition-colors hover:border-[#0d5c3a] hover:text-[#0d5c3a]"
-                >
-                  Sonucu ekibime goster
-                </a>
+              <div className="rounded-full border border-[var(--border)] bg-[var(--green-dim)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--green)]">
+                {formatNumber(roi.roiMultiplier)}x ROI
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 mt-6">
-              {[
-                ['22', 'is gunu / ay'],
-                ['3', 'ana is akisinda otomasyon'],
-                [formatNumber(roi.yearlyHoursSaved), 'yillik saat kazanci'],
-              ].map(([value, label]) => (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-5">
+                <div className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Aylik geri kazanilan sure</div>
+                <div className="mt-2 serif text-4xl text-white">{formatNumber(roi.monthlyHours)} saat</div>
+              </div>
+              <div className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-5">
+                <div className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Aylik parasal karsilik</div>
+                <div className="mt-2 serif text-4xl text-white">{formatMoney(roi.monthlyRecovered)}</div>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-5">
+              <div className="mb-4 flex items-center justify-between text-sm">
+                <span className="text-[var(--muted)]">Yillik saat tasarrufu</span>
+                <span className="font-semibold text-white">{formatNumber(roi.yearlyHours)} saat</span>
+              </div>
+              <div className="h-2 rounded-full bg-white/[0.06]">
                 <div
-                  key={label}
-                  className="rounded-2xl border border-[rgba(255,255,255,0.12)] bg-white/4 p-4 text-center"
-                >
-                  <div className="text-xl font-black text-white">{value}</div>
-                  <div className="text-[11px] uppercase tracking-[1.2px] text-white/52 mt-1">{label}</div>
-                </div>
-              ))}
+                  className="h-2 rounded-full bg-[var(--green)]"
+                  style={{ width: `${Math.min(roi.roiMultiplier * 22, 100)}%` }}
+                />
+              </div>
+              <p className="mt-4 text-sm leading-relaxed text-[var(--muted)]">
+                Bu model; yoklama, gunluk aktivite girisi, veli mesajlasmasi, duyuru ve aidat operasyonunda azalan manuel isi baz alir.
+              </p>
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={fireConfetti}
+                className="rounded-full bg-[var(--green)] px-6 py-4 text-sm font-bold text-[#060a06] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(74,222,128,0.22)]"
+              >
+                Kazanci kutla
+              </button>
+              <Link
+                href="/kayit"
+                className="rounded-full border border-[var(--border)] px-6 py-4 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-white/5"
+              >
+                Bu planla basla
+              </Link>
             </div>
           </div>
         </div>

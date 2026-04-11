@@ -34,21 +34,18 @@ export async function POST(request: Request) {
       )
     }
 
+    const contentType = request.headers.get('content-type') ?? ''
+
+    if (!contentType.includes('application/json')) {
+      return NextResponse.json({ error: 'Gecersiz istek formati.' }, { status: 415 })
+    }
+
     const body = (await request.json()) as SignupBody
     const okulAdi = body.okulAdi?.trim() ?? ''
     const adSoyad = body.adSoyad?.trim() ?? ''
-    const rawEmail = typeof body.email === 'string' ? body.email : ''
     const email = normalizeEmail(body.email)
     const sifre = body.sifre?.trim() ?? ''
     const normalizedSlug = slugifySchoolName(body.slug ?? '')
-
-    console.log('Request body:', {
-      okulAd: okulAdi,
-      slug: normalizedSlug,
-      adSoyad,
-      email,
-      rawEmail,
-    })
 
     if (!okulAdi || !adSoyad || !email || !sifre || !normalizedSlug) {
       return NextResponse.json({ error: 'Tum alanlar zorunludur.' }, { status: 400 })
@@ -93,11 +90,9 @@ export async function POST(request: Request) {
     })
 
     if (authError || !userData.user) {
-      console.log('Supabase error:', authError)
       return NextResponse.json(
         {
           error: authError?.message ?? 'Admin kullanicisi olusturulamadi.',
-          details: authError,
         },
         { status: 400 }
       )

@@ -1,6 +1,8 @@
 'use client'
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
@@ -40,6 +42,23 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
     photo: { label: 'Fotoğraf', emoji: '📷', color: '#6979f8' },
     absence: { label: 'Devamsızlık', emoji: '📅', color: '#9e9e9e' },
     rapor: { label: 'Günlük Rapor', emoji: '📋', color: '#667eea' },
+  }
+
+  async function loadFeed() {
+    if (!selectedOgr || !okul) return
+    const from = new Date()
+    from.setDate(from.getDate() - parseInt(feedFilter))
+    const fromStr = from.toISOString().split('T')[0]
+    let q = supabase
+      .from('aktiviteler')
+      .select('*')
+      .eq('okul_id', okul.id)
+      .eq('ogrenci_id', selectedOgr.id)
+      .gte('tarih', fromStr)
+      .order('id', { ascending: false })
+    if (typeFilter) q = q.eq('tur', typeFilter)
+    const { data } = await q
+    setFeed(data || [])
   }
 
   useEffect(() => { params.then(p => setSlug(p.slug)) }, [params])
@@ -114,17 +133,8 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
 
   useEffect(() => {
     if (selectedOgr && okul) loadFeed()
-  }, [selectedOgr, feedFilter, typeFilter])
-
-  async function loadFeed() {
-    if (!selectedOgr || !okul) return
-    const from = new Date(); from.setDate(from.getDate() - parseInt(feedFilter))
-    const fromStr = from.toISOString().split('T')[0]
-    let q = supabase.from('aktiviteler').select('*').eq('okul_id', okul.id).eq('ogrenci_id', selectedOgr.id).gte('tarih', fromStr).order('id', { ascending: false })
-    if (typeFilter) q = q.eq('tur', typeFilter)
-    const { data } = await q
-    setFeed(data || [])
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedFilter, okul, selectedOgr, typeFilter])
 
   async function loadAidat() {
     if (!okul) return
@@ -411,7 +421,15 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
           <div className="grid grid-cols-3 gap-2">
             {fotograflar.map(f => (
               <div key={f.id} className="aspect-square rounded-xl overflow-hidden">
-                <img src={f.url} className="w-full h-full object-cover" />
+                <Image
+                  src={f.url}
+                  alt={f.baslik || 'Ogrenci fotografi'}
+                  width={300}
+                  height={300}
+                  sizes="33vw"
+                  className="w-full h-full object-cover"
+                  unoptimized
+                />
               </div>
             ))}
             {!fotograflar.length && <div className="col-span-3 text-center py-16 text-gray-400">📷 Fotoğraf yok</div>}
