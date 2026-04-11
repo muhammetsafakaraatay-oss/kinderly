@@ -63,8 +63,10 @@ export default function KayitPage() {
       return
     }
 
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
     const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
+      email: result.email ?? email.trim().toLowerCase(),
       password: sifre.trim(),
     })
 
