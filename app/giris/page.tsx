@@ -18,7 +18,7 @@ const trustStats = [
 ] as const
 
 const supportPoints = [
-  'Yoneticiler, ogretmenler ve veliler tek hesap altyapisinda bulusur.',
+  'Yöneticiler, öğretmenler ve veliler tek hesap altyapısında buluşur.',
   'Bildirim, aidat ve gunluk akislara ayni oturumdan erisirsiniz.',
   'Yeni premium onboarding ile acilan okul paneli burada devam eder.',
 ] as const
@@ -37,15 +37,15 @@ export default function GirisPage() {
   const redirectPath = rolePath(role)
   const roleResolutionError =
     !authLoading && session && !redirectPath
-      ? 'Giris tamamlandi fakat bu hesap icin panel rolu bulunamadi. Lutfen destek ile iletisime gecin.'
+      ? 'Giriş tamamlandı fakat bu hesap için panel rolü bulunamadı. Lütfen destek ile iletişime geçin.'
       : ''
 
   const buttonLabel =
     submitting
-      ? 'Giris yapiliyor...'
+      ? 'Giriş yapılıyor...'
       : authLoading && session
         ? 'Panel hazirlaniyor...'
-        : 'Panele giris yap'
+        : 'Panele giriş yap'
 
   useEffect(() => {
     if (authLoading) return
@@ -64,7 +64,7 @@ export default function GirisPage() {
     const normalizedPassword = password.trim()
 
     if (!normalizedEmail || !normalizedPassword) {
-      setError('Email ve sifre zorunlu.')
+      setError('Email ve şifre zorunlu.')
       return
     }
 
@@ -79,7 +79,7 @@ export default function GirisPage() {
     if (signInError) {
       setError(
         signInError.message === 'Invalid login credentials'
-          ? 'Email veya sifre hatali.'
+          ? 'Email veya şifre hatalı.'
           : signInError.message
       )
     }
@@ -141,11 +141,11 @@ export default function GirisPage() {
         <div className="grid flex-1 items-center gap-10 py-10 lg:grid-cols-[1.05fr_0.95fr] lg:py-16">
           <section className="max-w-[640px]">
             <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--green-dim)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--green-strong)]">
-              Tek giris, tum okul akisi
+              Tek giriş, tüm okul akışı
             </div>
 
             <h1 className="serif mt-6 text-[clamp(3.1rem,6.8vw,6.4rem)] leading-[0.92] tracking-[-0.06em] text-white">
-              Ekip, veli ve yonetim
+              Ekip, veli ve yönetim
               <br />
               ayni premium sistemde
               <br />
@@ -153,8 +153,8 @@ export default function GirisPage() {
             </h1>
 
             <p className="mt-6 max-w-[560px] text-lg leading-8 text-[var(--muted)]">
-              Yeni landing ve onboarding deneyiminin devaminda, oturum acan her kullanici kendi rolu icin hazirlanan panele
-              otomatik yonlenir. Daha az karmasa, daha hizli operasyon, daha sakin bir okul gunu.
+              Yeni landing ve onboarding deneyiminin devamında, oturum açan her kullanıcı kendi rolü için hazırlanan panele
+              otomatik yönlenir. Daha az karmaşa, daha hızlı operasyon, daha sakin bir okul günü.
             </p>
 
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
@@ -171,7 +171,7 @@ export default function GirisPage() {
                 <span className="rounded-full border border-[var(--border)] bg-[#0b140c] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--green-strong)]">
                   Login flow
                 </span>
-                <span className="text-sm text-[var(--muted)]">Yonetici, ogretmen ve veli rollerini ayni oturum altyapisinda cozer.</span>
+                <span className="text-sm text-[var(--muted)]">Yönetici, öğretmen ve veli rollerini aynı oturum altyapısında çözer.</span>
               </div>
 
               <div className="mt-5 space-y-4">
@@ -193,8 +193,8 @@ export default function GirisPage() {
             <div className="relative rounded-[32px] border border-[var(--border)] bg-[rgba(11,18,11,0.88)] p-6 shadow-[0_30px_100px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-8">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--green-strong)]">Panel girisi</div>
-                  <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">Hesabinizla devam edin</h2>
+                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--green-strong)]">Panel girişi</div>
+                  <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">Hesabınızla devam edin</h2>
                 </div>
                 <div className="rounded-full border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-xs text-[var(--muted)]">
                   Mobil ile ayni hesap
@@ -202,7 +202,7 @@ export default function GirisPage() {
               </div>
 
               <p className="mt-3 max-w-[460px] text-sm leading-7 text-[var(--muted)]">
-                Oturum actiginiz anda hesabinizin rolunu algilar, sizi okul slug&apos;iniz altindaki dogru panele yonlendiririz.
+                Oturum açtığınız anda hesabınızın rolünü algılar, sizi okul slug&apos;iniz altındaki doğru panele yönlendiririz.
               </p>
 
               {!hasSupabaseEnv && (
@@ -227,13 +227,13 @@ export default function GirisPage() {
 
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Sifre</label>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Şifre</label>
                     <button
                       type="button"
                       onClick={() => setShowPassword((value) => !value)}
                       className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)] transition-colors hover:text-white"
                     >
-                      {showPassword ? 'Gizle' : 'Goster'}
+                      {showPassword ? 'Gizle' : 'Göster'}
                     </button>
                   </div>
                   <input
@@ -263,15 +263,15 @@ export default function GirisPage() {
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-[20px] border border-[var(--border)] bg-white/[0.02] p-4">
                   <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--green-strong)]">Yeni okul</div>
-                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">3 adimli premium onboarding ile dakikalar icinde kuruluma baslayin.</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">3 adımlı premium onboarding ile dakikalar içinde kuruluma başlayın.</p>
                   <Link href="/kayit" className="mt-4 inline-flex text-sm font-semibold text-white transition-colors hover:text-[var(--green-strong)]">
-                    Kayit sayfasina git
+                    Kayıt sayfasına git
                   </Link>
                 </div>
 
                 <div className="rounded-[20px] border border-[var(--border)] bg-white/[0.02] p-4">
                   <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--green-strong)]">Destek</div>
-                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Kurulum, erisim veya davet sorunlarinda ekip hizlica yardimci olur.</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Kurulum, erişim veya davet sorunlarında ekip hızlıca yardımcı olur.</p>
                   <a
                     href="mailto:info@kinderly.app"
                     className="mt-4 inline-flex text-sm font-semibold text-white transition-colors hover:text-[var(--green-strong)]"

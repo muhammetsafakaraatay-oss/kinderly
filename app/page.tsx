@@ -20,29 +20,29 @@ type DropdownKey = 'features' | 'audiences' | 'resources' | null
 const featureMenu: MenuItem[] = [
   { icon: '✓', title: 'Yoklama & Devam Takibi', description: 'Saniyeler icinde sinif bazli devam kontrolu alin.', href: '#ozellikler' },
   { icon: '⚡', title: 'Aktivite Kayitlari', description: 'Yemek, uyku, ilac ve gunluk notlari tek akisla yonetin.', href: '#ozellikler' },
-  { icon: '💬', title: 'Veli Iletisimi', description: 'Mesaj, duyuru ve push bildirimlerini tek merkezde toplayin.', href: '#ozellikler' },
-  { icon: '📷', title: 'Fotograf Paylasimi', description: 'Guvenli galeriyle ozel anlari ailelerle aninda paylasin.', href: '#ozellikler' },
+  { icon: '💬', title: 'Veli İletişimi', description: 'Mesaj, duyuru ve push bildirimlerini tek merkezde toplayin.', href: '#ozellikler' },
+  { icon: '📷', title: 'Fotoğraf Paylaşımı', description: 'Guvenli galeriyle ozel anlari ailelerle aninda paylasin.', href: '#ozellikler' },
   { icon: '₺', title: 'Aidat Yonetimi', description: 'Tahsilat, hatirlatma ve gecikme takibini otomatiklestirin.', href: '#fiyatlar' },
   { icon: '◌', title: 'Raporlar & Analizler', description: 'Devam, gelir ve operasyon verilerini canli dashboard ile izleyin.', href: '#metrikler' },
 ]
 
 const audienceMenu: MenuItem[] = [
-  { icon: '👑', title: 'Anaokulu Yoneticileri', description: 'Tum operasyonu tek ekranda toplayan ust duzey kontrol merkezi.', href: '#roller' },
-  { icon: '👩‍🏫', title: 'Ogretmenler & Personel', description: 'Gunluk rutinleri hizlandiran mobil is akislarina erisin.', href: '#roller' },
-  { icon: '👨‍👩‍👧', title: 'Veliler & Aileler', description: 'Cocugunuzun gununu canli feed ve bildirimlerle takip edin.', href: '#roller' },
+  { icon: '👑', title: 'Anaokulu Yöneticileri', description: 'Tum operasyonu tek ekranda toplayan ust duzey kontrol merkezi.', href: '#roller' },
+  { icon: '👩‍🏫', title: 'Öğretmenler & Personel', description: 'Gunluk rutinleri hizlandiran mobil is akislarina erisin.', href: '#roller' },
+  { icon: '👨‍👩‍👧', title: 'Veliler & Aileler', description: 'Çocugunuzun gununu canli feed ve bildirimlerle takip edin.', href: '#roller' },
   { icon: '🏢', title: 'Zincir & Cok Subeli', description: 'Birden fazla kampusu ortak standartlarla yonetin.', href: '#fiyatlar' },
 ]
 
 const resourceMenu: MenuItem[] = [
-  { icon: '⌘', title: 'Yardim Merkezi', description: 'Kurulum, destek ve sik sorulan sorular icin kaynak merkezi.', href: '#cta' },
+  { icon: '⌘', title: 'Yardım Merkezi', description: 'Kurulum, destek ve sik sorulan sorular icin kaynak merkezi.', href: '#cta' },
   { icon: '✦', title: 'Blog', description: 'Anaokulu operasyonu ve dijital donusum icin editor secimi icerikler.', href: '#cta' },
-  { icon: '♥', title: 'Basari Hikayeleri', description: 'Kinderly ile buyuyen okullarin gercek sonuclari.', href: '#yorumlar' },
+  { icon: '♥', title: 'Başarı Hikayeleri', description: 'Kinderly ile buyuyen okullarin gercek sonuclari.', href: '#yorumlar' },
   { icon: '▶', title: 'Webinarlar', description: 'Canli urun turlari ve sektor uzmanlariyla online oturumlar.', href: '#cta' },
 ]
 
 const stats = [
   ['512+', 'aktif okul'],
-  ['48.000+', 'ogrenci profili'],
+  ['48.000+', 'öğrenci profili'],
   ['%98', 'yenileme orani'],
   ['23 saat', 'aylik zaman kazanci'],
 ]
@@ -61,18 +61,18 @@ const features = [
     icon: '⚡',
     title: 'Aktivite Akisi',
     description: 'Yemek, uyku, ilac ve gunluk notlari bir feed mantigiyla kaydedin.',
-    tag: 'Ogretmen deneyimi',
+    tag: 'Öğretmen deneyimi',
   },
   {
     icon: '💬',
-    title: 'Veli Iletisimi',
+    title: 'Veli İletişimi',
     description: 'Mesaj, duyuru ve toplu bilgilendirme modulleriyle WhatsApp daginikligini bitirin.',
-    tag: 'Iletisim',
+    tag: 'İletişim',
   },
   {
     icon: '📷',
     title: 'Premium Galeri',
-    description: 'Her sinif icin filtrelenebilir, guvenli ve zarif bir fotograf deneyimi sunun.',
+    description: 'Her sinif icin filtrelenebilir, guvenli ve zarif bir fotoğraf deneyimi sunun.',
     tag: 'Deneyim',
   },
   {
@@ -87,27 +87,27 @@ const features = [
 const roleCards = [
   {
     icon: '👑',
-    title: 'Yoneticiler',
+    title: 'Yöneticiler',
     description: 'Satis, finans, devamsizlik ve ekip gorunurlugunu tek ekrandan alin.',
     bullets: ['Canli kampus genel gorunumu', 'Tahsilat ve raporlama', 'Personel ve sinif yonetimi'],
   },
   {
     icon: '👩‍🏫',
-    title: 'Ogretmenler',
+    title: 'Öğretmenler',
     description: 'Gun boyunca hizli veri girisi, daha az tekrar ve daha fazla odak.',
     bullets: ['Tek dokunusla aktivite kaydi', 'Gunluk rapor akisi', 'Aile ile kontrollu mesajlasma'],
   },
   {
     icon: '👨‍👩‍👧',
     title: 'Veliler',
-    description: 'Cocugunuzun gununu sakin, guvenli ve premium bir uygulama deneyimiyle izleyin.',
-    bullets: ['Canli feed ve bildirimler', 'Aidat ve duyuru ekranlari', 'Fotograf ve mesajlasma'],
+    description: 'Çocugunuzun gununu sakin, guvenli ve premium bir uygulama deneyimiyle izleyin.',
+    bullets: ['Canli feed ve bildirimler', 'Aidat ve duyuru ekranlari', 'Fotoğraf ve mesajlaşma'],
   },
 ]
 
 const timeline = [
   { step: '01', title: 'Okulu kur', description: 'Dakikalar icinde kurumunu ac, siniflari ve planini tanimla.' },
-  { step: '02', title: 'Ekip davet et', description: 'Ogretmenleri, personeli ve aileleri rolleriyle sisteme al.' },
+  { step: '02', title: 'Ekip davet et', description: 'Öğretmenleri, personeli ve aileleri rolleriyle sisteme al.' },
   { step: '03', title: 'Basla', description: 'Yoklama, mesaj, aidat ve raporlari ayni gun kullanmaya basla.' },
 ]
 
@@ -120,7 +120,7 @@ const testimonials = [
   {
     quote: 'Velilerden gelen geri bildirim tek kelimeyle premium. Uygulama okul markamizin bir parcasi gibi hissettiriyor.',
     name: 'Fatma K.',
-    role: 'Ogretmen, Papatya Koleji',
+    role: 'Öğretmen, Papatya Koleji',
   },
   {
     quote: 'Tahsilat ve duyuru tarafinda kaybettigimiz gunleri geri aldik. Yonetim paneli gercekten gelir yaratan bir arac oldu.',
@@ -132,7 +132,7 @@ const testimonials = [
 const pricing = [
   {
     name: 'Starter',
-    price: 'Ucretsiz',
+    price: 'Ücretsiz',
     detail: 'ilk kampusunu acan okullar',
     featured: false,
     items: ['50 ogrenciye kadar', 'Temel yoklama ve mesajlasma', 'Mobil veli deneyimi', 'Standart destek'],
@@ -321,7 +321,7 @@ export default function Home() {
 
           <div className="hidden items-center gap-8 lg:flex">
             <MegaMenu
-              title="Ozellikler"
+              title="Özellikler"
               items={featureMenu}
               active={activeDropdown === 'features'}
               onEnter={() => setActiveDropdown('features')}
@@ -351,13 +351,13 @@ export default function Home() {
               href="/giris"
               className="rounded-full border border-[var(--border)] px-5 py-3 text-sm font-medium text-white transition-all hover:-translate-y-0.5 hover:bg-white/5"
             >
-              Giris Yap
+              Giriş Yap
             </Link>
             <Link
               href="/kayit"
               className="rounded-full bg-[var(--green)] px-5 py-3 text-sm font-bold text-[#060a06] transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_40px_rgba(74,222,128,0.22)]"
             >
-              Ucretsiz Basla
+              Ücretsiz Başla
             </Link>
           </div>
 
@@ -377,7 +377,7 @@ export default function Home() {
         >
           <div className="space-y-6 px-[5%] py-6">
             {[
-              { label: 'Ozellikler', items: featureMenu },
+              { label: 'Özellikler', items: featureMenu },
               { label: 'Kim Icin', items: audienceMenu },
               { label: 'Kaynaklar', items: resourceMenu },
             ].map((section) => (
@@ -395,10 +395,10 @@ export default function Home() {
             ))}
             <div className="flex gap-3">
               <Link href="/giris" className="flex-1 rounded-full border border-[var(--border)] px-5 py-3 text-center text-sm font-medium text-white">
-                Giris Yap
+                Giriş Yap
               </Link>
               <Link href="/kayit" className="flex-1 rounded-full bg-[var(--green)] px-5 py-3 text-center text-sm font-bold text-[#060a06]">
-                Ucretsiz Basla
+                Ücretsiz Başla
               </Link>
             </div>
           </div>
@@ -430,14 +430,14 @@ export default function Home() {
                 href="/kayit"
                 className="group rounded-full bg-[var(--green)] px-7 py-4 text-sm font-bold text-[#060a06] transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_50px_rgba(74,222,128,0.2)]"
               >
-                Ucretsiz Basla
+                Ücretsiz Başla
                 <span className="ml-2 transition-transform group-hover:translate-x-1">→</span>
               </Link>
               <Link
                 href="/giris"
                 className="rounded-full border border-[var(--border)] px-7 py-4 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-white/5"
               >
-                Panele Giris Yap
+                Panele Giriş Yap
               </Link>
             </div>
             <div className="mt-14 grid gap-6 border-t border-[var(--border)] pt-8 sm:grid-cols-4">
@@ -472,7 +472,7 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    {['Dashboard', 'Ogrenciler', 'Mesajlar', 'Aidatlar', 'Fotograflar'].map((item, index) => (
+                    {['Dashboard', 'Öğrenciler', 'Mesajlar', 'Aidatlar', 'Fotoğraflar'].map((item, index) => (
                       <div
                         key={item}
                         className={`rounded-2xl border px-3 py-3 text-sm transition-all ${
@@ -583,11 +583,11 @@ export default function Home() {
       <section id="ozellikler" className="px-[5%] py-24">
         <div className="mx-auto max-w-[1400px]">
           <Reveal>
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--green)]">Ozellikler</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--green)]">Özellikler</div>
             <h2 className="serif mt-5 max-w-[760px] text-[clamp(2.8rem,5vw,4.8rem)] leading-[0.95] tracking-[-0.04em] text-white">
-              Operasyon gucunu
+              Operasyon gücünü
               <br />
-              premium bir urun deneyimine cevirin.
+              premium bir ürün deneyimine çevirin.
             </h2>
             <p className="mt-5 max-w-[660px] text-lg leading-relaxed text-[var(--muted)]">
               Her modulu, kurumunuza daha fazla sakinlik, gorunurluk ve profesyonellik vermek icin tasarladik.
@@ -801,7 +801,7 @@ export default function Home() {
                 href="/kayit"
                 className="rounded-full bg-[var(--green)] px-7 py-4 text-sm font-bold text-[#060a06] transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_40px_rgba(74,222,128,0.2)]"
               >
-                Ucretsiz Basla
+                Ücretsiz Başla
               </Link>
               <a
                 href="mailto:info@kinderly.app"
@@ -826,10 +826,10 @@ export default function Home() {
             </div>
           </div>
           <div className="flex flex-wrap gap-6 text-sm text-[var(--muted)]">
-            <a href="#ozellikler" className="transition-colors hover:text-white">Ozellikler</a>
+            <a href="#ozellikler" className="transition-colors hover:text-white">Özellikler</a>
             <a href="#roller" className="transition-colors hover:text-white">Roller</a>
             <a href="#fiyatlar" className="transition-colors hover:text-white">Fiyatlar</a>
-            <a href="mailto:info@kinderly.app" className="transition-colors hover:text-white">Iletisim</a>
+            <a href="mailto:info@kinderly.app" className="transition-colors hover:text-white">İletişim</a>
           </div>
         </div>
       </footer>

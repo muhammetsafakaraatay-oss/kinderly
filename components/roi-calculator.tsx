@@ -87,7 +87,7 @@ export function RoiCalculator() {
           <div className="relative overflow-hidden rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(74,222,128,0.1),rgba(74,222,128,0.03))] p-7">
             <div className="mb-5 inline-flex items-center gap-3 rounded-full border border-[var(--border)] bg-[var(--green-dim)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--green)]">
               <span className="h-2 w-2 rounded-full bg-[var(--green)]" />
-              ROI Hesaplayici
+              ROI Hesaplayıcı
             </div>
             <h2 className="serif text-[clamp(2.4rem,4vw,4.3rem)] leading-[0.96] tracking-[-0.04em] text-white">
               Kinderly ekibinize
@@ -97,13 +97,13 @@ export function RoiCalculator() {
               gelir geri kazandirir?
             </h2>
             <p className="mt-4 max-w-[620px] text-base leading-relaxed text-[var(--muted)] md:text-lg">
-              Ogrenci sayisi, ekip maliyeti ve gunluk kurtarilan sureye gore tahmini yillik geri donusu canli olarak gorun.
+              Öğrenci sayısı, ekip maliyeti ve günlük kurtarılan süreye göre tahmini yıllık geri dönüşü canlı olarak görün.
             </p>
 
             <div className="mt-10 space-y-7">
               <label className="block">
                 <div className="mb-3 flex items-center justify-between gap-4">
-                  <span className="text-sm font-medium text-white">Ogrenci sayisi</span>
+                  <span className="text-sm font-medium text-white">Öğrenci sayısı</span>
                   <span className="text-sm font-semibold text-[var(--green)]">{studentCount}</span>
                 </div>
                 <input
@@ -135,7 +135,7 @@ export function RoiCalculator() {
 
               <label className="block">
                 <div className="mb-3 flex items-center justify-between gap-4">
-                  <span className="text-sm font-medium text-white">Gunluk kazanilan sure</span>
+                  <span className="text-sm font-medium text-white">Günlük kazanılan süre</span>
                   <span className="text-sm font-semibold text-[var(--green)]">{formatNumber(savedHours)} saat</span>
                 </div>
                 <input
@@ -167,7 +167,7 @@ export function RoiCalculator() {
 
             <div className="mb-6 flex items-center justify-between">
               <div>
-                <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">Tahmini geri donus</div>
+                <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">Tahmini geri dönüş</div>
                 <div className="mt-2 serif text-5xl text-[var(--green)]">{formatMoney(roi.yearlyValue)}</div>
               </div>
               <div className="rounded-full border border-[var(--border)] bg-[var(--green-dim)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--green)]">
@@ -177,18 +177,18 @@ export function RoiCalculator() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-5">
-                <div className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Aylik geri kazanilan sure</div>
+                <div className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Aylık geri kazanılan süre</div>
                 <div className="mt-2 serif text-4xl text-white">{formatNumber(roi.monthlyHours)} saat</div>
               </div>
               <div className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-5">
-                <div className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Aylik parasal karsilik</div>
+                <div className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Aylık parasal karşılık</div>
                 <div className="mt-2 serif text-4xl text-white">{formatMoney(roi.monthlyRecovered)}</div>
               </div>
             </div>
 
             <div className="mt-5 rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-5">
               <div className="mb-4 flex items-center justify-between text-sm">
-                <span className="text-[var(--muted)]">Yillik saat tasarrufu</span>
+                <span className="text-[var(--muted)]">Yıllık saat tasarrufu</span>
                 <span className="font-semibold text-white">{formatNumber(roi.yearlyHours)} saat</span>
               </div>
               <div className="h-2 rounded-full bg-white/[0.06]">
@@ -198,7 +198,7 @@ export function RoiCalculator() {
                 />
               </div>
               <p className="mt-4 text-sm leading-relaxed text-[var(--muted)]">
-                Bu model; yoklama, gunluk aktivite girisi, veli mesajlasmasi, duyuru ve aidat operasyonunda azalan manuel isi baz alir.
+                Bu model; yoklama, günlük aktivite girişi, veli mesajlaşması, duyuru ve aidat operasyonunda azalan manuel işi baz alır.
               </p>
             </div>
 
@@ -208,13 +208,13 @@ export function RoiCalculator() {
                 onClick={fireConfetti}
                 className="rounded-full bg-[var(--green)] px-6 py-4 text-sm font-bold text-[#060a06] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(74,222,128,0.22)]"
               >
-                Kazanci kutla
+                Kazancı kutla
               </button>
               <Link
                 href="/kayit"
                 className="rounded-full border border-[var(--border)] px-6 py-4 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-white/5"
               >
-                Bu planla basla
+                Bu planla başla
               </Link>
             </div>
           </div>

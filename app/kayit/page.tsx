@@ -23,12 +23,12 @@ function passwordStrength(password: string) {
   const score = checks.filter(Boolean).length
 
   if (score <= 2) {
-    return { label: 'Zayif', color: 'bg-red-400', width: '33%' }
+    return { label: 'Zayıf', color: 'bg-red-400', width: '33%' }
   }
   if (score <= 4) {
     return { label: 'Orta', color: 'bg-amber-300', width: '66%' }
   }
-  return { label: 'Guclu', color: 'bg-[var(--green)]', width: '100%' }
+  return { label: 'Güçlü', color: 'bg-[var(--green)]', width: '100%' }
 }
 
 export default function KayitPage() {
@@ -55,7 +55,7 @@ export default function KayitPage() {
       eyebrow: 'Adim 2',
       title: schoolName
         ? `Merhaba! ${schoolName} icin yonetici hesabini olusturalim.`
-        : 'Merhaba! Yonetici hesabini olusturalim.',
+        : 'Merhaba! Yönetici hesabini olusturalim.',
       text: 'Bu hesap ayni anda okul sahibiniz, yonetim paneliniz ve ilk operasyon merkeziniz olacak.',
     },
     3: {
@@ -385,7 +385,7 @@ export default function KayitPage() {
                         type="password"
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
-                        placeholder="Guclu bir sifre belirleyin"
+                        placeholder="Güçlü bir şifre belirleyin"
                         className="w-full bg-transparent text-lg text-white outline-none placeholder:text-white/26"
                       />
                       <div className="mt-4 h-2 rounded-full bg-white/[0.05]">
@@ -431,7 +431,7 @@ export default function KayitPage() {
                     <div className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Hazirlanan alan</div>
                     <div className="mt-3 text-xl font-semibold text-white">kinderly.app/{slug}/admin</div>
                     <div className="mt-2 text-sm text-[var(--muted)]">
-                      Ogrenciler, siniflar, aidatlar ve iletisim modulleri kullanima hazir.
+                      Öğrenciler, sınıflar, aidatlar ve iletişim modülleri kullanıma hazır.
                     </div>
                   </div>
 
