@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kinderly Web
 
-## Getting Started
+Next.js tabanli web paneli, mobil uygulamadaki Supabase auth yapisi ile hizalanmistir.
 
-First, run the development server:
+## Kurulum
+
+1. `.env.example` dosyasini kopyalayip `.env.local` olustur:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Supabase bilgilerini gir:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. Bagimliliklari kur ve calistir:
 
-## Learn More
+```bash
+npm install
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Giris
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Web girisi artik email ve sifre ile yapilir.
+- Kullanici rolu Supabase uzerinden cozulur.
+- Giris yapan kullanici kendi okul slug ve rol yoluna otomatik yonlendirilir.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Beklenen Yapi
 
-## Deploy on Vercel
+- `personel.user_id` ve `veliler.user_id` alanlari auth kullanicisi ile eslesmeli
+- `okullar.slug` dolu olmali
+- Rol alanlari `admin`, `ogretmen`, `veli` varyasyonlariyla uyumlu olmali
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Kontrol
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npx tsc --noEmit --incremental false
+```
+
+## Deploy
+
+Detayli deploy adimlari icin [DEPLOY_VERCEL.md](/Users/safa/Desktop/kinderly-web/DEPLOY_VERCEL.md:1) dosyasina bak.

@@ -1,12 +1,16 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth'
+import { rolePath } from '@/lib/auth-helpers'
 import { Ogrenci, Sinif } from '@/lib/types'
 
 export default function OgretmenPage({ params }: { params: Promise<{ slug: string }> }) {
+  const router = useRouter()
+  const { session, role, okul: authOkul, loading, signOut } = useAuth()
   const [slug, setSlug] = useState('')
   const [okul, setOkul] = useState<any>(null)
-  const [loggedIn, setLoggedIn] = useState(false)
   const [ad, setAd] = useState('')
   const [sinifSec, setSinifSec] = useState('')
   const [siniflar, setSiniflar] = useState<Sinif[]>([])
@@ -19,7 +23,6 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
   const [aktType, setAktType] = useState('')
   const [aktForm, setAktForm] = useState<any>({})
   const [sideOpen, setSideOpen] = useState(false)
-  const [err, setErr] = useState('')
   const [gunlukModal, setGunlukModal] = useState(false)
   const [gunlukForm, setGunlukForm] = useState<any>({})
 
@@ -41,31 +44,52 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
   useEffect(() => { params.then(p => setSlug(p.slug)) }, [params])
 
   useEffect(() => {
-    if (!slug) return
-    const saved = sessionStorage.getItem('kinderly_ogretmen_' + slug)
-    if (saved) {
-      const s = JSON.parse(saved)
-      setOkul(s.okul); setAd(s.ad); setSinifSec(s.sinif); setLoggedIn(true)
-      loadData(s.okul.id, s.sinif)
-    } else {
-      loadSiniflar()
-    }
-  }, [slug])
+    if (loading || !slug) return
 
-  async function loadSiniflar() {
-    const { data: okData } = await supabase.from('okullar').select('*').eq('slug', slug).single()
-    if (okData) {
-      setOkul(okData)
-      const { data: sinifData } = await supabase.from('siniflar').select('*').eq('okul_id', okData.id).order('ad')
-      setSiniflar(sinifData || [])
+    if (!session || !authOkul) {
+      router.replace('/giris')
+      return
     }
-  }
 
-  async function doLogin() {
-    if (!ad.trim() || !sinifSec) { setErr('Ad ve sınıf zorunlu!'); return }
-    sessionStorage.setItem('kinderly_ogretmen_' + slug, JSON.stringify({ okul, ad: ad.trim(), sinif: sinifSec }))
-    setLoggedIn(true)
-    loadData(okul.id, sinifSec)
+    const expectedPath = rolePath(role)
+    if (role !== 'ogretmen') {
+      router.replace(`/${authOkul.slug}/${expectedPath ?? 'admin'}`)
+      return
+    }
+
+    if (authOkul.slug !== slug) {
+      router.replace(`/${authOkul.slug}/ogretmen`)
+      return
+    }
+
+    const currentSession = session
+    const currentOkul = authOkul
+
+    async function bootstrapTeacher() {
+      setOkul(currentOkul)
+      await loadSiniflar(Number(currentOkul.id))
+
+      const { data: personel } = await supabase
+        .from('personel')
+        .select('ad_soyad, sinif')
+        .eq('user_id', currentSession.user.id)
+        .eq('okul_id', currentOkul.id)
+        .maybeSingle()
+
+      const teacherName = personel?.ad_soyad?.trim() || currentSession.user.email || 'Ogretmen'
+      const teacherClass = personel?.sinif?.trim() || ''
+
+      setAd(teacherName)
+      setSinifSec(teacherClass)
+      await loadData(Number(currentOkul.id), teacherClass)
+    }
+
+    bootstrapTeacher()
+  }, [authOkul, loading, role, router, session, slug])
+
+  async function loadSiniflar(okulId: number) {
+    const { data: sinifData } = await supabase.from('siniflar').select('*').eq('okul_id', okulId).order('ad')
+    setSiniflar(sinifData || [])
   }
 
   async function loadData(okulId: number, sinif: string) {
@@ -126,34 +150,13 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
     alert('Günlük rapor kaydedildi ✓')
   }
 
-  if (!loggedIn) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 w-full max-w-sm">
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3">🌱</div>
-          <h1 className="text-xl font-bold text-indigo-600">Kinderly</h1>
-          <p className="text-sm text-gray-500 mt-1">Öğretmen Paneli</p>
-        </div>
-        <div className="space-y-3">
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Adınız Soyadınız</label>
-            <input value={ad} onChange={e => setAd(e.target.value)} placeholder="Fatma Karagöz"
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm outline-none focus:border-indigo-500" />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Sınıfınız</label>
-            <select value={sinifSec} onChange={e => setSinifSec(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm outline-none bg-white focus:border-indigo-500">
-              <option value="">— Sınıf Seçin —</option>
-              {siniflar.map(s => <option key={s.id} value={s.ad}>{s.ad}</option>)}
-            </select>
-          </div>
-          <button onClick={doLogin} className="w-full bg-indigo-600 text-white rounded-lg py-3 text-sm font-semibold">Giriş Yap</button>
-          {err && <p className="text-red-500 text-sm text-center">{err}</p>}
-        </div>
+  if (loading || !session || !okul) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">
+        Panel hazirlaniyor...
       </div>
-    </div>
-  )
+    )
+  }
 
   const geldi = Object.values(yoklama).filter(v => v === 'geldi').length
 
@@ -179,7 +182,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
           ))}
         </nav>
         <div className="p-4 border-t border-gray-200">
-          <button onClick={() => { sessionStorage.removeItem('kinderly_ogretmen_' + slug); setLoggedIn(false) }}
+          <button onClick={async () => { await signOut(); router.replace('/giris') }}
             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg">
             🚪 Çıkış Yap
           </button>

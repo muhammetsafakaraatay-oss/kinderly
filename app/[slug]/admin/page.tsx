@@ -1,16 +1,18 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { supabase, SUPA_URL, SUPA_KEY } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth'
+import { rolePath } from '@/lib/auth-helpers'
 import { Ogrenci, Sinif, Okul, Aidat, Aktivite, GunlukRapor, Gelisim, Servis } from '@/lib/types'
 
 export default function AdminPage({ params }: { params: Promise<{ slug: string }> }) {
+  const router = useRouter()
+  const { session, role, okul: authOkul, loading, signOut } = useAuth()
   const [slug, setSlug] = useState('')
   const [okul, setOkul] = useState<Okul | null>(null)
   const [ogrenciler, setOgrenciler] = useState<Ogrenci[]>([])
   const [siniflar, setSiniflar] = useState<Sinif[]>([])
-  const [loggedIn, setLoggedIn] = useState(false)
-  const [pass, setPass] = useState('')
-  const [err, setErr] = useState('')
   const [activePage, setActivePage] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [dark, setDark] = useState(false)
@@ -24,26 +26,32 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   }, [])
 
   useEffect(() => {
-    if (!slug) return
-    const saved = sessionStorage.getItem('kinderly_admin_' + slug)
-    if (saved) {
-      const s = JSON.parse(saved)
-      setOkul(s.okul); setLoggedIn(true); loadAll(s.okul.id)
+    if (loading || !slug) return
+
+    if (!session || !authOkul) {
+      router.replace('/giris')
+      return
     }
-  }, [slug])
+
+    const expectedPath = rolePath(role)
+    if (role !== 'admin') {
+      router.replace(`/${authOkul.slug}/${expectedPath ?? 'admin'}`)
+      return
+    }
+
+    if (authOkul.slug !== slug) {
+      router.replace(`/${authOkul.slug}/admin`)
+      return
+    }
+
+    setOkul(authOkul as Okul)
+    loadAll(Number(authOkul.id))
+  }, [authOkul, loading, role, router, session, slug])
 
   function toggleDark() {
     const next = !dark; setDark(next)
     localStorage.setItem('kinderly_dark', String(next))
     document.documentElement.classList.toggle('dark', next)
-  }
-
-  async function doLogin() {
-    const { data, error } = await supabase.from('okullar').select('*').eq('slug', slug).eq('sifre', pass).single()
-    if (error || !data) { setErr('Okul kodu veya şifre hatalı!'); return }
-    setOkul(data); setLoggedIn(true)
-    sessionStorage.setItem('kinderly_admin_' + slug, JSON.stringify({ okul: data }))
-    loadAll(data.id)
   }
 
   async function loadAll(okulId: number) {
@@ -55,23 +63,13 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
     if (sinif) setSiniflar(sinif)
   }
 
-  if (!loggedIn) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 w-full max-w-sm">
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3">🌱</div>
-          <h1 className="text-xl font-bold text-indigo-600">Kinderly</h1>
-          <p className="text-sm text-gray-500 mt-1">Yönetim Paneli — {slug}</p>
-        </div>
-        <input type="password" placeholder="Şifre" value={pass}
-          onChange={e => setPass(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && doLogin()}
-          className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm outline-none focus:border-indigo-500 mb-3" />
-        <button onClick={doLogin} className="w-full bg-indigo-600 text-white rounded-lg py-3 text-sm font-semibold">Giriş Yap</button>
-        {err && <p className="text-red-500 text-sm text-center mt-2">{err}</p>}
+  if (loading || !session || !okul) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">
+        Panel hazirlaniyor...
       </div>
-    </div>
-  )
+    )
+  }
 
   const navItems = [
     { id: 'dashboard', icon: '🏠', label: 'Ana Panel' },
@@ -116,7 +114,7 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
           ))}
         </nav>
         <div className={`p-3 border-t ${dark ? 'border-gray-700' : 'border-gray-200'}`}>
-          <button onClick={() => { sessionStorage.removeItem('kinderly_admin_' + slug); setLoggedIn(false) }}
+          <button onClick={async () => { await signOut(); router.replace('/giris') }}
             className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg ${dark ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-500 hover:bg-gray-50'}`}>
             🚪 Çıkış Yap
           </button>
@@ -1016,13 +1014,13 @@ function Fotograflar({ siniflar, okul, dark }: any) {
     setUploading(true)
     for (const f of files) {
       const fn = Date.now() + '_' + Math.random().toString(36).slice(2) + '.jpg'
-      const up = await fetch(SUPA_URL + '/storage/v1/object/fotograflar/' + fn, {
-        method: 'POST',
-        headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': f.type || 'image/jpeg', 'x-upsert': 'true' },
-        body: f
+      const { error } = await supabase.storage.from('fotograflar').upload(fn, f, {
+        contentType: f.type || 'image/jpeg',
+        upsert: true,
       })
-      if (up.ok) {
-        const url = SUPA_URL + '/storage/v1/object/public/fotograflar/' + fn
+      if (!error) {
+        const { data } = supabase.storage.from('fotograflar').getPublicUrl(fn)
+        const url = data.publicUrl
         await supabase.from('fotograflar').insert({ okul_id: okul.id, url, aciklama: form.aciklama, sinif: form.sinif, tarih: today() })
       }
     }

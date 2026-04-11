@@ -1,15 +1,17 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth'
+import { rolePath } from '@/lib/auth-helpers'
 import { Ogrenci } from '@/lib/types'
 
 export default function VeliPage({ params }: { params: Promise<{ slug: string }> }) {
+  const router = useRouter()
+  const { session, role, okul: authOkul, loading, signOut } = useAuth()
   const [slug, setSlug] = useState('')
   const [okul, setOkul] = useState<any>(null)
   const [ogrenciler, setOgrenciler] = useState<Ogrenci[]>([])
-  const [loggedIn, setLoggedIn] = useState(false)
-  const [tel, setTel] = useState('')
-  const [err, setErr] = useState('')
   const [activePage, setActivePage] = useState('home')
   const [selectedOgr, setSelectedOgr] = useState<Ogrenci | null>(null)
   const [feed, setFeed] = useState<any[]>([])
@@ -43,42 +45,76 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
   useEffect(() => { params.then(p => setSlug(p.slug)) }, [params])
 
   useEffect(() => {
-    if (!slug) return
-    const saved = sessionStorage.getItem('kinderly_veli_' + slug)
-    if (saved) {
-      const s = JSON.parse(saved)
-      setOkul(s.okul); setOgrenciler(s.ogrenciler); setLoggedIn(true)
-      if (s.ogrenciler.length > 0) setSelectedOgr(s.ogrenciler[0])
+    if (loading || !slug) return
+
+    if (!session || !authOkul) {
+      router.replace('/giris')
+      return
     }
-  }, [slug])
+
+    const expectedPath = rolePath(role)
+    if (role !== 'veli') {
+      router.replace(`/${authOkul.slug}/${expectedPath ?? 'admin'}`)
+      return
+    }
+
+    if (authOkul.slug !== slug) {
+      router.replace(`/${authOkul.slug}/veli`)
+      return
+    }
+
+    const currentSession = session
+    const currentOkul = authOkul
+
+    async function bootstrapParent() {
+      setOkul(currentOkul)
+
+      const relationQuery = await supabase
+        .from('veliler')
+        .select('ogrenci_id, ogrenciler(*)')
+        .eq('user_id', currentSession.user.id)
+        .eq('okul_id', currentOkul.id)
+
+      const relationRows = (relationQuery.data || [])
+        .map((item: any) => item.ogrenciler)
+        .filter(Boolean) as Ogrenci[]
+
+      if (relationRows.length > 0) {
+        setOgrenciler(relationRows)
+        setSelectedOgr(relationRows[0])
+        return
+      }
+
+      const { data: veliRows } = await supabase
+        .from('veliler')
+        .select('ogrenci_id')
+        .eq('user_id', currentSession.user.id)
+        .eq('okul_id', currentOkul.id)
+
+      const ids = (veliRows || []).map((item) => item.ogrenci_id).filter(Boolean)
+
+      if (!ids.length) {
+        setOgrenciler([])
+        setSelectedOgr(null)
+        return
+      }
+
+      const { data: children } = await supabase
+        .from('ogrenciler')
+        .select('*')
+        .in('id', ids)
+        .order('ad_soyad')
+
+      setOgrenciler((children || []) as Ogrenci[])
+      setSelectedOgr(children?.[0] ?? null)
+    }
+
+    bootstrapParent()
+  }, [authOkul, loading, role, router, session, slug])
 
   useEffect(() => {
     if (selectedOgr && okul) loadFeed()
   }, [selectedOgr, feedFilter, typeFilter])
-
-  function formatTel(v: string) {
-    const d = v.replace(/[^0-9]/g, '').slice(0, 11)
-    let f = d.slice(0, 4)
-    if (d.length > 4) f += ' ' + d.slice(4, 7)
-    if (d.length > 7) f += ' ' + d.slice(7, 9)
-    if (d.length > 9) f += ' ' + d.slice(9, 11)
-    return f
-  }
-
-  async function doLogin() {
-    const raw = tel.replace(/[^0-9]/g, '')
-    if (raw.length < 10) { setErr('Geçerli telefon numarası girin!'); return }
-    const son10 = raw.slice(-10)
-    const { data: okData } = await supabase.from('okullar').select('*').eq('slug', slug).single()
-    if (!okData) { setErr('Okul bulunamadı!'); return }
-    const { data: ogr } = await supabase.from('ogrenciler').select('*')
-      .eq('okul_id', okData.id).eq('aktif', true)
-      .or(`veli_telefon.ilike.%${son10}%,veli2_telefon.ilike.%${son10}%`)
-    if (!ogr || !ogr.length) { setErr('Bu numaraya kayıtlı öğrenci bulunamadı!'); return }
-    setOkul(okData); setOgrenciler(ogr); setLoggedIn(true)
-    setSelectedOgr(ogr[0])
-    sessionStorage.setItem('kinderly_veli_' + slug, JSON.stringify({ okul: okData, ogrenciler: ogr }))
-  }
 
   async function loadFeed() {
     if (!selectedOgr || !okul) return
@@ -136,25 +172,13 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
     setFotograflar(data || [])
   }
 
-  if (!loggedIn) return (
-    <div className="min-h-screen flex flex-col bg-white">
-      <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 px-6 pt-14 pb-12 text-center relative overflow-hidden">
-        <div className="absolute inset-0 opacity-5 text-9xl flex items-end justify-end pr-4">🌙</div>
-        <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-4xl mx-auto mb-3">🌱</div>
-        <h1 className="text-2xl font-bold text-white">Veli Paneli</h1>
-        <p className="text-indigo-200 text-sm mt-1">{slug}</p>
+  if (loading || !session || !okul) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">
+        Panel hazirlaniyor...
       </div>
-      <div className="flex-1 bg-white rounded-t-3xl -mt-4 p-6">
-        <label className="block text-xs font-semibold text-gray-500 mb-2">Telefon Numaranız</label>
-        <input value={tel} onChange={e => setTel(formatTel(e.target.value))}
-          onKeyDown={e => e.key === 'Enter' && doLogin()}
-          placeholder="05xx xxx xx xx"
-          className="w-full border-2 border-gray-200 rounded-xl px-4 py-4 text-xl text-center tracking-widest font-semibold outline-none focus:border-indigo-500 mb-4" />
-        <button onClick={doLogin} className="w-full bg-indigo-600 text-white rounded-xl py-4 font-semibold text-base">Giriş Yap</button>
-        {err && <p className="text-red-500 text-sm text-center mt-3 font-semibold">{err}</p>}
-      </div>
-    </div>
-  )
+    )
+  }
 
   const unpaidTotal = aidatlar.filter(a => !a.odendi).reduce((s, a) => s + Number(a.tutar), 0)
 
@@ -193,7 +217,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
           ))}
         </nav>
         <div className="p-4 border-t border-gray-200">
-          <button onClick={() => { sessionStorage.removeItem('kinderly_veli_' + slug); setLoggedIn(false) }}
+          <button onClick={async () => { await signOut(); router.replace('/giris') }}
             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg">
             🚪 Çıkış Yap
           </button>
