@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { RoiCalculator } from '@/components/roi-calculator'
 
 export default function Home() {
   return (
@@ -11,7 +10,6 @@ export default function Home() {
           <span className="font-bold text-xl text-[#0f1a14] tracking-tight">Kinderly</span>
         </div>
         <div className="hidden md:flex items-center gap-8">
-          <a href="#roi" className="text-sm text-[#5a7265] hover:text-[#0d5c3a] font-medium transition-colors">ROI</a>
           <a href="#ozellikler" className="text-sm text-[#5a7265] hover:text-[#0d5c3a] font-medium transition-colors">Özellikler</a>
           <a href="#fiyatlar" className="text-sm text-[#5a7265] hover:text-[#0d5c3a] font-medium transition-colors">Fiyatlar</a>
         </div>
@@ -37,7 +35,7 @@ export default function Home() {
             Yoklama, aktivite takibi, veli iletişimi ve aidat yönetimi — hepsi tek platformda. Öğretmenler için tasarlandı, veliler için sevindi.
           </p>
           <div className="flex items-center gap-4 flex-wrap">
-            <Link href="/kayit" className="bg-[#0d5c3a] text-white px-8 py-4 rounded-[14px] text-base font-semibold hover:bg-[#1a7a50] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(13,92,58,0.25)] inline-flex items-center gap-2">
+            <Link href="/giris" className="bg-[#0d5c3a] text-white px-8 py-4 rounded-[14px] text-base font-semibold hover:bg-[#1a7a50] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(13,92,58,0.25)] inline-flex items-center gap-2">
               Ücretsiz Dene →
             </Link>
             <a href="#ozellikler" className="text-[#1e2d25] text-sm font-medium hover:text-[#0d5c3a] transition-colors">
@@ -84,8 +82,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      <RoiCalculator />
 
       {/* FEATURES */}
       <section id="ozellikler" className="py-24 px-[5%]">
@@ -141,7 +137,7 @@ export default function Home() {
                 </li>
               ))}
             </ul>
-            <Link href="/kayit" className="block w-full py-3.5 rounded-xl text-sm font-bold text-center border-2 border-[rgba(13,92,58,0.15)] text-[#1e2d25] hover:border-[#0d5c3a] hover:text-[#0d5c3a] transition-colors">
+            <Link href="/giris" className="block w-full py-3.5 rounded-xl text-sm font-bold text-center border-2 border-[rgba(13,92,58,0.15)] text-[#1e2d25] hover:border-[#0d5c3a] hover:text-[#0d5c3a] transition-colors">
               Ücretsiz Başla
             </Link>
           </div>
@@ -158,7 +154,7 @@ export default function Home() {
                 </li>
               ))}
             </ul>
-            <Link href="/kayit" className="block w-full py-3.5 rounded-xl text-sm font-bold text-center bg-[#0d5c3a] text-white hover:bg-[#1a7a50] transition-colors">
+            <Link href="/giris" className="block w-full py-3.5 rounded-xl text-sm font-bold text-center bg-[#0d5c3a] text-white hover:bg-[#1a7a50] transition-colors">
               Hemen Başla
             </Link>
           </div>
@@ -188,7 +184,7 @@ export default function Home() {
             Okulunuzu bugün dönüştürün.
           </h2>
           <p className="text-lg text-[#5a7265] mb-10 font-light">Kurulum 5 dakika. Kredi kartı gerekmez. İlk 30 gün ücretsiz.</p>
-          <Link href="/kayit" className="inline-flex items-center gap-2 bg-[#0d5c3a] text-white px-10 py-4 rounded-[14px] text-base font-semibold hover:bg-[#1a7a50] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(13,92,58,0.25)]">
+          <Link href="/giris" className="inline-flex items-center gap-2 bg-[#0d5c3a] text-white px-10 py-4 rounded-[14px] text-base font-semibold hover:bg-[#1a7a50] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(13,92,58,0.25)]">
             Ücretsiz Başla →
           </Link>
         </div>
