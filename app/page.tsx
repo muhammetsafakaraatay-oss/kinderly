@@ -149,7 +149,7 @@ export default function Home() {
           {[
             {emoji:'👑',name:'Yönetici',desc:'Okulunuzun tüm operasyonunu tek ekrandan görün.',features:['Öğrenci & personel yönetimi','Aidat & ödeme takibi','Duyuru yayınlama','Detaylı raporlar']},
             {emoji:'👩‍🏫',name:'Öğretmen',desc:'Günlük rutinleri hızlandırın, velilerle güçlü iletişim kurun.',features:['Hızlı yoklama','Aktivite kaydetme','Veli mesajlaşma','Fotoğraf paylaşma']},
-            {emoji:'👨‍👩‍👧',name:'Veli',desc:'Çocuğunuzun her anından haberdar olun.',features:['Günlük aktivite feed'i','Anlık bildirimler','Öğretmenle mesajlaşma','Aidat takibi']},
+            {emoji:'👨‍👩‍👧',name:'Veli',desc:'Çocuğunuzun her anından haberdar olun.',features:['Günlük aktivite feedini','Anlık bildirimler','Öğretmenle mesajlaşma','Aidat takibi']},
           ].map(r => (
             <div key={r.name} className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-8 hover:border-[rgba(74,222,128,0.3)] transition-all group">
               <div className="text-4xl mb-5">{r.emoji}</div>
