@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { hasSupabaseEnv, supabase } from '@/lib/supabase'
 
 export type Role = 'admin' | 'ogretmen' | 'veli' | null
 
@@ -70,6 +70,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let active = true
+
+    if (!hasSupabaseEnv) {
+      setLoading(false)
+      return () => {
+        active = false
+      }
+    }
 
     async function hydrateSession() {
       const { data } = await supabase.auth.getSession()
@@ -213,6 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         personel,
         loading,
         signOut: async () => {
+          if (!hasSupabaseEnv) return
           await supabase.auth.signOut()
           setRole(null)
           setOkul(null)

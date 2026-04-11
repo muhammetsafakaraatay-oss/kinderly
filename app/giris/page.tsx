@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { hasSupabaseEnv, supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
 
@@ -25,6 +25,11 @@ export default function GirisPage() {
   }, [authLoading, okul?.slug, role, router, session])
 
   async function handleLogin() {
+    if (!hasSupabaseEnv) {
+      setError('Supabase ayarlari Vercel ortaminda eksik. NEXT_PUBLIC_SUPABASE_URL ve NEXT_PUBLIC_SUPABASE_ANON_KEY eklenmeli.')
+      return
+    }
+
     const normalizedEmail = email.trim().toLowerCase()
     const normalizedPassword = password.trim()
 
@@ -68,6 +73,13 @@ export default function GirisPage() {
           <p className="text-sm text-[#5a7265] text-center mb-6">
             Mobil uygulamadaki hesabinizla giris yapin.
           </p>
+
+          {!hasSupabaseEnv && (
+            <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Vercel ortam degiskenleri eksik. `NEXT_PUBLIC_SUPABASE_URL` ve `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+              tanimlanmadan web girisi calismaz.
+            </div>
+          )}
 
           <div className="mb-4">
             <label className="block text-xs font-bold text-[#5a7265] mb-2 uppercase tracking-wide">Email</label>

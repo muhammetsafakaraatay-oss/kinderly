@@ -139,7 +139,7 @@ export function RoiCalculator() {
 
               <div className="space-y-3">
                 <Link
-                  href="/giris"
+                  href="/kayit"
                   className="flex items-center justify-center rounded-2xl bg-[#0d5c3a] px-5 py-4 text-sm font-bold text-white transition-colors hover:bg-[#1a7a50]"
                 >
                   Hesabimla denemeye basla

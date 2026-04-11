@@ -14,6 +14,7 @@ cp .env.example .env.local
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
 3. Bagimliliklari kur ve calistir:
 
@@ -27,6 +28,7 @@ npm run dev
 - Web girisi artik email ve sifre ile yapilir.
 - Kullanici rolu Supabase uzerinden cozulur.
 - Giris yapan kullanici kendi okul slug ve rol yoluna otomatik yonlendirilir.
+- `/kayit` akisi ile yeni okul + admin hesabi olusturulabilir.
 
 ## Beklenen Yapi
 
