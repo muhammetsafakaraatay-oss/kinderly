@@ -32,6 +32,13 @@ export async function POST(request: Request) {
     const sifre = body.sifre?.trim() ?? ''
     const normalizedSlug = slugifySchoolName(body.slug ?? '')
 
+    console.log('Request body:', {
+      okulAd: okulAdi,
+      slug: normalizedSlug,
+      adSoyad,
+      email,
+    })
+
     if (!okulAdi || !adSoyad || !email || !sifre || !normalizedSlug) {
       return NextResponse.json({ error: 'Tum alanlar zorunludur.' }, { status: 400 })
     }
@@ -75,8 +82,12 @@ export async function POST(request: Request) {
     })
 
     if (authError || !userData.user) {
+      console.log('Supabase error:', authError)
       return NextResponse.json(
-        { error: authError?.message ?? 'Admin kullanicisi olusturulamadi.' },
+        {
+          error: authError?.message ?? 'Admin kullanicisi olusturulamadi.',
+          details: authError,
+        },
         { status: 400 }
       )
     }
