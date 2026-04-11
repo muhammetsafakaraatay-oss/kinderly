@@ -10,6 +10,8 @@ type SignupBody = {
   sifre?: string
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 export async function POST(request: Request) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -25,7 +27,8 @@ export async function POST(request: Request) {
     const body = (await request.json()) as SignupBody
     const okulAdi = body.okulAdi?.trim() ?? ''
     const adSoyad = body.adSoyad?.trim() ?? ''
-    const email = body.email?.trim().toLowerCase() ?? ''
+    const rawEmail = typeof body.email === 'string' ? body.email : ''
+    const email = rawEmail.trim().toLowerCase()
     const sifre = body.sifre?.trim() ?? ''
     const normalizedSlug = slugifySchoolName(body.slug ?? '')
 
@@ -38,6 +41,10 @@ export async function POST(request: Request) {
         { error: 'Okul kodu sadece kucuk harf, rakam ve tire icerebilir.' },
         { status: 400 }
       )
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      return NextResponse.json({ error: 'Gecerli bir email adresi girin.' }, { status: 400 })
     }
 
     if (sifre.length < 8) {
@@ -65,9 +72,6 @@ export async function POST(request: Request) {
       email,
       password: sifre,
       email_confirm: true,
-      user_metadata: {
-        ad_soyad: adSoyad,
-      },
     })
 
     if (authError || !userData.user) {
