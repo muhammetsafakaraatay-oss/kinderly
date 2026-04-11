@@ -1,10 +1,9 @@
-cd ~/Desktop/kinderly-web && python3 << 'PYEOF'
-content = '''import Link from \'next/link\'
-import { RoiCalculator } from \'@/components/roi-calculator\'
-import { Instrument_Serif, DM_Sans } from \'next/font/google\'
+import Link from 'next/link'
+import { RoiCalculator } from '@/components/roi-calculator'
+import { Instrument_Serif, DM_Sans } from 'next/font/google'
 
-const serif = Instrument_Serif({ subsets: [\'latin\'], weight: \'400\', variable: \'--font-serif\' })
-const sans = DM_Sans({ subsets: [\'latin\'], weight: [\'300\',\'400\',\'500\',\'600\',\'700\'], variable: \'--font-sans\' })
+const serif = Instrument_Serif({ subsets: ['latin'], weight: '400', variable: '--font-serif' })
+const sans = DM_Sans({ subsets: ['latin'], weight: ['300','400','500','600','700'], variable: '--font-sans' })
 
 export default function Home() {
   return (
@@ -43,7 +42,7 @@ export default function Home() {
         <div className="relative z-10 max-w-[680px]">
           <div className="inline-flex items-center gap-2 border border-[var(--border)] bg-[var(--green-dim)] rounded-full px-4 py-1.5 mb-8">
             <div className="w-1.5 h-1.5 rounded-full bg-[var(--green)] animate-pulse" />
-            <span className="text-xs font-bold text-[var(--green)] uppercase tracking-wide">Türkiye\'nin #1 Anaokulu Platformu</span>
+            <span className="text-xs font-bold text-[var(--green)] uppercase tracking-wide">Türkiye'nin #1 Anaokulu Platformu</span>
           </div>
           <h1 className="serif text-[clamp(52px,7.5vw,96px)] leading-[0.95] tracking-[-3px] mb-6">
             Anaokulu<br />yönetimini<br /><em className="text-[var(--green)]">yeniden</em><br />keşfet.
@@ -60,7 +59,7 @@ export default function Home() {
             </Link>
           </div>
           <div className="flex gap-10 mt-14 pt-10 border-t border-[var(--border)]">
-            {[[\'500+\',\'Okul\'],[\'50K+\',\'Öğrenci\'],[\'98%\',\'Memnuniyet\'],[\'20sa\',\'Tasarruf/ay\']].map(([v,l]) => (
+            {[['500+','Okul'],['50K+','Öğrenci'],['98%','Memnuniyet'],['20sa','Tasarruf/ay']].map(([v,l]) => (
               <div key={l}>
                 <div className="serif text-3xl text-white tracking-tight">{v}</div>
                 <div className="text-xs text-[var(--muted)] mt-1 font-medium">{l}</div>
@@ -86,14 +85,14 @@ export default function Home() {
                 <div className="w-10 h-10 rounded-xl bg-[rgba(74,222,128,0.1)] flex items-center justify-center text-lg">🏫</div>
               </div>
               <div className="grid grid-cols-4 gap-2 mb-3">
-                {[[\'26\',\'Geldi\'],[\'14\',\'Aktivite\'],[\'3\',\'Mesaj\'],[\'2\',\'Duyuru\']].map(([v,l]) => (
+                {[['26','Geldi'],['14','Aktivite'],['3','Mesaj'],['2','Duyuru']].map(([v,l]) => (
                   <div key={l} className="rounded-xl bg-[#0f170f] border border-[var(--border)] p-2.5 text-center">
                     <div className="font-black text-lg text-white">{v}</div>
                     <div className="text-[9px] text-[var(--muted)]">{l}</div>
                   </div>
                 ))}
               </div>
-              {[[\'🍎\',\'Ayşe K.\',\'Öğle yemeği\'],[\'😴\',\'Ali D.\',\'Uyku 90dk\'],[\'⭐\',\'Zeynep Ç.\',\'Tebrik!\']].map(([e,n,d]) => (
+              {[['🍎','Ayşe K.','Öğle yemeği'],['😴','Ali D.','Uyku 90dk'],['⭐','Zeynep Ç.','Tebrik!']].map(([e,n,d]) => (
                 <div key={n} className="flex items-center gap-2.5 py-2 border-b border-[var(--border)] last:border-0">
                   <div className="w-8 h-8 rounded-lg bg-[var(--green-dim)] flex items-center justify-center text-sm">{e}</div>
                   <div><div className="text-xs font-semibold text-white">{n}</div><div className="text-[10px] text-[var(--muted)]">{d}</div></div>
@@ -108,7 +107,7 @@ export default function Home() {
       <div className="border-y border-[var(--border)] px-[5%] py-5 flex items-center gap-8 flex-wrap">
         <span className="text-xs font-bold text-[var(--muted)] uppercase tracking-widest whitespace-nowrap">Güvenilen okullar</span>
         <div className="flex gap-8 flex-wrap">
-          {[\'Güneş Anaokulu\',\'Papatya Koleji\',\'Yıldız Yuvası\',\'Pembe Bulut\',\'Gökkuşağı\'].map(s => (
+          {['Güneş Anaokulu','Papatya Koleji','Yıldız Yuvası','Pembe Bulut','Gökkuşağı'].map(s => (
             <span key={s} className="text-sm text-white/20 font-medium">{s}</span>
           ))}
         </div>
@@ -125,13 +124,13 @@ export default function Home() {
         <div className="text-[var(--muted)] text-lg font-light max-w-md mb-14">Farklı araçlar arasında gidip gelmek yok. Okulunuzun tüm operasyonu tek noktadan.</div>
         <div className="grid md:grid-cols-2 gap-3">
           {[
-            {icon:\'✅\',title:\'Dijital Yoklama\',desc:\'Saniyeler içinde tüm sınıfın yoklamasını alın. Veliler anında bildirim alır.\',wide:true},
-            {icon:\'⚡\',title:\'Aktivite Takibi\',desc:\'Yemek, uyku, tuvalet, sağlık — her aktiviteyi kaydedin.\'},
-            {icon:\'💬\',title:\'Veli İletişimi\',desc:\'Mesajlaşma, duyurular ve push notification. WhatsApp karmaşasına son.\'},
-            {icon:\'📷\',title:\'Fotoğraf Paylaşımı\',desc:\'Özel anları güvenle velilerle paylaşın.\'},
-            {icon:\'💰\',title:\'Aidat Yönetimi\',desc:\'Ödeme takibi, gecikmiş faturalar. Para takibinde kayıp yok.\',wide:true},
+            {icon:'✅',title:'Dijital Yoklama',desc:'Saniyeler içinde tüm sınıfın yoklamasını alın. Veliler anında bildirim alır.',wide:true},
+            {icon:'⚡',title:'Aktivite Takibi',desc:'Yemek, uyku, tuvalet, sağlık — her aktiviteyi kaydedin.'},
+            {icon:'💬',title:'Veli İletişimi',desc:'Mesajlaşma, duyurular ve push notification. WhatsApp karmaşasına son.'},
+            {icon:'📷',title:'Fotoğraf Paylaşımı',desc:'Özel anları güvenle velilerle paylaşın.'},
+            {icon:'💰',title:'Aidat Yönetimi',desc:'Ödeme takibi, gecikmiş faturalar. Para takibinde kayıp yok.',wide:true},
           ].map(f => (
-            <div key={f.title} className={`rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-8 hover:border-[rgba(74,222,128,0.3)] hover:-translate-y-1 transition-all ${f.wide ? \'md:col-span-2 flex items-center gap-10\' : \'\'}`}>
+            <div key={f.title} className={`rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-8 hover:border-[rgba(74,222,128,0.3)] hover:-translate-y-1 transition-all ${f.wide ? 'md:col-span-2 flex items-center gap-10' : ''}`}>
               <div className="text-3xl mb-4 flex-shrink-0">{f.icon}</div>
               <div>
                 <div className="serif text-2xl text-white mb-2">{f.title}</div>
@@ -148,9 +147,9 @@ export default function Home() {
         <div className="serif text-[clamp(36px,5vw,60px)] leading-tight tracking-tight mb-14">Herkes için<br />tasarlandı.</div>
         <div className="grid md:grid-cols-3 gap-4">
           {[
-            {emoji:\'👑\',name:\'Yönetici\',desc:\'Okulunuzun tüm operasyonunu tek ekrandan görün.\',features:[\'Öğrenci & personel yönetimi\',\'Aidat & ödeme takibi\',\'Duyuru yayınlama\',\'Detaylı raporlar\']},
-            {emoji:\'👩‍🏫\',name:\'Öğretmen\',desc:\'Günlük rutinleri hızlandırın, velilerle güçlü iletişim kurun.\',features:[\'Hızlı yoklama\',\'Aktivite kaydetme\',\'Veli mesajlaşma\',\'Fotoğraf paylaşma\']},
-            {emoji:\'👨‍👩‍👧\',name:\'Veli\',desc:\'Çocuğunuzun her anından haberdar olun.\',features:[\'Günlük aktivite feed\'i\',\'Anlık bildirimler\',\'Öğretmenle mesajlaşma\',\'Aidat takibi\']},
+            {emoji:'👑',name:'Yönetici',desc:'Okulunuzun tüm operasyonunu tek ekrandan görün.',features:['Öğrenci & personel yönetimi','Aidat & ödeme takibi','Duyuru yayınlama','Detaylı raporlar']},
+            {emoji:'👩‍🏫',name:'Öğretmen',desc:'Günlük rutinleri hızlandırın, velilerle güçlü iletişim kurun.',features:['Hızlı yoklama','Aktivite kaydetme','Veli mesajlaşma','Fotoğraf paylaşma']},
+            {emoji:'👨‍👩‍👧',name:'Veli',desc:'Çocuğunuzun her anından haberdar olun.',features:['Günlük aktivite feed'i','Anlık bildirimler','Öğretmenle mesajlaşma','Aidat takibi']},
           ].map(r => (
             <div key={r.name} className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-8 hover:border-[rgba(74,222,128,0.3)] transition-all group">
               <div className="text-4xl mb-5">{r.emoji}</div>
@@ -167,7 +166,7 @@ export default function Home() {
       {/* METRICS */}
       <section className="py-10 px-[5%]">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[[\'500+\',\'Aktif Okul\'],[\'50K+\',\'Öğrenci Takibi\'],[\'98%\',\'Memnuniyet\'],[\'2M+\',\'Aktivite Kaydı\']].map(([v,l]) => (
+          {[['500+','Aktif Okul'],['50K+','Öğrenci Takibi'],['98%','Memnuniyet'],['2M+','Aktivite Kaydı']].map(([v,l]) => (
             <div key={l} className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-8 text-center">
               <div className="serif text-5xl text-[var(--green)] tracking-tight">{v}</div>
               <div className="text-xs text-[var(--muted)] mt-3 uppercase tracking-wider">{l}</div>
@@ -185,9 +184,9 @@ export default function Home() {
         <div className="serif text-[clamp(36px,5vw,60px)] leading-tight tracking-tight mb-14">Onlar anlatsın.</div>
         <div className="grid md:grid-cols-3 gap-4">
           {[
-            {q:\'Kinderly ile yoklama ve veli bilgilendirmesi için ayırdığımız süre yarıya indi. Artık sabah koşuşturmacası yok.\',name:\'Ayşe H.\',role:\'Müdür · Güneş Anaokulu\'},
-            {q:\'Veliler uygulamayı çok seviyor. Çocuklarının ne yediğini, ne zaman uyuduğunu anlık görüyorlar.\',name:\'Fatma K.\',role:\'Öğretmen · Papatya Koleji\'},
-            {q:\'Aidat takibi artık çok kolay. Geciken ödemeler otomatik hatırlatılıyor. Aylık muhasebe saatlerden dakikalara indi.\',name:\'Mehmet A.\',role:\'Kurucu · Yıldız Yuvası\'},
+            {q:'Kinderly ile yoklama ve veli bilgilendirmesi için ayırdığımız süre yarıya indi. Artık sabah koşuşturmacası yok.',name:'Ayşe H.',role:'Müdür · Güneş Anaokulu'},
+            {q:'Veliler uygulamayı çok seviyor. Çocuklarının ne yediğini, ne zaman uyuduğunu anlık görüyorlar.',name:'Fatma K.',role:'Öğretmen · Papatya Koleji'},
+            {q:'Aidat takibi artık çok kolay. Geciken ödemeler otomatik hatırlatılıyor. Aylık muhasebe saatlerden dakikalara indi.',name:'Mehmet A.',role:'Kurucu · Yıldız Yuvası'},
           ].map((t,i) => (
             <div key={i} className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-8">
               <div className="text-[var(--green)] mb-6 text-sm tracking-widest">★★★★★</div>
@@ -211,7 +210,7 @@ export default function Home() {
             <div className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-4">Başlangıç</div>
             <div className="serif text-5xl tracking-tight mb-1">Ücretsiz</div>
             <div className="text-[var(--muted)] text-sm mb-6">sonsuza kadar</div>
-            <ul className="space-y-3 mb-8">{[\'50 öğrenciye kadar\',\'Yoklama takibi\',\'Temel mesajlaşma\',\'Mobil uygulama\'].map(f=><li key={f} className="text-sm text-[var(--muted)] flex gap-2"><span className="text-[var(--green)]">✓</span>{f}</li>)}</ul>
+            <ul className="space-y-3 mb-8">{['50 öğrenciye kadar','Yoklama takibi','Temel mesajlaşma','Mobil uygulama'].map(f=><li key={f} className="text-sm text-[var(--muted)] flex gap-2"><span className="text-[var(--green)]">✓</span>{f}</li>)}</ul>
             <Link href="/kayit" className="block text-center py-3 rounded-full border border-[var(--border)] text-sm font-bold hover:border-[var(--green)] hover:text-[var(--green)] transition-colors">Ücretsiz Başla</Link>
           </div>
           <div className="rounded-[20px] border border-[var(--green)] bg-[#0d1a0d] p-8 relative">
@@ -219,14 +218,14 @@ export default function Home() {
             <div className="text-xs font-bold text-[var(--green)] uppercase tracking-wider mb-4">Pro</div>
             <div className="serif text-5xl tracking-tight mb-1">₺499</div>
             <div className="text-[var(--muted)] text-sm mb-6">/ ay · tüm özellikler</div>
-            <ul className="space-y-3 mb-8">{[\'Sınırsız öğrenci\',\'Tüm aktivite türleri\',\'Fotoğraf paylaşımı\',\'Aidat yönetimi\',\'Push notification\',\'Öncelikli destek\'].map(f=><li key={f} className="text-sm text-white/70 flex gap-2"><span className="text-[var(--green)]">✓</span>{f}</li>)}</ul>
+            <ul className="space-y-3 mb-8">{['Sınırsız öğrenci','Tüm aktivite türleri','Fotoğraf paylaşımı','Aidat yönetimi','Push notification','Öncelikli destek'].map(f=><li key={f} className="text-sm text-white/70 flex gap-2"><span className="text-[var(--green)]">✓</span>{f}</li>)}</ul>
             <Link href="/kayit" className="block text-center py-3 rounded-full bg-[var(--green)] text-[#060a06] text-sm font-bold hover:-translate-y-0.5 transition-transform">Hemen Başla</Link>
           </div>
           <div className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-8">
             <div className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-4">Kurumsal</div>
             <div className="serif text-5xl tracking-tight mb-1">Özel</div>
             <div className="text-[var(--muted)] text-sm mb-6">çok şubeli kurumlar</div>
-            <ul className="space-y-3 mb-8">{[\'Çoklu şube\',\'Özel entegrasyonlar\',\'SLA garantisi\',\'Dedicated destek\'].map(f=><li key={f} className="text-sm text-[var(--muted)] flex gap-2"><span className="text-[var(--green)]">✓</span>{f}</li>)}</ul>
+            <ul className="space-y-3 mb-8">{['Çoklu şube','Özel entegrasyonlar','SLA garantisi','Dedicated destek'].map(f=><li key={f} className="text-sm text-[var(--muted)] flex gap-2"><span className="text-[var(--green)]">✓</span>{f}</li>)}</ul>
             <a href="mailto:info@kinderly.app" className="block text-center py-3 rounded-full border border-[var(--border)] text-sm font-bold hover:border-[var(--green)] hover:text-[var(--green)] transition-colors">Teklif Al</a>
           </div>
         </div>
@@ -258,9 +257,3 @@ export default function Home() {
     </main>
   )
 }
-'''
-
-with open('app/page.tsx', 'w') as f:
-    f.write(content)
-print('Yazildi!')
-PYEOF
