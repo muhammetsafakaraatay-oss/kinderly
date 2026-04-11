@@ -34,15 +34,26 @@ export default function GirisPage() {
 
   const normalizedEmail = useMemo(() => email.trim().toLowerCase(), [email])
   const canSubmit = normalizedEmail.length > 0 && password.trim().length > 0 && !submitting && !authLoading
+  const redirectPath = rolePath(role)
+  const roleResolutionError =
+    !authLoading && session && !redirectPath
+      ? 'Giris tamamlandi fakat bu hesap icin panel rolu bulunamadi. Lutfen destek ile iletisime gecin.'
+      : ''
+
+  const buttonLabel =
+    submitting
+      ? 'Giris yapiliyor...'
+      : authLoading && session
+        ? 'Panel hazirlaniyor...'
+        : 'Panele giris yap'
 
   useEffect(() => {
     if (authLoading) return
 
-    const path = rolePath(role)
-    if (session && okul?.slug && path) {
-      router.replace(`/${okul.slug}/${path}`)
+    if (session && okul?.slug && redirectPath) {
+      router.replace(`/${okul.slug}/${redirectPath}`)
     }
-  }, [authLoading, okul?.slug, role, router, session])
+  }, [authLoading, okul?.slug, redirectPath, router, session])
 
   async function handleLogin() {
     if (!hasSupabaseEnv) {
@@ -242,10 +253,12 @@ export default function GirisPage() {
                 disabled={!canSubmit}
                 className="mt-7 w-full rounded-[20px] bg-[var(--green)] px-5 py-4 text-base font-semibold text-[#051005] transition-all hover:translate-y-[-1px] hover:bg-[#7bf0a6] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {submitting || authLoading ? 'Giris yapiliyor...' : 'Panele giris yap'}
+                {buttonLabel}
               </button>
 
-              {error && <p className="mt-4 text-sm leading-6 text-[#fda4af]">{error}</p>}
+              {(error || roleResolutionError) && (
+                <p className="mt-4 text-sm leading-6 text-[#fda4af]">{error || roleResolutionError}</p>
+              )}
 
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-[20px] border border-[var(--border)] bg-white/[0.02] p-4">

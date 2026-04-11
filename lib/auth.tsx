@@ -20,6 +20,7 @@ type PersonelInfo = {
   rol: string
   sinif?: string | null
   aktif?: boolean | null
+  user_id?: string | null
 }
 
 type AuthContextValue = {
@@ -32,6 +33,16 @@ type AuthContextValue = {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
+const AUTH_QUERY_TIMEOUT_MS = 8000
+
+async function withTimeout<T>(promise: PromiseLike<T>, timeoutMs = AUTH_QUERY_TIMEOUT_MS): Promise<T> {
+  return await Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error('Auth query timeout')), timeoutMs)
+    }),
+  ])
+}
 
 function normalizeRole(value: string | null | undefined): Role {
   if (!value) return null
@@ -75,31 +86,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const email = user.email?.trim().toLocaleLowerCase('tr-TR')
       let matchedPersonel: PersonelInfo | null = null
 
-      const { data: activeRows } = await supabase
-        .from('personel')
-        .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
-        .eq('user_id', user.id)
-        .eq('aktif', true)
-        .limit(5)
+      const { data: activeRows } = (await withTimeout(
+        supabase
+          .from('personel')
+          .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
+          .eq('user_id', user.id)
+          .eq('aktif', true)
+          .limit(5)
+      )) as { data: PersonelInfo[] | null }
 
       matchedPersonel = (activeRows || []).find((row) => row.user_id === user.id) ?? null
 
       if (!matchedPersonel) {
-        const { data: userRows } = await supabase
-          .from('personel')
-          .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
-          .eq('user_id', user.id)
-          .limit(5)
+        const { data: userRows } = (await withTimeout(
+          supabase
+            .from('personel')
+            .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
+            .eq('user_id', user.id)
+            .limit(5)
+        )) as { data: PersonelInfo[] | null }
 
         matchedPersonel = (userRows || []).find((row) => row.user_id === user.id) ?? null
       }
 
       if (!matchedPersonel && email) {
-        const { data: emailRows } = await supabase
-          .from('personel')
-          .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
-          .eq('email', email)
-          .limit(5)
+        const { data: emailRows } = (await withTimeout(
+          supabase
+            .from('personel')
+            .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
+            .eq('email', email)
+            .limit(5)
+        )) as { data: PersonelInfo[] | null }
 
         matchedPersonel =
           (emailRows || []).find((row) => row.email?.trim().toLocaleLowerCase('tr-TR') === email) ?? null
@@ -117,11 +134,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        const { data: okulData } = await supabase
-          .from('okullar')
-          .select('id, ad, slug')
-          .eq('id', matchedPersonel.okul_id)
-          .maybeSingle()
+        const { data: okulData } = (await withTimeout(
+          supabase
+            .from('okullar')
+            .select('id, ad, slug')
+            .eq('id', matchedPersonel.okul_id)
+            .maybeSingle()
+        )) as { data: OkulInfo | null }
 
         setRole(normalizedRole)
         setPersonel(matchedPersonel)
@@ -130,19 +149,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      const { data: veli } = await supabase
-        .from('veliler')
-        .select('okul_id')
-        .eq('user_id', user.id)
-        .eq('aktif', true)
-        .maybeSingle()
+      const { data: veli } = (await withTimeout(
+        supabase
+          .from('veliler')
+          .select('okul_id')
+          .eq('user_id', user.id)
+          .eq('aktif', true)
+          .maybeSingle()
+      )) as { data: { okul_id: number | string } | null }
 
       if (veli) {
-        const { data: okulData } = await supabase
-          .from('okullar')
-          .select('id, ad, slug')
-          .eq('id', veli.okul_id)
-          .maybeSingle()
+        const { data: okulData } = (await withTimeout(
+          supabase
+            .from('okullar')
+            .select('id, ad, slug')
+            .eq('id', veli.okul_id)
+            .maybeSingle()
+        )) as { data: OkulInfo | null }
 
         setRole('veli')
         setPersonel(null)
