@@ -87,7 +87,13 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
 
       <aside className={`fixed top-0 left-0 h-full w-60 z-50 flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 ${dark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-r`}>
         <div className={`p-4 border-b flex items-center gap-3 ${dark ? 'border-gray-700' : 'border-gray-200'}`}>
-          <div className="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center text-xl">🌱</div>
+          {okul?.logo_url ? (
+            <img src={okul.logo_url} alt={okul.ad} className="h-9 w-9 rounded-lg object-cover" />
+          ) : (
+            <div className="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center text-sm font-bold text-white">
+              {(okul?.ad || 'Kinderly').split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase()}
+            </div>
+          )}
           <div>
             <div className={`text-sm font-semibold ${dark ? 'text-white' : 'text-gray-800'}`}>{okul?.ad || 'Kinderly'}</div>
             <div className="text-xs text-gray-500">Yönetim Paneli</div>
@@ -1672,19 +1678,52 @@ function Etkinlikler({ siniflar, okul, dark }: any) {
 function OkulAyarlari({ okul, dark, setOkul }: any) {
   const [form, setForm] = useState<any>({})
   const [saved, setSaved] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
 
   useEffect(() => { if (okul) setForm({ ...okul }) }, [okul])
 
   async function save() {
-    await supabase.from('okullar').update({ ad: form.ad, telefon: form.telefon, adres: form.adres, sifre: form.sifre }).eq('id', okul.id)
+    await supabase.from('okullar').update({ ad: form.ad, telefon: form.telefon, adres: form.adres, sifre: form.sifre, logo_url: form.logo_url || null }).eq('id', okul.id)
     setOkul({ ...okul, ...form })
     setSaved(true); setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function handleLogoUpload(file?: File | null) {
+    if (!file) return
+    setUploadingLogo(true)
+    const storagePath = `${okul.id}/${Date.now()}-${file.name.replace(/\s+/g, '-')}`
+    const { error } = await supabase.storage.from('logos').upload(storagePath, file, {
+      contentType: file.type || 'image/png',
+      upsert: true,
+    })
+
+    if (!error) {
+      const { data } = supabase.storage.from('logos').getPublicUrl(storagePath)
+      setForm((prev: any) => ({ ...prev, logo_url: data.publicUrl }))
+    }
+
+    setUploadingLogo(false)
   }
 
   return (
     <div className="max-w-lg">
       <Card dark={dark} className="p-6 space-y-4">
         <h3 className={`font-semibold text-base mb-4 ${dark ? 'text-white' : ''}`}>⚙️ Okul Bilgileri</h3>
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-2">Okul Logosu</label>
+          <div className="flex items-center gap-3">
+            {form.logo_url ? (
+              <img src={form.logo_url} alt={form.ad || 'Logo'} className="h-16 w-16 rounded-2xl object-cover border border-gray-200" />
+            ) : (
+              <div className="h-16 w-16 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold">
+                {(form.ad || 'Kinderly').split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <input type="file" accept="image/*" onChange={e => handleLogoUpload(e.target.files?.[0] ?? null)}
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+          </div>
+          <p className="mt-2 text-xs text-gray-500">{uploadingLogo ? 'Logo yükleniyor...' : 'Bucket: logos'}</p>
+        </div>
         {[['Okul Adı','ad'],['Telefon','telefon'],['Adres','adres']].map(([l,k]) => (
           <div key={k}>
             <label className="block text-xs font-semibold text-gray-500 mb-1">{l}</label>

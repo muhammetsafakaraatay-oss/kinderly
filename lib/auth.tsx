@@ -10,6 +10,7 @@ type OkulInfo = {
   id: number | string
   ad: string
   slug: string
+  logo_url?: string | null
 }
 
 type PersonelInfo = {
@@ -137,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: okulData } = (await withTimeout(
           supabase
             .from('okullar')
-            .select('id, ad, slug')
+            .select('id, ad, slug, logo_url')
             .eq('id', matchedPersonel.okul_id)
             .maybeSingle()
         )) as { data: OkulInfo | null }
@@ -162,7 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: okulData } = (await withTimeout(
           supabase
             .from('okullar')
-            .select('id, ad, slug')
+            .select('id, ad, slug, logo_url')
             .eq('id', veli.okul_id)
             .maybeSingle()
         )) as { data: OkulInfo | null }

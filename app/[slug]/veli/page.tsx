@@ -14,7 +14,6 @@ import {
   loadParentChildren,
   loadStudentMessagesCompat,
   markMessagesReadCompat,
-  normalizeAnnouncement,
   resolveParentMessageParties,
   type AnnouncementItem,
   type NormalizedMessage,
@@ -29,29 +28,35 @@ type ParentTab = 'bugun' | 'mesajlar' | 'duyurular' | 'aidatlar' | 'cocugum'
 type ActivityRow = {
   id: number
   tur: string
-  detay?: Record<string, string | number | boolean | null> | null
+  detay?: Record<string, unknown> | null
   kaydeden?: string | null
   created_at?: string | null
+  olusturuldu?: string | null
 }
 
-const tabs: Array<{ id: ParentTab; label: string }> = [
-  { id: 'bugun', label: 'Bugün' },
-  { id: 'mesajlar', label: 'Mesajlar' },
-  { id: 'duyurular', label: 'Duyurular' },
-  { id: 'aidatlar', label: 'Aidatlar' },
-  { id: 'cocugum', label: 'Çocuğum' },
+type ChildDetails = Ogrenci & {
+  notlar?: string | null
+  alerji?: string | null
+}
+
+const tabs: Array<{ id: ParentTab; label: string; icon: string }> = [
+  { id: 'bugun', label: 'Bugün', icon: '🏠' },
+  { id: 'mesajlar', label: 'Mesajlar', icon: '💬' },
+  { id: 'duyurular', label: 'Duyurular', icon: '📢' },
+  { id: 'aidatlar', label: 'Aidatlar', icon: '💳' },
+  { id: 'cocugum', label: 'Çocuğum', icon: '🌸' },
 ]
 
-const activityLabels: Record<string, string> = {
-  food: 'Yemek',
-  nap: 'Uyku',
-  potty: 'Tuvalet',
-  photo: 'Fotoğraf',
-  kudos: 'Tebrik',
-  meds: 'İlaç',
-  incident: 'Kaza',
-  health: 'Sağlık',
-  note: 'Not',
+const activityTypes: Record<string, { emoji: string; label: string; color: string }> = {
+  food: { emoji: '🍎', label: 'Yemek', color: '#00b884' },
+  nap: { emoji: '😴', label: 'Uyku', color: '#3d4eb8' },
+  potty: { emoji: '🚽', label: 'Tuvalet', color: '#00b8d4' },
+  photo: { emoji: '📷', label: 'Fotoğraf', color: '#e91e8c' },
+  kudos: { emoji: '⭐', label: 'Tebrik', color: '#9c27b0' },
+  meds: { emoji: '💊', label: 'İlaç', color: '#f5a623' },
+  incident: { emoji: '🩹', label: 'Kaza', color: '#f44336' },
+  health: { emoji: '🌡️', label: 'Sağlık', color: '#7c4dff' },
+  note: { emoji: '📝', label: 'Not', color: '#00897b' },
 }
 
 function today() {
@@ -62,12 +67,14 @@ function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(' ')
 }
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('tr-TR', {
-    style: 'currency',
-    currency: 'TRY',
-    maximumFractionDigits: 0,
-  }).format(value)
+function initials(name?: string | null) {
+  return (name || 'Kinderly')
+    .split(' ')
+    .filter(Boolean)
+    .map((item) => item[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
 }
 
 function formatDateTime(value?: string | null) {
@@ -82,12 +89,49 @@ function formatDateTime(value?: string | null) {
   })
 }
 
-function getActivitySummary(row: ActivityRow) {
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('tr-TR', {
+    style: 'currency',
+    currency: 'TRY',
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+function formatDateLabel(value?: string | null) {
+  if (!value) return 'Bilgi girilmedi'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Bilgi girilmedi'
+  return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+function activitySummary(row: ActivityRow) {
   const detay = row.detay || {}
-  const firstValue = ['not', 'aciklama', 'durum', 'ogun', 'miktar', 'ilac']
-    .map((key) => detay[key])
-    .find(Boolean)
-  return firstValue ? String(firstValue) : 'Yeni bilgi eklendi.'
+  const values = [
+    detay.not,
+    detay.aciklama,
+    detay.ogun ? `${String(detay.ogun)}${detay.yeme ? ` · ${String(detay.yeme)}` : ''}` : null,
+    detay.sure,
+    detay.ates ? `${String(detay.ates)}°C` : null,
+    detay.ilac ? `${String(detay.ilac)}${detay.doz ? ` · ${String(detay.doz)}` : ''}` : null,
+  ].filter(Boolean)
+
+  return values[0] ? String(values[0]) : 'Detay eklenmedi'
+}
+
+function ageFromBirthDate(value?: string | null) {
+  if (!value) return null
+  const birthDate = new Date(value)
+  if (Number.isNaN(birthDate.getTime())) return null
+  const now = new Date()
+  let age = now.getFullYear() - birthDate.getFullYear()
+  const monthDiff = now.getMonth() - birthDate.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birthDate.getDate())) age -= 1
+  return age
+}
+
+function isSameDay(a: string, b?: string) {
+  if (!b) return false
+  return new Date(a).toDateString() === new Date(b).toDateString()
 }
 
 export default function VeliPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -95,17 +139,18 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
   const { session, role, okul: authOkul, loading, signOut } = useAuth()
   const [slug, setSlug] = useState('')
   const [activeTab, setActiveTab] = useState<ParentTab>('bugun')
-  const [children, setChildren] = useState<Ogrenci[]>([])
+  const [children, setChildren] = useState<ChildDetails[]>([])
   const [selectedChildId, setSelectedChildId] = useState<number | null>(null)
   const [attendanceStatus, setAttendanceStatus] = useState('')
   const [activities, setActivities] = useState<ActivityRow[]>([])
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([])
-  const [aidatlar, setAidatlar] = useState<Aidat[]>([])
+  const [fees, setFees] = useState<Aidat[]>([])
   const [messages, setMessages] = useState<NormalizedMessage[]>([])
-  const [messageText, setMessageText] = useState('')
+  const [messageDraft, setMessageDraft] = useState('')
   const [messageState, setMessageState] = useState('')
   const [pageLoading, setPageLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [feeFilter, setFeeFilter] = useState<'hepsi' | 'bekleyen' | 'odendi'>('hepsi')
 
   useEffect(() => {
     void params.then((value) => setSlug(value.slug))
@@ -136,30 +181,36 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
     if (!okul || !session) return
 
     let alive = true
-    const currentSession = session
     const currentOkul = okul
+    const currentSession = session
 
-    async function bootstrap() {
+    async function loadChildren() {
       setPageLoading(true)
       const { data, error } = await loadParentChildren(currentSession.user.id, currentOkul.id)
 
       if (!alive) return
 
       if (error) {
-        setMessageState(getSupabaseErrorMessage(error, 'Öğrenci bilgileri yüklenemedi.'))
-        setChildren([])
-        setSelectedChildId(null)
-        setPageLoading(false)
-        return
+        setMessageState(getSupabaseErrorMessage(error, 'Çocuk bilgileri yüklenemedi.'))
       }
 
-      const nextChildren = data as Ogrenci[]
-      setChildren(nextChildren)
-      setSelectedChildId((current) => current ?? nextChildren[0]?.id ?? null)
+      const childIds = data.map((item) => item.id)
+      let detailedChildren = data as ChildDetails[]
+
+      if (childIds.length) {
+        const { data: detailRows } = await supabase
+          .from('ogrenciler')
+          .select('*')
+          .in('id', childIds)
+        detailedChildren = (detailRows || []) as ChildDetails[]
+      }
+
+      setChildren(detailedChildren)
+      setSelectedChildId((current) => current ?? detailedChildren[0]?.id ?? null)
       setPageLoading(false)
     }
 
-    void bootstrap()
+    void loadChildren()
 
     return () => {
       alive = false
@@ -173,19 +224,18 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
     const currentOkul = okul
     const currentChildId = selectedChildId
 
-    async function loadDashboard() {
+    async function loadData() {
       setPageLoading(true)
-
-      const [activityQuery, yoklamaQuery, announcementQuery, feeQuery, messageQuery] = await Promise.all([
+      const [activityQuery, attendanceQuery, announcementQuery, feeQuery, messageQuery] = await Promise.all([
         supabase
           .from('aktiviteler')
-          .select('id,tur,detay,kaydeden,created_at')
+          .select('id,tur,detay,kaydeden,created_at,olusturuldu')
           .eq('okul_id', currentOkul.id)
           .eq('ogrenci_id', currentChildId)
           .eq('tarih', today())
           .eq('veli_gosterilsin', true)
           .order('id', { ascending: false })
-          .limit(20),
+          .limit(60),
         supabase
           .from('yoklama')
           .select('durum')
@@ -193,55 +243,55 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
           .eq('ogrenci_id', currentChildId)
           .eq('tarih', today())
           .maybeSingle(),
-        loadAnnouncementsCompat(currentOkul.id, 20),
+        loadAnnouncementsCompat(currentOkul.id, 30),
         supabase
           .from('aidatlar')
           .select('*')
           .eq('okul_id', currentOkul.id)
           .eq('ogrenci_id', currentChildId)
-          .order('id', { ascending: false })
-          .limit(12),
+          .order('son_odeme', { ascending: true }),
         loadStudentMessagesCompat(currentOkul.id, currentChildId, 200),
       ])
 
       if (!alive) return
 
       setActivities((activityQuery.data || []) as ActivityRow[])
-      setAttendanceStatus(yoklamaQuery.data?.durum || '')
+      setAttendanceStatus(attendanceQuery.data?.durum || '')
       setAnnouncements(announcementQuery.data || [])
-      setAidatlar((feeQuery.data || []) as Aidat[])
+      setFees((feeQuery.data || []) as Aidat[])
       setMessages(messageQuery.data || [])
       setPageLoading(false)
     }
 
-    void loadDashboard()
+    void loadData()
 
     const channel = supabase
-      .channel(`veli-panel-${currentOkul.id}-${currentChildId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesajlar', filter: `okul_id=eq.${currentOkul.id}` }, () => {
-        void loadStudentMessagesCompat(currentOkul.id, currentChildId, 200).then((result) => setMessages(result.data || []))
+      .channel(`veli-web-${currentOkul.id}-${currentChildId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesajlar', filter: `okul_id=eq.${currentOkul.id}` }, async () => {
+        const result = await loadStudentMessagesCompat(currentOkul.id, currentChildId, 200)
+        setMessages(result.data || [])
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'aktiviteler', filter: `okul_id=eq.${currentOkul.id}` }, () => {
-        void supabase
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'aktiviteler', filter: `okul_id=eq.${currentOkul.id}` }, async () => {
+        const { data } = await supabase
           .from('aktiviteler')
-          .select('id,tur,detay,kaydeden,created_at')
+          .select('id,tur,detay,kaydeden,created_at,olusturuldu')
           .eq('okul_id', currentOkul.id)
           .eq('ogrenci_id', currentChildId)
           .eq('tarih', today())
           .eq('veli_gosterilsin', true)
           .order('id', { ascending: false })
-          .limit(20)
-          .then(({ data }) => setActivities((data || []) as ActivityRow[]))
+          .limit(60)
+        setActivities((data || []) as ActivityRow[])
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'yoklama', filter: `okul_id=eq.${currentOkul.id}` }, () => {
-        void supabase
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'yoklama', filter: `okul_id=eq.${currentOkul.id}` }, async () => {
+        const { data } = await supabase
           .from('yoklama')
           .select('durum')
           .eq('okul_id', currentOkul.id)
           .eq('ogrenci_id', currentChildId)
           .eq('tarih', today())
           .maybeSingle()
-          .then(({ data }) => setAttendanceStatus(data?.durum || ''))
+        setAttendanceStatus(data?.durum || '')
       })
       .subscribe()
 
@@ -251,58 +301,51 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
     }
   }, [okul, selectedChildId])
 
+  useEffect(() => {
+    if (!okul || !selectedChildId) return
+    void markMessagesReadCompat(okul.id, selectedChildId)
+  }, [okul, selectedChildId])
+
   const selectedChild = useMemo(
     () => children.find((child) => child.id === selectedChildId) || null,
     [children, selectedChildId]
   )
 
-  const paidFees = useMemo(
-    () => aidatlar.filter((item) => item.odendi),
-    [aidatlar]
-  )
+  const filteredFees = useMemo(() => {
+    if (feeFilter === 'bekleyen') return fees.filter((item) => !item.odendi)
+    if (feeFilter === 'odendi') return fees.filter((item) => item.odendi)
+    return fees
+  }, [feeFilter, fees])
 
-  const unpaidFees = useMemo(
-    () => aidatlar.filter((item) => !item.odendi),
-    [aidatlar]
+  const totalPending = useMemo(
+    () => fees.filter((item) => !item.odendi).reduce((sum, item) => sum + Number(item.tutar || 0), 0),
+    [fees]
   )
-
-  const totalDebt = useMemo(
-    () => unpaidFees.reduce((sum, item) => sum + Number(item.tutar || 0), 0),
-    [unpaidFees]
-  )
-
-  useEffect(() => {
-    if (!okul || !selectedChildId || !session) return
-    void markMessagesReadCompat(okul.id, selectedChildId)
-  }, [okul, selectedChildId, session])
 
   async function sendMessage() {
-    if (!session || !okul || !selectedChild || !messageText.trim()) return
+    if (!session || !okul || !selectedChild || !messageDraft.trim()) return
 
     setSending(true)
     setMessageState('')
-
     const { data: parties, error: partyError } = await resolveParentMessageParties(session.user.id, okul.id, selectedChild.id)
 
     if (partyError || !parties) {
-      setMessageState(getSupabaseErrorMessage(partyError, 'Öğretmen eşleşmesi bulunamadı.'))
       setSending(false)
+      setMessageState(getSupabaseErrorMessage(partyError, 'Öğretmen eşleşmesi bulunamadı.'))
       return
     }
 
-    const { error } = await insertMessageCompat(
-      {
-        okul_id: okul.id,
-        ogrenci_id: selectedChild.id,
-        gonderen_id: parties.senderId,
-        gonderen_rol: 'veli',
-        alici_id: parties.receiverId,
-        alici_tip: 'ogretmen',
-        okundu: false,
-        olusturuldu: new Date().toISOString(),
-      },
-      messageText.trim()
-    )
+    const { error } = await insertMessageCompat({
+      okul_id: okul.id,
+      ogrenci_id: selectedChild.id,
+      gonderen_id: parties.senderId,
+      gonderen_rol: 'veli',
+      gonderen_ad: 'Veli',
+      alici_id: parties.receiverId,
+      alici_tip: 'ogretmen',
+      okundu: false,
+      created_at: new Date().toISOString(),
+    }, messageDraft.trim())
 
     setSending(false)
 
@@ -311,308 +354,361 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
       return
     }
 
-    setMessageText('')
+    setMessageDraft('')
     setMessageState('Mesaj öğretmene iletildi.')
-    const result = await loadStudentMessagesCompat(okul.id, selectedChild.id, 200)
-    setMessages(result.data || [])
   }
 
   if (loading || pageLoading || !session || !okul) {
     return <LoadingScreen />
   }
 
+  const childAge = ageFromBirthDate(selectedChild?.dogum_tarihi)
+
   return (
     <main className={`${serif.variable} ${sans.variable} min-h-screen bg-[#f8fafc] font-sans text-[#0f172a]`}>
       <style>{`
-        .input-base {
+        .panel-input {
           width: 100%;
-          border-radius: 1rem;
           border: 1px solid #e2e8f0;
-          background: #f8fafc;
-          padding: 0.9rem 1rem;
-          font-size: 0.95rem;
+          border-radius: 16px;
+          padding: 0.85rem 1rem;
+          background: #fff;
           color: #0f172a;
           outline: none;
         }
       `}</style>
-      <div className="mx-auto max-w-[1440px] px-5 py-8 lg:px-10">
-        <header className="rounded-[32px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[#f59e0b]">Veli paneli</div>
-              <h1 className="mt-3 text-[clamp(2.4rem,5vw,4.4rem)] font-semibold leading-[0.92] tracking-[-0.05em] [font-family:var(--font-serif)]">
-                Günlük akışı sakin ve net takip edin.
-              </h1>
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">
-                Yoklama, öğretmen mesajları, duyurular, aidatlar ve çocuk özetiniz tek görünümde.
-              </p>
+
+      <div className="flex min-h-screen flex-col lg:flex-row">
+        <aside className="w-full border-b border-slate-200 bg-white shadow-sm lg:sticky lg:top-0 lg:h-screen lg:w-[260px] lg:flex-none lg:border-b-0 lg:border-r">
+          <div className="flex h-full flex-col px-5 py-6">
+            <div className="flex items-center gap-3">
+              {okul.logo_url ? (
+                <img src={okul.logo_url} alt={okul.ad} className="h-14 w-14 rounded-2xl object-cover ring-1 ring-slate-200" />
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f59e0b] text-lg font-bold text-white">
+                  {initials(okul.ad)}
+                </div>
+              )}
+              <div>
+                <div className="text-base font-semibold text-slate-900">{okul.ad}</div>
+                <div className="text-sm text-slate-500">Veli Paneli</div>
+              </div>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Link href="/giris" className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-[#f59e0b] hover:text-[#f59e0b]">
-                Giriş sayfası
-              </Link>
-              <button
-                onClick={async () => {
-                  await signOut()
-                  router.replace('/giris')
-                }}
-                className="rounded-full bg-[#f59e0b] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#d97706]"
-              >
-                Çıkış yap
-              </button>
-            </div>
-          </div>
+            {children.length > 1 && (
+              <div className="mt-8">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Çocuk seç</div>
+                <div className="mt-3 space-y-2">
+                  {children.map((child) => (
+                    <button
+                      key={child.id}
+                      onClick={() => setSelectedChildId(child.id)}
+                      className={cx(
+                        'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition',
+                        selectedChildId === child.id ? 'bg-amber-50 text-[#f59e0b]' : 'text-slate-600 hover:bg-slate-100'
+                      )}
+                    >
+                      <div className={cx('flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold', selectedChildId === child.id ? 'bg-[#f59e0b] text-white' : 'bg-amber-100 text-amber-700')}>
+                        {initials(child.ad_soyad)}
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold">{child.ad_soyad}</div>
+                        <div className="text-xs text-slate-500">{child.sinif || 'Sınıf bilgisi'}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
-          {children.length > 1 && (
-            <div className="mt-6 flex flex-wrap gap-3">
-              {children.map((child) => (
+            <nav className="mt-8 space-y-2">
+              {tabs.map((tab) => (
                 <button
-                  key={child.id}
-                  onClick={() => setSelectedChildId(child.id)}
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
                   className={cx(
-                    'rounded-full px-4 py-2 text-sm font-semibold transition',
-                    selectedChildId === child.id ? 'bg-[#f59e0b] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition',
+                    activeTab === tab.id ? 'bg-amber-50 text-[#f59e0b]' : 'text-slate-600 hover:bg-slate-100'
                   )}
                 >
-                  {child.ad_soyad}
+                  <span>{tab.icon}</span>
+                  <span>{tab.label}</span>
                 </button>
               ))}
+            </nav>
+
+            <div className="mt-auto rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-slate-900">{selectedChild?.ad_soyad || 'Veli hesabı'}</div>
+              <div className="mt-1 text-xs text-slate-500">{selectedChild?.sinif || 'Çocuk bilgisi'}</div>
+              <div className="mt-4 flex gap-2">
+                <Link href="/giris" className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-600">
+                  Giriş
+                </Link>
+                <button
+                  onClick={async () => {
+                    await signOut()
+                    router.replace('/giris')
+                  }}
+                  className="flex-1 rounded-2xl bg-[#f59e0b] px-4 py-3 text-sm font-semibold text-white"
+                >
+                  Çıkış
+                </button>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <div className="flex-1 px-4 py-5 lg:px-8 lg:py-7">
+          <header className="rounded-[24px] border border-slate-200 bg-white px-5 py-5 shadow-sm">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[#f59e0b]">{tabs.find((tab) => tab.id === activeTab)?.label}</div>
+                <h1 className="mt-2 text-[clamp(2rem,4vw,3.8rem)] leading-[0.95] tracking-[-0.05em] text-slate-900 [font-family:var(--font-serif)]">
+                  Günlük akışı webden takip edin.
+                </h1>
+                <p className="mt-3 text-sm leading-7 text-slate-500">{selectedChild?.ad_soyad || 'Çocuk seçin'} · {selectedChild?.sinif || 'Sınıf bilgisi'}</p>
+              </div>
+            </div>
+          </header>
+
+          {messageState && (
+            <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              {messageState}
             </div>
           )}
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cx(
-                  'rounded-full px-4 py-2 text-sm font-semibold transition',
-                  activeTab === tab.id ? 'bg-[#f59e0b] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </header>
-
-        {messageState && (
-          <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-            {messageState}
-          </div>
-        )}
-
-        {activeTab === 'bugun' && (
-          <section className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-            <PanelCard className="bg-[linear-gradient(135deg,#fff7ed,white)]">
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <div className="text-sm font-medium text-slate-500">Bugünkü yoklama durumu</div>
-                  <div className="mt-3 inline-flex rounded-full bg-white px-5 py-3 text-2xl font-semibold text-slate-900 shadow-sm">
-                    {attendanceStatus || 'Henüz işlenmedi'}
+          {activeTab === 'bugun' && (
+            <section className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+              <PanelCard className="bg-[linear-gradient(135deg,#fff7ed,white)]">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-900">{selectedChild?.ad_soyad || 'Çocuk seçin'}</h2>
+                    <p className="mt-1 text-sm text-slate-500">{selectedChild?.sinif || 'Sınıf bilgisi'}</p>
                   </div>
+                  <span className={cx(
+                    'rounded-full px-4 py-2 text-sm font-semibold',
+                    attendanceStatus === 'geldi' ? 'bg-emerald-50 text-emerald-700' :
+                      attendanceStatus === 'gelmedi' ? 'bg-rose-50 text-rose-700' :
+                        attendanceStatus === 'izinli' ? 'bg-amber-50 text-amber-700' :
+                          'bg-slate-100 text-slate-600'
+                  )}>
+                    {attendanceStatus === 'geldi' ? '✅ Geldi' : attendanceStatus === 'gelmedi' ? '❌ Gelmedi' : attendanceStatus === 'izinli' ? '🏖️ İzinli' : '⏳ Bekleniyor'}
+                  </span>
                 </div>
-                <div className="rounded-[24px] border border-amber-100 bg-white px-5 py-4">
-                  <div className="text-xs uppercase tracking-[0.16em] text-slate-500">Seçili çocuk</div>
-                  <div className="mt-2 text-xl font-semibold text-slate-900">{selectedChild?.ad_soyad || 'Öğrenci seçin'}</div>
+
+                <div className="mt-6 grid gap-4 md:grid-cols-3">
+                  <MetricCard label="Aktivite" value={String(activities.length)} />
+                  <MetricCard label="Bekleyen aidat" value={String(fees.filter((item) => !item.odendi).length)} />
+                  <MetricCard label="Toplam borç" value={formatCurrency(totalPending)} />
                 </div>
-              </div>
+              </PanelCard>
 
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
-                <StatCard label="Bugünkü aktivite" value={String(activities.length)} />
-                <StatCard label="Bekleyen aidat" value={String(unpaidFees.length)} />
-                <StatCard label="Toplam borç" value={formatCurrency(totalDebt)} />
-              </div>
-            </PanelCard>
-
-            <PanelCard>
-              <h2 className="text-lg font-semibold text-slate-900">Canlı günlük akış</h2>
-              <p className="mt-1 text-sm text-slate-500">Öğretmen yeni aktivite ekledikçe bu alan güncellenir.</p>
-              <div className="mt-6 space-y-3">
-                {activities.length ? activities.map((activity) => (
-                  <div key={activity.id} className="rounded-2xl border border-slate-200 px-4 py-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <div className="font-semibold text-slate-900">{activityLabels[activity.tur] || activity.tur}</div>
-                        <div className="mt-1 text-sm text-slate-600">{getActivitySummary(activity)}</div>
-                      </div>
-                      <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{formatDateTime(activity.created_at)}</div>
-                    </div>
-                  </div>
-                )) : (
-                  <EmptyState title="Henüz aktivite yok" description="Gün içinde paylaşılan kayıtlar burada listelenecek." />
-                )}
-              </div>
-            </PanelCard>
-          </section>
-        )}
-
-        {activeTab === 'mesajlar' && (
-          <section className="mt-6">
-            <PanelCard>
-              <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-                <div className="rounded-[24px] border border-slate-200">
-                  <div className="border-b border-slate-200 px-5 py-4">
-                    <div className="font-semibold text-slate-900">Öğretmen ile yazışma</div>
-                    <div className="text-sm text-slate-500">{selectedChild?.ad_soyad || 'Öğrenci seçin'}</div>
-                  </div>
-
-                  <div className="max-h-[460px] space-y-3 overflow-y-auto px-5 py-5">
-                    {messages.length ? messages.map((message) => (
-                      <div key={message.id} className={cx('flex', message.gonderen_rol.includes('veli') ? 'justify-end' : 'justify-start')}>
-                        <div className={cx(
-                          'max-w-[75%] rounded-[22px] px-4 py-3 text-sm shadow-sm',
-                          message.gonderen_rol.includes('veli')
-                            ? 'bg-[#f59e0b] text-white'
-                            : 'bg-slate-100 text-slate-700'
-                        )}>
-                          <div>{message.content}</div>
-                          <div className={cx('mt-2 text-[11px]', message.gonderen_rol.includes('veli') ? 'text-amber-100' : 'text-slate-400')}>
-                            {formatDateTime(message.created_at)}
+              <PanelCard>
+                <h2 className="text-lg font-semibold text-slate-900">Aktivite feed</h2>
+                <p className="mt-1 text-sm text-slate-500">Supabase realtime ile anlık güncellenir.</p>
+                <div className="mt-6 space-y-3">
+                  {activities.length ? activities.map((activity) => {
+                    const meta = activityTypes[activity.tur] || { emoji: '📋', label: activity.tur, color: '#64748b' }
+                    return (
+                      <div key={activity.id} className="flex items-start gap-4 rounded-[22px] border border-slate-200 px-4 py-4">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-xl text-white" style={{ backgroundColor: meta.color }}>
+                          {meta.emoji}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="text-sm font-semibold text-slate-900">{meta.label}</div>
+                            <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{formatDateTime(activity.created_at || activity.olusturuldu)}</div>
                           </div>
+                          <div className="mt-2 text-sm text-slate-600">{activitySummary(activity)}</div>
                         </div>
                       </div>
-                    )) : (
-                      <EmptyState title="Henüz mesaj yok" description="İlk mesajı göndererek yazışmayı başlatabilirsiniz." />
-                    )}
-                  </div>
+                    )
+                  }) : (
+                    <EmptyState title="Henüz aktivite yok" description="Öğretmen kayıt eklediğinde burada görünür." />
+                  )}
                 </div>
+              </PanelCard>
+            </section>
+          )}
 
-                <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-                  <h2 className="text-lg font-semibold text-slate-900">Mesaj gönder</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">
-                    Realtime bağlantısı açık; öğretmenin yanıtı bu ekranda anlık görünür.
-                  </p>
-                  <textarea
-                    value={messageText}
-                    onChange={(event) => setMessageText(event.target.value)}
-                    className="input-base mt-4 min-h-[180px] resize-none bg-white"
-                    placeholder="Öğretmene mesajınız..."
-                  />
-                  <button
-                    onClick={sendMessage}
-                    disabled={sending || !selectedChild}
-                    className="mt-4 w-full rounded-2xl bg-[#f59e0b] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
-                  >
-                    {sending ? 'Gönderiliyor...' : 'Mesajı gönder'}
-                  </button>
-                </div>
-              </div>
-            </PanelCard>
-          </section>
-        )}
-
-        {activeTab === 'duyurular' && (
-          <section className="mt-6">
-            <PanelCard>
-              <h2 className="text-lg font-semibold text-slate-900">Okul duyuruları</h2>
-              <div className="mt-6 space-y-3">
-                {announcements.length ? announcements.map((announcement) => (
-                  <div key={announcement.id} className="rounded-2xl border border-slate-200 px-4 py-4">
-                    <div className="font-semibold text-slate-900">{announcement.baslik}</div>
-                    <div className="mt-2 text-sm leading-6 text-slate-600">{announcement.icerik}</div>
-                    <div className="mt-3 text-xs uppercase tracking-[0.14em] text-slate-400">{formatDateTime(announcement.created_at)}</div>
-                  </div>
-                )) : (
-                  <EmptyState title="Duyuru bulunamadı" description="Yeni okul duyuruları burada listelenir." />
-                )}
-              </div>
-            </PanelCard>
-          </section>
-        )}
-
-        {activeTab === 'aidatlar' && (
-          <section className="mt-6 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-            <PanelCard className="bg-[linear-gradient(135deg,#fff7ed,white)]">
-              <h2 className="text-lg font-semibold text-slate-900">Borç özeti</h2>
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
-                <StatCard label="Bekleyen" value={String(unpaidFees.length)} />
-                <StatCard label="Ödenen" value={String(paidFees.length)} />
-                <StatCard label="Toplam borç" value={formatCurrency(totalDebt)} />
-              </div>
-            </PanelCard>
-
-            <PanelCard>
-              <h2 className="text-lg font-semibold text-slate-900">Aidat hareketleri</h2>
-              <div className="mt-6 space-y-3">
-                {aidatlar.length ? aidatlar.map((aidat) => (
-                  <div key={aidat.id} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 px-4 py-4">
-                    <div>
-                      <div className="font-semibold text-slate-900">{aidat.ay}</div>
-                      <div className="text-sm text-slate-500">{aidat.odendi ? 'Ödendi' : 'Bekliyor'}</div>
+          {activeTab === 'mesajlar' && (
+            <section className="mt-6">
+              <PanelCard>
+                <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
+                  <div className="rounded-[24px] border border-slate-200">
+                    <div className="border-b border-slate-200 px-5 py-4">
+                      <div className="text-lg font-semibold text-slate-900">Öğretmen ile sohbet</div>
+                      <div className="mt-1 text-sm text-slate-500">{selectedChild?.ad_soyad || 'Çocuk seçin'}</div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-semibold text-slate-900">{formatCurrency(Number(aidat.tutar || 0))}</div>
-                      <div className={cx('text-xs font-semibold uppercase tracking-[0.14em]', aidat.odendi ? 'text-emerald-600' : 'text-amber-600')}>
-                        {aidat.odendi ? 'Ödenen' : 'Bekleyen'}
+                    <div className="max-h-[520px] space-y-3 overflow-y-auto px-5 py-5">
+                      {messages.map((message, index) => {
+                        const isMine = message.gonderen_rol.includes('veli')
+                        const showDate = index === 0 || !isSameDay(message.created_at, messages[index - 1]?.created_at)
+                        return (
+                          <div key={message.id}>
+                            {showDate && (
+                              <div className="my-4 flex items-center gap-3">
+                                <div className="h-px flex-1 bg-slate-200" />
+                                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                  {new Date(message.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
+                                </div>
+                                <div className="h-px flex-1 bg-slate-200" />
+                              </div>
+                            )}
+                            <div className={cx('flex', isMine ? 'justify-end' : 'justify-start')}>
+                              <div className={cx(
+                                'max-w-[75%] rounded-[22px] px-4 py-3 text-sm shadow-sm',
+                                isMine ? 'bg-[#f59e0b] text-white' : 'bg-slate-100 text-slate-700'
+                              )}>
+                                <div>{message.content}</div>
+                                <div className={cx('mt-2 text-[11px]', isMine ? 'text-amber-100' : 'text-slate-400')}>{formatDateTime(message.created_at)}</div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+                    <h2 className="text-lg font-semibold text-slate-900">Mesaj gönder</h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-500">Öğretmenin yanıtı aynı ekranda anlık olarak görünecek.</p>
+                    <textarea className="panel-input mt-4 min-h-[220px] resize-none bg-white" value={messageDraft} onChange={(event) => setMessageDraft(event.target.value)} placeholder="Mesaj yazın..." />
+                    <button onClick={sendMessage} disabled={sending || !selectedChild} className="mt-4 w-full rounded-2xl bg-[#f59e0b] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
+                      {sending ? 'Gönderiliyor...' : 'Gönder'}
+                    </button>
+                  </div>
+                </div>
+              </PanelCard>
+            </section>
+          )}
+
+          {activeTab === 'duyurular' && (
+            <section className="mt-6">
+              <PanelCard>
+                <h2 className="text-lg font-semibold text-slate-900">Duyuru listesi</h2>
+                <div className="mt-6 space-y-3">
+                  {announcements.length ? announcements.map((announcement) => (
+                    <div key={announcement.id} className="rounded-[22px] border border-slate-200 px-4 py-4">
+                      <div className="text-base font-semibold text-slate-900">{announcement.baslik}</div>
+                      <div className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-400">{formatDateTime(announcement.created_at)}</div>
+                      <div className="mt-3 text-sm leading-7 text-slate-600">{announcement.icerik}</div>
+                    </div>
+                  )) : (
+                    <EmptyState title="Henüz duyuru yok" description="Okul yeni duyuru paylaştığında burada görünecek." />
+                  )}
+                </div>
+              </PanelCard>
+            </section>
+          )}
+
+          {activeTab === 'aidatlar' && (
+            <section className="mt-6 space-y-6">
+              <PanelCard className="bg-[linear-gradient(135deg,#fff7ed,white)]">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Toplam bekleyen tutar</h2>
+                    <div className="mt-2 text-4xl font-semibold tracking-[-0.05em] text-[#f59e0b]">{formatCurrency(totalPending)}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <FilterChip active={feeFilter === 'hepsi'} onClick={() => setFeeFilter('hepsi')}>Hepsi</FilterChip>
+                    <FilterChip active={feeFilter === 'bekleyen'} onClick={() => setFeeFilter('bekleyen')}>Bekleyen</FilterChip>
+                    <FilterChip active={feeFilter === 'odendi'} onClick={() => setFeeFilter('odendi')}>Ödendi</FilterChip>
+                  </div>
+                </div>
+              </PanelCard>
+
+              <PanelCard>
+                <div className="space-y-3">
+                  {filteredFees.length ? filteredFees.map((fee) => (
+                    <div key={fee.id} className="flex flex-wrap items-center justify-between gap-4 rounded-[22px] border border-slate-200 px-4 py-4">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">{fee.donem || fee.ay}</div>
+                        <div className="mt-1 text-xs text-slate-500">Son ödeme: {formatDateLabel(fee.son_odeme || fee.odeme_tarihi)}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-base font-semibold text-slate-900">{formatCurrency(Number(fee.tutar || 0))}</div>
+                        <span className={cx(
+                          'mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold',
+                          fee.odendi ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                        )}>
+                          {fee.odendi ? 'Ödendi' : 'Bekleyen'}
+                        </span>
                       </div>
                     </div>
-                  </div>
-                )) : (
-                  <EmptyState title="Aidat kaydı yok" description="Okul aidat girişi yaptığında burada görüntülenir." />
-                )}
-              </div>
-            </PanelCard>
-          </section>
-        )}
+                  )) : (
+                    <EmptyState title="Kayıt bulunamadı" description="Bu filtreye uygun aidat kaydı yok." />
+                  )}
+                </div>
+              </PanelCard>
+            </section>
+          )}
 
-        {activeTab === 'cocugum' && (
-          <section className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-            <PanelCard>
-              <h2 className="text-lg font-semibold text-slate-900">Çocuğum</h2>
-              <div className="mt-6 space-y-4">
-                <InfoRow label="Ad soyad" value={selectedChild?.ad_soyad} />
-                <InfoRow label="Sınıf" value={selectedChild?.sinif} />
-                <InfoRow label="Doğum tarihi" value={selectedChild?.dogum_tarihi} />
-                <InfoRow label="Alerji" value={selectedChild?.alerjiler} />
-                <InfoRow label="Veli adı" value={selectedChild?.veli_ad} />
-              </div>
-            </PanelCard>
+          {activeTab === 'cocugum' && (
+            <section className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+              <PanelCard>
+                <h2 className="text-lg font-semibold text-slate-900">Çocuk bilgileri</h2>
+                <div className="mt-6 space-y-3">
+                  <InfoRow label="Ad soyad" value={selectedChild?.ad_soyad} />
+                  <InfoRow label="Sınıf" value={selectedChild?.sinif} />
+                  <InfoRow label="Yaş" value={childAge !== null ? `${childAge} yaş` : null} />
+                  <InfoRow label="Doğum tarihi" value={formatDateLabel(selectedChild?.dogum_tarihi)} />
+                  <InfoRow label="Alerji / özel durum" value={selectedChild?.alerji || selectedChild?.alerjiler || selectedChild?.notlar} />
+                </div>
+              </PanelCard>
 
-            <PanelCard>
-              <h2 className="text-lg font-semibold text-slate-900">Bugünkü özet</h2>
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <SummaryCard title="Yoklama" value={attendanceStatus || 'Henüz işlenmedi'} />
-                <SummaryCard title="Aktivite" value={`${activities.length} kayıt`} />
-                <SummaryCard title="Bekleyen aidat" value={`${unpaidFees.length} kalem`} />
-                <SummaryCard title="Son güncelleme" value={activities[0]?.created_at ? formatDateTime(activities[0].created_at) : 'Bugün'} />
-              </div>
-            </PanelCard>
-          </section>
-        )}
+              <PanelCard>
+                <h2 className="text-lg font-semibold text-slate-900">Bugünkü özet</h2>
+                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                  <SummaryCard title="Bugünkü aktivite" value={`${activities.length} kayıt`} />
+                  <SummaryCard title="Yoklama" value={attendanceStatus || 'Bekleniyor'} />
+                  <SummaryCard title="Bekleyen aidat" value={`${fees.filter((item) => !item.odendi).length} kalem`} />
+                  <SummaryCard title="Son güncelleme" value={activities[0] ? formatDateTime(activities[0].created_at || activities[0].olusturuldu) : 'Bugün'} />
+                </div>
+              </PanelCard>
+            </section>
+          )}
+        </div>
       </div>
     </main>
   )
 }
 
 function PanelCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <section className={cx('rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm', className)}>{children}</section>
+  return <section className={cx('rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm', className)}>{children}</section>
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-5">
+    <div className="rounded-[20px] border border-slate-200 bg-white px-4 py-4">
       <div className="text-sm text-slate-500">{label}</div>
-      <div className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-900">{value}</div>
+      <div className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-slate-900">{value}</div>
+    </div>
+  )
+}
+
+function FilterChip({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className={cx('rounded-full px-4 py-2 text-sm font-semibold transition', active ? 'bg-[#f59e0b] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+      {children}
+    </button>
+  )
+}
+
+function InfoRow({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="rounded-[20px] border border-slate-200 px-4 py-4">
+      <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{label}</div>
+      <div className="mt-2 text-sm font-semibold text-slate-900">{value || 'Bilgi girilmedi'}</div>
     </div>
   )
 }
 
 function SummaryCard({ title, value }: { title: string; value: string }) {
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-5">
+    <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4">
       <div className="text-sm text-slate-500">{title}</div>
       <div className="mt-2 text-xl font-semibold text-slate-900">{value}</div>
-    </div>
-  )
-}
-
-function InfoRow({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 px-4 py-4">
-      <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{label}</div>
-      <div className="mt-2 text-base font-medium text-slate-900">{value || 'Bilgi girilmedi'}</div>
     </div>
   )
 }

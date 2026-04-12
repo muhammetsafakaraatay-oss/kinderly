@@ -8,13 +8,14 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
 import {
+  createSignedPhotoUrl,
   getSupabaseErrorMessage,
   insertActivityCompat,
+  insertAnnouncementCompat,
   insertMessageCompat,
   loadAnnouncementsCompat,
   loadSchoolMessagesCompat,
   markMessagesReadCompat,
-  normalizeAnnouncement,
   resolveTeacherMessageParties,
   upsertAttendanceCompat,
   type AnnouncementItem,
@@ -25,8 +26,8 @@ import type { Ogrenci, Okul } from '@/lib/types'
 const serif = Instrument_Serif({ subsets: ['latin'], weight: '400', variable: '--font-serif' })
 const sans = DM_Sans({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700'], variable: '--font-sans' })
 
-type TeacherTab = 'dashboard' | 'yoklama' | 'aktiviteler' | 'mesajlar' | 'duyurular' | 'fotograflar'
-type AttendanceStatus = 'geldi' | 'gelmedi' | 'izinli'
+type TeacherTab = 'dashboard' | 'yoklama' | 'aktiviteler' | 'mesajlar' | 'duyurular' | 'fotograflar' | 'gunluk'
+type AttendanceStatus = 'geldi' | 'gelmedi' | 'izinli' | ''
 type ActivityType = 'food' | 'nap' | 'potty' | 'photo' | 'kudos' | 'meds' | 'incident' | 'health' | 'note'
 
 type TeacherProfile = {
@@ -39,137 +40,121 @@ type ActivityRow = {
   id: number
   ogrenci_id: number
   tur: ActivityType | string
-  detay?: Record<string, string | number | boolean | null> | null
+  detay?: Record<string, unknown> | null
   kaydeden?: string | null
   created_at?: string | null
+  olusturuldu?: string | null
   ogrenciler?: { ad_soyad?: string | null } | { ad_soyad?: string | null }[] | null
 }
 
-type PhotoRow = {
+type PhotoCard = {
   id: number
-  ogrenci_id?: number | null
-  url: string
-  aciklama?: string | null
-  sinif?: string | null
-  created_at?: string | null
-  tarih?: string | null
+  ogrenci_id: number
+  studentName: string
+  note: string
+  imageUrl: string | null
+  createdAt: string | null
 }
 
-type ActivityField =
-  | { key: string; label: string; kind: 'text' | 'textarea' | 'number' | 'time' }
-  | { key: string; label: string; kind: 'select'; options: string[] }
-  | { key: string; label: string; kind: 'checkbox' }
-
-const tabs: Array<{ id: TeacherTab; label: string }> = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'yoklama', label: 'Yoklama' },
-  { id: 'aktiviteler', label: 'Aktiviteler' },
-  { id: 'mesajlar', label: 'Mesajlar' },
-  { id: 'duyurular', label: 'Duyurular' },
-  { id: 'fotograflar', label: 'Fotoğraflar' },
+const tabs: Array<{ id: TeacherTab; label: string; icon: string }> = [
+  { id: 'dashboard', label: 'Dashboard', icon: '🏠' },
+  { id: 'yoklama', label: 'Yoklama', icon: '✅' },
+  { id: 'aktiviteler', label: 'Aktiviteler', icon: '⚡' },
+  { id: 'mesajlar', label: 'Mesajlar', icon: '💬' },
+  { id: 'duyurular', label: 'Duyurular', icon: '📢' },
+  { id: 'fotograflar', label: 'Fotoğraflar', icon: '📷' },
+  { id: 'gunluk', label: 'Günlük Rapor', icon: '📋' },
 ]
 
-const activityOptions: Array<{ id: ActivityType; label: string }> = [
-  { id: 'food', label: 'Yemek' },
-  { id: 'nap', label: 'Uyku' },
-  { id: 'potty', label: 'Tuvalet' },
-  { id: 'photo', label: 'Fotoğraf' },
-  { id: 'kudos', label: 'Tebrik' },
-  { id: 'meds', label: 'İlaç' },
-  { id: 'incident', label: 'Kaza' },
-  { id: 'health', label: 'Sağlık' },
-  { id: 'note', label: 'Not' },
+const activityTypeConfig: Array<{ id: ActivityType; label: string; emoji: string; color: string; bg: string }> = [
+  { id: 'food', label: 'Yemek', emoji: '🍎', color: '#00b884', bg: '#dcfce7' },
+  { id: 'nap', label: 'Uyku', emoji: '😴', color: '#3d4eb8', bg: '#e0e7ff' },
+  { id: 'potty', label: 'Tuvalet', emoji: '🚽', color: '#00b8d4', bg: '#e0f2fe' },
+  { id: 'photo', label: 'Fotoğraf', emoji: '📷', color: '#e91e8c', bg: '#fce7f3' },
+  { id: 'kudos', label: 'Tebrik', emoji: '⭐', color: '#9c27b0', bg: '#f3e8ff' },
+  { id: 'meds', label: 'İlaç', emoji: '💊', color: '#f5a623', bg: '#fef3c7' },
+  { id: 'incident', label: 'Kaza', emoji: '🩹', color: '#f44336', bg: '#fee2e2' },
+  { id: 'health', label: 'Sağlık', emoji: '🌡️', color: '#7c4dff', bg: '#ede9fe' },
+  { id: 'note', label: 'Not', emoji: '📝', color: '#00897b', bg: '#ccfbf1' },
 ]
-
-const activityFieldMap: Record<ActivityType, ActivityField[]> = {
-  food: [
-    { key: 'ogun', label: 'Öğün', kind: 'select', options: ['Kahvaltı', 'Öğle', 'İkindi'] },
-    { key: 'miktar', label: 'Miktar', kind: 'text' },
-    { key: 'not', label: 'Not', kind: 'textarea' },
-  ],
-  nap: [
-    { key: 'baslangic', label: 'Başlangıç', kind: 'time' },
-    { key: 'bitis', label: 'Bitiş', kind: 'time' },
-    { key: 'sure', label: 'Süre', kind: 'text' },
-    { key: 'not', label: 'Not', kind: 'textarea' },
-  ],
-  potty: [
-    { key: 'durum', label: 'Durum', kind: 'select', options: ['Başarılı', 'Destekli', 'Kontrol'] },
-    { key: 'not', label: 'Not', kind: 'textarea' },
-  ],
-  photo: [
-    { key: 'aciklama', label: 'Açıklama', kind: 'textarea' },
-    { key: 'veli_gosterilsin', label: 'Veliye gösterilsin', kind: 'checkbox' },
-  ],
-  kudos: [
-    { key: 'baslik', label: 'Tebrik başlığı', kind: 'text' },
-    { key: 'not', label: 'Kutlama notu', kind: 'textarea' },
-  ],
-  meds: [
-    { key: 'ilac', label: 'İlaç adı', kind: 'text' },
-    { key: 'doz', label: 'Doz', kind: 'text' },
-    { key: 'saat', label: 'Saat', kind: 'time' },
-    { key: 'not', label: 'Not', kind: 'textarea' },
-  ],
-  incident: [
-    { key: 'olay', label: 'Olay özeti', kind: 'text' },
-    { key: 'aksiyon', label: 'Alınan aksiyon', kind: 'textarea' },
-  ],
-  health: [
-    { key: 'ates', label: 'Ateş', kind: 'text' },
-    { key: 'durum', label: 'Durum', kind: 'text' },
-    { key: 'not', label: 'Not', kind: 'textarea' },
-  ],
-  note: [
-    { key: 'baslik', label: 'Başlık', kind: 'text' },
-    { key: 'not', label: 'Not', kind: 'textarea' },
-  ],
-}
-
-const attendanceOptions: AttendanceStatus[] = ['geldi', 'gelmedi', 'izinli']
 
 function today() {
   return new Date().toISOString().split('T')[0]
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) return 'Bugün'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'Bugün'
-  return date.toLocaleString('tr-TR', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(' ')
 }
 
-function getActivityStudentName(activity: ActivityRow) {
-  if (Array.isArray(activity.ogrenciler)) {
-    return activity.ogrenciler[0]?.ad_soyad ?? 'Öğrenci'
-  }
-
-  return activity.ogrenciler?.ad_soyad ?? 'Öğrenci'
+function initials(name?: string | null) {
+  return (name || 'Kinderly')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
 }
 
-function getActivitySummary(activity: ActivityRow) {
+function formatDateLabel(value?: string | null) {
+  const date = value ? new Date(value) : new Date()
+  if (Number.isNaN(date.getTime())) return 'Bugün'
+  return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })
+}
+
+function formatTime(value?: string | null) {
+  if (!value) return 'Bugün'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Bugün'
+  return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return 'Bugün'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Bugün'
+  return date.toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+function activityMeta(type: string) {
+  return activityTypeConfig.find((item) => item.id === type) || { id: type as ActivityType, label: type, emoji: '📋', color: '#64748b', bg: '#f1f5f9' }
+}
+
+function activityStudentName(activity: ActivityRow) {
+  if (Array.isArray(activity.ogrenciler)) return activity.ogrenciler[0]?.ad_soyad || 'Öğrenci'
+  return activity.ogrenciler?.ad_soyad || 'Öğrenci'
+}
+
+function activitySummary(activity: ActivityRow) {
   const detay = activity.detay || {}
-  const firstValue = ['not', 'aciklama', 'durum', 'olay', 'miktar', 'ogun', 'ilac']
-    .map((key) => detay[key])
-    .find(Boolean)
+  const values = [
+    detay.not,
+    detay.aciklama,
+    detay.ogun ? `${String(detay.ogun)}${detay.yeme ? ` · ${String(detay.yeme)}` : ''}` : null,
+    detay.sure,
+    detay.ilac ? `${String(detay.ilac)}${detay.doz ? ` · ${String(detay.doz)}` : ''}` : null,
+    detay.ates ? `${String(detay.ates)}°C` : null,
+    detay.olay,
+    detay.durum,
+  ].filter(Boolean)
 
-  return firstValue ? String(firstValue) : 'Yeni kayıt oluşturuldu.'
+  return values[0] ? String(values[0]) : 'Detay eklenmedi'
 }
 
-function createInitialActivityForm(type: ActivityType) {
-  const fields = activityFieldMap[type]
-  return Object.fromEntries(
-    fields.map((field) => [field.key, field.kind === 'checkbox' ? true : ''])
-  ) as Record<string, string | boolean>
+function getStoragePath(detay?: Record<string, unknown> | null) {
+  const storagePath = typeof detay?.storagePath === 'string' ? detay.storagePath : typeof detay?.path === 'string' ? detay.path : null
+  return storagePath || null
+}
+
+async function uploadPhotoFile(okulId: number | string, ogrenciId: number, file: File) {
+  const storagePath = `${okulId}/${ogrenciId}/${Date.now()}-${file.name.replace(/\s+/g, '-')}`
+  const { error } = await supabase.storage.from('photos').upload(storagePath, file, {
+    contentType: file.type || 'image/jpeg',
+    upsert: true,
+  })
+
+  if (error) throw error
+  return storagePath
 }
 
 export default function OgretmenPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -178,32 +163,36 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
   const [slug, setSlug] = useState('')
   const [activeTab, setActiveTab] = useState<TeacherTab>('dashboard')
   const [teacher, setTeacher] = useState<TeacherProfile | null>(null)
-  const [ogrenciler, setOgrenciler] = useState<Ogrenci[]>([])
+  const [students, setStudents] = useState<Ogrenci[]>([])
   const [attendance, setAttendance] = useState<Record<number, AttendanceStatus>>({})
   const [activities, setActivities] = useState<ActivityRow[]>([])
   const [messages, setMessages] = useState<NormalizedMessage[]>([])
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([])
-  const [photos, setPhotos] = useState<PhotoRow[]>([])
+  const [photoCards, setPhotoCards] = useState<PhotoCard[]>([])
   const [pageLoading, setPageLoading] = useState(true)
-  const [selectedClass, setSelectedClass] = useState('all')
+  const [statusMessage, setStatusMessage] = useState('')
+  const [classFilter, setClassFilter] = useState('all')
+  const [activitySearch, setActivitySearch] = useState('')
   const [selectedActivityStudentId, setSelectedActivityStudentId] = useState<number | null>(null)
   const [selectedMessageStudentId, setSelectedMessageStudentId] = useState<number | null>(null)
+  const [selectedReportStudentId, setSelectedReportStudentId] = useState<number | null>(null)
   const [selectedPhotoStudentId, setSelectedPhotoStudentId] = useState<number | null>(null)
   const [activityType, setActivityType] = useState<ActivityType>('food')
-  const [activityForm, setActivityForm] = useState<Record<string, string | boolean>>(createInitialActivityForm('food'))
-  const [announcementTitle, setAnnouncementTitle] = useState('')
-  const [announcementBody, setAnnouncementBody] = useState('')
-  const [threadMessage, setThreadMessage] = useState('')
-  const [bulkMessage, setBulkMessage] = useState('')
-  const [photoNote, setPhotoNote] = useState('')
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [activityForm, setActivityForm] = useState<Record<string, string>>({})
+  const [activityNote, setActivityNote] = useState('')
+  const [activityPhotoFile, setActivityPhotoFile] = useState<File | null>(null)
+  const [threadDraft, setThreadDraft] = useState('')
+  const [bulkDraft, setBulkDraft] = useState('')
+  const [announcementForm, setAnnouncementForm] = useState({ baslik: '', icerik: '' })
+  const [announcementModalOpen, setAnnouncementModalOpen] = useState(false)
+  const [galleryUpload, setGalleryUpload] = useState<File | null>(null)
+  const [galleryNote, setGalleryNote] = useState('')
   const [savingAttendance, setSavingAttendance] = useState(false)
   const [savingActivity, setSavingActivity] = useState(false)
-  const [sendingMessage, setSendingMessage] = useState(false)
-  const [sendingBulkMessage, setSendingBulkMessage] = useState(false)
+  const [sendingThread, setSendingThread] = useState(false)
+  const [sendingBulk, setSendingBulk] = useState(false)
   const [savingAnnouncement, setSavingAnnouncement] = useState(false)
-  const [uploadingPhoto, setUploadingPhoto] = useState(false)
-  const [statusMessage, setStatusMessage] = useState('')
+  const [uploadingGallery, setUploadingGallery] = useState(false)
 
   useEffect(() => {
     void params.then((value) => setSlug(value.slug))
@@ -234,13 +223,13 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
     if (!okul || !session) return
 
     let alive = true
-    const currentSession = session
     const currentOkul = okul
+    const currentSession = session
 
-    async function loadPanelData() {
+    async function loadData() {
       setPageLoading(true)
 
-      const [{ data: personel, error: personelError }, { data: students, error: studentsError }] = await Promise.all([
+      const [{ data: personel, error: personelError }, { data: studentRows, error: studentError }, { data: classRows }] = await Promise.all([
         supabase
           .from('personel')
           .select('id,ad_soyad,sinif')
@@ -253,35 +242,34 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
           .eq('okul_id', currentOkul.id)
           .eq('aktif', true)
           .order('ad_soyad'),
+        supabase.from('siniflar').select('id,ad').eq('okul_id', currentOkul.id).order('ad'),
       ])
 
       if (!alive) return
 
       if (personelError || !personel?.id) {
-        setStatusMessage(getSupabaseErrorMessage(personelError, 'Öğretmen profili yüklenemedi.'))
+        setStatusMessage(getSupabaseErrorMessage(personelError, 'Öğretmen bilgisi yüklenemedi.'))
         setPageLoading(false)
         return
       }
 
-      if (studentsError) {
-        setStatusMessage(getSupabaseErrorMessage(studentsError, 'Öğrenci listesi yüklenemedi.'))
+      if (studentError) {
+        setStatusMessage(getSupabaseErrorMessage(studentError, 'Öğrenciler yüklenemedi.'))
       }
 
-      const safeStudents = (students || []) as Ogrenci[]
-      const classFallback = personel.sinif || 'all'
+      const nextStudents = (studentRows || []) as Ogrenci[]
 
-      const [attendanceQuery, activityQuery, messageQuery, announcementQuery, photoQuery] = await Promise.all([
+      const [attendanceQuery, activityQuery, messageQuery, announcementQuery] = await Promise.all([
         supabase.from('yoklama').select('ogrenci_id,durum').eq('okul_id', currentOkul.id).eq('tarih', today()),
         supabase
           .from('aktiviteler')
-          .select('id,ogrenci_id,tur,detay,kaydeden,created_at,ogrenciler(ad_soyad)')
+          .select('id,ogrenci_id,tur,detay,kaydeden,created_at,olusturuldu,ogrenciler(ad_soyad)')
           .eq('okul_id', currentOkul.id)
           .eq('tarih', today())
           .order('id', { ascending: false })
-          .limit(24),
-        loadSchoolMessagesCompat(currentOkul.id, 300),
-        loadAnnouncementsCompat(currentOkul.id, 20),
-        supabase.from('fotograflar').select('*').eq('okul_id', currentOkul.id).order('id', { ascending: false }).limit(60),
+          .limit(120),
+        loadSchoolMessagesCompat(currentOkul.id, 400),
+        loadAnnouncementsCompat(currentOkul.id, 30),
       ])
 
       if (!alive) return
@@ -291,39 +279,88 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
         nextAttendance[row.ogrenci_id] = row.durum
       })
 
+      const activityRows = (activityQuery.data || []) as ActivityRow[]
+      const photoRows = activityRows.filter((item) => item.tur === 'photo')
+      const nextPhotos = await Promise.all(
+        photoRows.map(async (row) => {
+          const detay = row.detay || {}
+          const existingUrl = typeof detay.url === 'string' ? detay.url : null
+          const storagePath = getStoragePath(detay)
+          const signed = storagePath ? await createSignedPhotoUrl(storagePath) : { data: existingUrl, error: null }
+          return {
+            id: row.id,
+            ogrenci_id: row.ogrenci_id,
+            studentName: activityStudentName(row),
+            note: typeof detay.not === 'string' ? detay.not : typeof detay.aciklama === 'string' ? detay.aciklama : '',
+            imageUrl: signed.data || existingUrl,
+            createdAt: row.created_at || row.olusturuldu || null,
+          } satisfies PhotoCard
+        })
+      )
+
+      const teacherClass = personel.sinif || (classRows || [])[0]?.ad || 'all'
       setTeacher(personel as TeacherProfile)
-      setOgrenciler(safeStudents)
+      setStudents(nextStudents)
       setAttendance(nextAttendance)
-      setActivities((activityQuery.data || []) as ActivityRow[])
+      setActivities(activityRows)
       setMessages(messageQuery.data || [])
       setAnnouncements(announcementQuery.data || [])
-      setPhotos((photoQuery.data || []) as PhotoRow[])
-      setSelectedClass((current) => (current === 'all' ? classFallback : current))
-      setSelectedActivityStudentId((current) => current ?? safeStudents[0]?.id ?? null)
-      setSelectedMessageStudentId((current) => current ?? safeStudents[0]?.id ?? null)
-      setSelectedPhotoStudentId((current) => current ?? safeStudents[0]?.id ?? null)
+      setPhotoCards(nextPhotos.filter((item) => item.imageUrl))
+      setClassFilter((current) => (current === 'all' ? teacherClass : current))
+      setSelectedActivityStudentId((current) => current ?? nextStudents[0]?.id ?? null)
+      setSelectedMessageStudentId((current) => current ?? nextStudents[0]?.id ?? null)
+      setSelectedReportStudentId((current) => current ?? nextStudents[0]?.id ?? null)
+      setSelectedPhotoStudentId((current) => current ?? nextStudents[0]?.id ?? null)
       setPageLoading(false)
     }
 
-    void loadPanelData()
+    void loadData()
 
     const channel = supabase
-      .channel(`ogretmen-panel-${currentOkul.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesajlar', filter: `okul_id=eq.${currentOkul.id}` }, () => {
-        void loadSchoolMessagesCompat(currentOkul.id, 300).then((result) => setMessages(result.data || []))
+      .channel(`ogretmen-web-${currentOkul.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesajlar', filter: `okul_id=eq.${currentOkul.id}` }, async () => {
+        const result = await loadSchoolMessagesCompat(currentOkul.id, 400)
+        setMessages(result.data || [])
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'duyurular', filter: `okul_id=eq.${currentOkul.id}` }, () => {
-        void loadAnnouncementsCompat(currentOkul.id, 20).then((result) => setAnnouncements(result.data || []))
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'aktiviteler', filter: `okul_id=eq.${currentOkul.id}` }, () => {
-        void supabase
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'aktiviteler', filter: `okul_id=eq.${currentOkul.id}` }, async () => {
+        const { data } = await supabase
           .from('aktiviteler')
-          .select('id,ogrenci_id,tur,detay,kaydeden,created_at,ogrenciler(ad_soyad)')
+          .select('id,ogrenci_id,tur,detay,kaydeden,created_at,olusturuldu,ogrenciler(ad_soyad)')
           .eq('okul_id', currentOkul.id)
           .eq('tarih', today())
           .order('id', { ascending: false })
-          .limit(24)
-          .then(({ data }) => setActivities((data || []) as ActivityRow[]))
+          .limit(120)
+        const rows = (data || []) as ActivityRow[]
+        setActivities(rows)
+        const nextPhotos = await Promise.all(
+          rows.filter((item) => item.tur === 'photo').map(async (row) => {
+            const detay = row.detay || {}
+            const existingUrl = typeof detay.url === 'string' ? detay.url : null
+            const storagePath = getStoragePath(detay)
+            const signed = storagePath ? await createSignedPhotoUrl(storagePath) : { data: existingUrl, error: null }
+            return {
+              id: row.id,
+              ogrenci_id: row.ogrenci_id,
+              studentName: activityStudentName(row),
+              note: typeof detay.not === 'string' ? detay.not : typeof detay.aciklama === 'string' ? detay.aciklama : '',
+              imageUrl: signed.data || existingUrl,
+              createdAt: row.created_at || row.olusturuldu || null,
+            } satisfies PhotoCard
+          })
+        )
+        setPhotoCards(nextPhotos.filter((item) => item.imageUrl))
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'yoklama', filter: `okul_id=eq.${currentOkul.id}` }, async () => {
+        const { data } = await supabase.from('yoklama').select('ogrenci_id,durum').eq('okul_id', currentOkul.id).eq('tarih', today())
+        const nextAttendance: Record<number, AttendanceStatus> = {}
+        ;(data || []).forEach((row: { ogrenci_id: number; durum: AttendanceStatus }) => {
+          nextAttendance[row.ogrenci_id] = row.durum
+        })
+        setAttendance(nextAttendance)
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'duyurular', filter: `okul_id=eq.${currentOkul.id}` }, async () => {
+        const result = await loadAnnouncementsCompat(currentOkul.id, 30)
+        setAnnouncements(result.data || [])
       })
       .subscribe()
 
@@ -334,37 +371,29 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
   }, [okul, session])
 
   const classOptions = useMemo(() => {
-    const values = Array.from(new Set(ogrenciler.map((item) => item.sinif).filter(Boolean))) as string[]
+    const values = Array.from(new Set(students.map((student) => student.sinif).filter(Boolean))) as string[]
     return values.sort((a, b) => a.localeCompare(b, 'tr'))
-  }, [ogrenciler])
+  }, [students])
 
   const filteredStudents = useMemo(() => {
-    if (selectedClass === 'all') return ogrenciler
-    return ogrenciler.filter((ogrenci) => ogrenci.sinif === selectedClass)
-  }, [ogrenciler, selectedClass])
+    const byClass = classFilter === 'all' ? students : students.filter((student) => student.sinif === classFilter)
+    return byClass
+  }, [classFilter, students])
 
-  const selectedMessageStudent = useMemo(
-    () => ogrenciler.find((ogrenci) => ogrenci.id === selectedMessageStudentId) ?? null,
-    [ogrenciler, selectedMessageStudentId]
-  )
+  const searchableStudents = useMemo(() => {
+    const base = filteredStudents.length ? filteredStudents : students
+    if (!activitySearch.trim()) return base
+    return base.filter((student) => student.ad_soyad.toLocaleLowerCase('tr-TR').includes(activitySearch.toLocaleLowerCase('tr-TR')))
+  }, [activitySearch, filteredStudents, students])
 
-  const selectedActivityStudent = useMemo(
-    () => ogrenciler.find((ogrenci) => ogrenci.id === selectedActivityStudentId) ?? null,
-    [ogrenciler, selectedActivityStudentId]
-  )
-
-  const selectedPhotoStudent = useMemo(
-    () => ogrenciler.find((ogrenci) => ogrenci.id === selectedPhotoStudentId) ?? null,
-    [ogrenciler, selectedPhotoStudentId]
-  )
-
-  const attendanceSummary = useMemo(() => {
-    const values = filteredStudents.map((ogrenci) => attendance[ogrenci.id]).filter(Boolean)
+  const attendanceStats = useMemo(() => {
+    const values = filteredStudents.map((student) => attendance[student.id])
     const geldi = values.filter((value) => value === 'geldi').length
     const gelmedi = values.filter((value) => value === 'gelmedi').length
     const izinli = values.filter((value) => value === 'izinli').length
-    const rate = filteredStudents.length ? Math.round((geldi / filteredStudents.length) * 100) : 0
-    return { geldi, gelmedi, izinli, rate }
+    const bekliyor = filteredStudents.length - geldi - gelmedi - izinli
+    const progress = filteredStudents.length ? Math.round((geldi / filteredStudents.length) * 100) : 0
+    return { geldi, gelmedi, izinli, bekliyor, progress }
   }, [attendance, filteredStudents])
 
   const unreadByStudent = useMemo(() => {
@@ -377,29 +406,44 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
     return map
   }, [messages])
 
-  const threadMessages = useMemo(
-    () => messages.filter((message) => message.ogrenci_id === selectedMessageStudentId),
+  const selectedMessageStudent = useMemo(
+    () => students.find((student) => student.id === selectedMessageStudentId) || null,
+    [selectedMessageStudentId, students]
+  )
+
+  const selectedReportStudent = useMemo(
+    () => students.find((student) => student.id === selectedReportStudentId) || null,
+    [selectedReportStudentId, students]
+  )
+
+  const messageThread = useMemo(
+    () => messages.filter((message) => message.ogrenci_id === selectedMessageStudentId).sort((a, b) => a.created_at.localeCompare(b.created_at)),
     [messages, selectedMessageStudentId]
   )
 
-  const photoGallery = useMemo(() => {
-    if (!selectedPhotoStudentId) return photos
-    return photos.filter((photo) => photo.ogrenci_id === selectedPhotoStudentId)
-  }, [photos, selectedPhotoStudentId])
+  const reportActivities = useMemo(
+    () => activities.filter((activity) => activity.ogrenci_id === selectedReportStudentId),
+    [activities, selectedReportStudentId]
+  )
+
+  const galleryItems = useMemo(
+    () => selectedPhotoStudentId ? photoCards.filter((item) => item.ogrenci_id === selectedPhotoStudentId) : photoCards,
+    [photoCards, selectedPhotoStudentId]
+  )
 
   useEffect(() => {
-    if (!selectedMessageStudentId || !teacher || !okul) return
+    if (!okul || !selectedMessageStudentId || !teacher) return
     void markMessagesReadCompat(okul.id, selectedMessageStudentId, teacher.id)
   }, [okul, selectedMessageStudentId, teacher])
 
   async function handleAttendanceSave() {
     if (!okul) return
 
-    const rows = filteredStudents
-      .map((ogrenci) => ({ ogrenci_id: ogrenci.id, durum: attendance[ogrenci.id] }))
-      .filter((row): row is { ogrenci_id: number; durum: AttendanceStatus } => Boolean(row.durum))
-
     setSavingAttendance(true)
+    const rows = filteredStudents
+      .filter((student) => attendance[student.id])
+      .map((student) => ({ ogrenci_id: student.id, durum: attendance[student.id] }))
+
     const { error } = await upsertAttendanceCompat(okul.id, today(), rows)
     setSavingAttendance(false)
 
@@ -412,122 +456,124 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
   }
 
   async function handleActivitySave() {
-    if (!okul || !selectedActivityStudent) return
+    if (!okul || !selectedActivityStudentId) return
 
     setSavingActivity(true)
-    const { error } = await insertActivityCompat({
-      okul_id: okul.id,
-      ogrenci_id: selectedActivityStudent.id,
-      tarih: today(),
-      tur: activityType,
-      detay: activityForm,
-      kaydeden: teacher?.ad_soyad || 'Öğretmen',
-      veli_gosterilsin: true,
-    })
-    setSavingActivity(false)
+    const detail: Record<string, unknown> = { ...activityForm }
+    if (activityNote.trim()) detail.not = activityNote.trim()
 
-    if (error) {
-      setStatusMessage(getSupabaseErrorMessage(error, 'Aktivite kaydı oluşturulamadı.'))
-      return
+    try {
+      if (activityType === 'photo' && activityPhotoFile) {
+        const storagePath = await uploadPhotoFile(okul.id, selectedActivityStudentId, activityPhotoFile)
+        detail.storagePath = storagePath
+        detail.url = null
+      }
+
+      const { error } = await insertActivityCompat({
+        okul_id: okul.id,
+        ogrenci_id: selectedActivityStudentId,
+        tarih: today(),
+        tur: activityType,
+        detay: detail,
+        kaydeden: teacher?.ad_soyad || 'Öğretmen',
+        veli_gosterilsin: true,
+      })
+
+      setSavingActivity(false)
+
+      if (error) {
+        setStatusMessage(getSupabaseErrorMessage(error, 'Aktivite kaydedilemedi.'))
+        return
+      }
+
+      setActivityForm({})
+      setActivityNote('')
+      setActivityPhotoFile(null)
+      setStatusMessage('Aktivite kaydı oluşturuldu.')
+    } catch (error) {
+      setSavingActivity(false)
+      setStatusMessage(getSupabaseErrorMessage(error as { message?: string }, 'Fotoğraf yüklenemedi.'))
     }
-
-    setActivityForm(createInitialActivityForm(activityType))
-    setStatusMessage('Aktivite kaydı oluşturuldu.')
   }
 
   async function handleSendMessage() {
-    if (!session || !okul || !selectedMessageStudent || !threadMessage.trim()) return
+    if (!session || !okul || !selectedMessageStudent || !threadDraft.trim()) return
 
-    setSendingMessage(true)
-
-    const { data: parties, error: partyError } = await resolveTeacherMessageParties(
-      session.user.id,
-      okul.id,
-      selectedMessageStudent.id
-    )
-
+    setSendingThread(true)
+    const { data: parties, error: partyError } = await resolveTeacherMessageParties(session.user.id, okul.id, selectedMessageStudent.id)
     if (partyError || !parties) {
+      setSendingThread(false)
       setStatusMessage(getSupabaseErrorMessage(partyError, 'Veli eşleşmesi bulunamadı.'))
-      setSendingMessage(false)
       return
     }
 
-    const { error } = await insertMessageCompat(
-      {
-        okul_id: okul.id,
-        ogrenci_id: selectedMessageStudent.id,
-        gonderen_id: parties.senderId,
-        gonderen_rol: 'ogretmen',
-        alici_id: parties.receiverId,
-        alici_tip: 'veli',
-        okundu: false,
-        olusturuldu: new Date().toISOString(),
-      },
-      threadMessage.trim()
-    )
+    const { error } = await insertMessageCompat({
+      okul_id: okul.id,
+      ogrenci_id: selectedMessageStudent.id,
+      gonderen_id: parties.senderId,
+      gonderen_rol: 'ogretmen',
+      gonderen_ad: teacher?.ad_soyad || 'Öğretmen',
+      alici_id: parties.receiverId,
+      alici_tip: 'veli',
+      okundu: false,
+      created_at: new Date().toISOString(),
+    }, threadDraft.trim())
 
-    setSendingMessage(false)
+    setSendingThread(false)
 
     if (error) {
       setStatusMessage(getSupabaseErrorMessage(error, 'Mesaj gönderilemedi.'))
       return
     }
 
-    setThreadMessage('')
+    setThreadDraft('')
     setStatusMessage('Mesaj gönderildi.')
   }
 
   async function handleBulkMessage() {
-    if (!session || !okul || !bulkMessage.trim()) return
+    if (!session || !okul || !bulkDraft.trim()) return
+    setSendingBulk(true)
 
-    const targets = filteredStudents
-    setSendingBulkMessage(true)
-
-    for (const ogrenci of targets) {
-      const { data: parties, error: partyError } = await resolveTeacherMessageParties(session.user.id, okul.id, ogrenci.id)
-      if (partyError || !parties) continue
-
-      await insertMessageCompat(
-        {
-          okul_id: okul.id,
-          ogrenci_id: ogrenci.id,
-          gonderen_id: parties.senderId,
-          gonderen_rol: 'ogretmen',
-          alici_id: parties.receiverId,
-          alici_tip: 'veli',
-          okundu: false,
-          olusturuldu: new Date().toISOString(),
-        },
-        bulkMessage.trim()
-      )
+    for (const student of filteredStudents) {
+      const { data: parties } = await resolveTeacherMessageParties(session.user.id, okul.id, student.id)
+      if (!parties?.receiverId) continue
+      await insertMessageCompat({
+        okul_id: okul.id,
+        ogrenci_id: student.id,
+        gonderen_id: parties.senderId,
+        gonderen_rol: 'ogretmen',
+        gonderen_ad: teacher?.ad_soyad || 'Öğretmen',
+        alici_id: parties.receiverId,
+        alici_tip: 'veli',
+        okundu: false,
+        created_at: new Date().toISOString(),
+      }, bulkDraft.trim())
     }
 
-    setSendingBulkMessage(false)
-    setBulkMessage('')
-    setStatusMessage(`Toplu mesaj ${targets.length} öğrenci için kuyruğa alındı.`)
+    setSendingBulk(false)
+    setBulkDraft('')
+    setStatusMessage(`Toplu mesaj ${filteredStudents.length} veliye iletildi.`)
   }
 
   async function handleAnnouncementSave() {
-    if (!okul || !announcementTitle.trim() || !announcementBody.trim()) return
+    if (!okul || !announcementForm.baslik.trim() || !announcementForm.icerik.trim()) return
 
     setSavingAnnouncement(true)
-    const { error } = await supabase.from('duyurular').insert({
-      okul_id: okul.id,
-      baslik: announcementTitle.trim(),
-      icerik: announcementBody.trim(),
-      created_at: new Date().toISOString(),
-      tarih: today(),
-    })
+    const { error } = await insertAnnouncementCompat(
+      { okul_id: okul.id, gonderen_id: session?.user.id ?? null },
+      announcementForm.baslik.trim(),
+      announcementForm.icerik.trim()
+    )
     setSavingAnnouncement(false)
 
     if (error) {
-      setStatusMessage(getSupabaseErrorMessage(error, 'Duyuru kaydedilemedi.'))
+      setStatusMessage(getSupabaseErrorMessage(error, 'Duyuru yayınlanamadı.'))
       return
     }
 
-    setAnnouncementTitle('')
-    setAnnouncementBody('')
-    const result = await loadAnnouncementsCompat(okul.id, 20)
+    setAnnouncementForm({ baslik: '', icerik: '' })
+    setAnnouncementModalOpen(false)
+    const result = await loadAnnouncementsCompat(okul.id, 30)
     setAnnouncements(result.data || [])
     setStatusMessage('Duyuru yayınlandı.')
   }
@@ -538,674 +584,707 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
       setStatusMessage(getSupabaseErrorMessage(error, 'Duyuru silinemedi.'))
       return
     }
-
     setAnnouncements((current) => current.filter((item) => item.id !== id))
-    setStatusMessage('Duyuru silindi.')
   }
 
-  async function handlePhotoUpload() {
-    if (!okul || !selectedPhotoStudent || !photoFile) return
+  async function handleGalleryUpload() {
+    if (!okul || !selectedPhotoStudentId || !galleryUpload) return
 
-    setUploadingPhoto(true)
-    const fileName = `${Date.now()}-${selectedPhotoStudent.id}-${photoFile.name.replace(/\s+/g, '-')}`
-    const { error: uploadError } = await supabase.storage.from('fotograflar').upload(fileName, photoFile, {
-      contentType: photoFile.type || 'image/jpeg',
-      upsert: true,
-    })
+    setUploadingGallery(true)
+    try {
+      const storagePath = await uploadPhotoFile(okul.id, selectedPhotoStudentId, galleryUpload)
+      const { error } = await insertActivityCompat({
+        okul_id: okul.id,
+        ogrenci_id: selectedPhotoStudentId,
+        tarih: today(),
+        tur: 'photo',
+        detay: {
+          storagePath,
+          not: galleryNote.trim(),
+        },
+        kaydeden: teacher?.ad_soyad || 'Öğretmen',
+        veli_gosterilsin: true,
+      })
+      setUploadingGallery(false)
 
-    if (uploadError) {
-      setUploadingPhoto(false)
-      setStatusMessage(getSupabaseErrorMessage(uploadError, 'Fotoğraf yüklenemedi.'))
-      return
+      if (error) {
+        setStatusMessage(getSupabaseErrorMessage(error, 'Fotoğraf paylaşılamadı.'))
+        return
+      }
+
+      setGalleryUpload(null)
+      setGalleryNote('')
+      setStatusMessage('Fotoğraf galeriye eklendi.')
+    } catch (error) {
+      setUploadingGallery(false)
+      setStatusMessage(getSupabaseErrorMessage(error as { message?: string }, 'Fotoğraf yüklenemedi.'))
     }
-
-    const { data } = supabase.storage.from('fotograflar').getPublicUrl(fileName)
-    const insertResult = await supabase.from('fotograflar').insert({
-      okul_id: okul.id,
-      ogrenci_id: selectedPhotoStudent.id,
-      url: data.publicUrl,
-      aciklama: photoNote.trim(),
-      sinif: selectedPhotoStudent.sinif,
-      tarih: today(),
-      created_at: new Date().toISOString(),
-    })
-
-    setUploadingPhoto(false)
-
-    if (insertResult.error) {
-      setStatusMessage(getSupabaseErrorMessage(insertResult.error, 'Fotoğraf kaydı oluşturulamadı.'))
-      return
-    }
-
-    setPhotoFile(null)
-    setPhotoNote('')
-    const photoResult = await supabase.from('fotograflar').select('*').eq('okul_id', okul.id).order('id', { ascending: false }).limit(60)
-    setPhotos((photoResult.data || []) as PhotoRow[])
-    setStatusMessage('Fotoğraf galeriye eklendi.')
   }
 
   if (loading || pageLoading || !session || !okul) {
     return <LoadingScreen />
   }
 
+  const totalUnread = Array.from(unreadByStudent.values()).reduce((sum, value) => sum + value, 0)
+  const allStudents = students.length
+  const activityToday = activities.length
+
   return (
     <main className={`${serif.variable} ${sans.variable} min-h-screen bg-[#f8fafc] font-sans text-[#0f172a]`}>
       <style>{`
-        .input-base {
+        .panel-input {
           width: 100%;
-          border-radius: 1rem;
           border: 1px solid #e2e8f0;
-          background: #f8fafc;
-          padding: 0.9rem 1rem;
-          font-size: 0.95rem;
+          border-radius: 16px;
+          padding: 0.85rem 1rem;
+          background: #fff;
           color: #0f172a;
           outline: none;
         }
       `}</style>
-      <div className="mx-auto max-w-[1440px] px-5 py-8 lg:px-10">
-        <header className="rounded-[32px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[#10b981]">Öğretmen paneli</div>
-              <h1 className="mt-3 text-[clamp(2.5rem,5vw,4.6rem)] font-semibold leading-[0.92] tracking-[-0.05em] [font-family:var(--font-serif)]">
-                Sınıf akışını tek merkezden yönetin.
-              </h1>
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">
-                {teacher?.ad_soyad || 'Öğretmen'} için yoklama, aktiviteler, mesajlar, duyurular ve galeri tek sayfada.
-              </p>
+
+      <div className="flex min-h-screen flex-col lg:flex-row">
+        <aside className="w-full border-b border-slate-200 bg-white shadow-sm lg:sticky lg:top-0 lg:h-screen lg:w-[260px] lg:flex-none lg:border-b-0 lg:border-r">
+          <div className="flex h-full flex-col px-5 py-6">
+            <div className="flex items-center gap-3">
+              {okul.logo_url ? (
+                <img src={okul.logo_url} alt={okul.ad} className="h-14 w-14 rounded-2xl object-cover ring-1 ring-slate-200" />
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#10b981] text-lg font-bold text-white">
+                  {initials(okul.ad)}
+                </div>
+              )}
+              <div>
+                <div className="text-base font-semibold text-slate-900">{okul.ad}</div>
+                <div className="text-sm text-slate-500">Öğretmen Paneli</div>
+              </div>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Link href={`/${okul.slug}/admin`} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-[#10b981] hover:text-[#10b981]">
-                Admin paneli
-              </Link>
+            <nav className="mt-8 space-y-2">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cx(
+                    'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition',
+                    activeTab === tab.id ? 'bg-emerald-50 text-[#10b981]' : 'text-slate-600 hover:bg-slate-100'
+                  )}
+                >
+                  <span>{tab.icon}</span>
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </nav>
+
+            <div className="mt-auto rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-slate-900">{teacher?.ad_soyad || 'Öğretmen'}</div>
+              <div className="mt-1 text-xs text-slate-500">{teacher?.sinif || 'Tüm sınıflar'}</div>
               <button
                 onClick={async () => {
                   await signOut()
                   router.replace('/giris')
                 }}
-                className="rounded-full bg-[#10b981] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#059669]"
+                className="mt-4 w-full rounded-2xl bg-[#10b981] px-4 py-3 text-sm font-semibold text-white"
               >
                 Çıkış yap
               </button>
             </div>
           </div>
+        </aside>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cx(
-                  'rounded-full px-4 py-2 text-sm font-semibold transition',
-                  activeTab === tab.id ? 'bg-[#10b981] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </header>
-
-        {statusMessage && (
-          <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            {statusMessage}
-          </div>
-        )}
-
-        {activeTab === 'dashboard' && (
-          <section className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-            <PanelCard className="bg-[linear-gradient(135deg,#ecfdf5,white)]">
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <div className="text-sm font-medium text-slate-500">Bugünün devam oranı</div>
-                  <div className="mt-2 text-6xl font-semibold tracking-[-0.05em] text-[#10b981]">
-                    %{attendanceSummary.rate}
-                  </div>
-                </div>
-                <div className="rounded-[24px] border border-emerald-100 bg-white px-5 py-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Aktif filtre</div>
-                  <div className="mt-2 text-xl font-semibold text-slate-900">
-                    {selectedClass === 'all' ? 'Tüm sınıflar' : selectedClass}
-                  </div>
-                </div>
+        <div className="flex-1 px-4 py-5 lg:px-8 lg:py-7">
+          <header className="rounded-[24px] border border-slate-200 bg-white px-5 py-5 shadow-sm">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[#10b981]">{tabs.find((tab) => tab.id === activeTab)?.label}</div>
+                <h1 className="mt-2 text-[clamp(2rem,4vw,3.8rem)] leading-[0.95] tracking-[-0.05em] text-slate-900 [font-family:var(--font-serif)]">
+                  Sınıf akışını webde yönetin.
+                </h1>
+                <p className="mt-3 text-sm leading-7 text-slate-500">{formatDateLabel()} · {teacher?.sinif || 'Tüm sınıflar'}</p>
               </div>
-
-              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <StatCard label="Toplam öğrenci" value={String(filteredStudents.length)} />
-                <StatCard label="Geldi" value={String(attendanceSummary.geldi)} />
-                <StatCard label="Gelmedi" value={String(attendanceSummary.gelmedi)} />
-                <StatCard label="Okunmamış mesaj" value={String(Array.from(unreadByStudent.values()).reduce((sum, item) => sum + item, 0))} />
-              </div>
-            </PanelCard>
-
-            <PanelCard>
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Sınıf filtresi</h2>
-                  <p className="mt-1 text-sm text-slate-500">Yoklama, mesaj ve toplu işlem görünümünü sınıf bazında daraltın.</p>
-                </div>
-                <select
-                  value={selectedClass}
-                  onChange={(event) => setSelectedClass(event.target.value)}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
-                >
-                  <option value="all">Tüm sınıflar</option>
-                  {classOptions.map((sinif) => (
-                    <option key={sinif} value={sinif}>
-                      {sinif}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="mt-6 space-y-3">
-                {filteredStudents.slice(0, 5).map((ogrenci) => (
-                  <div key={ogrenci.id} className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3">
-                    <div>
-                      <div className="font-medium text-slate-900">{ogrenci.ad_soyad}</div>
-                      <div className="text-xs text-slate-500">{ogrenci.sinif || 'Sınıf belirtilmedi'}</div>
-                    </div>
-                    <StatusBadge status={attendance[ogrenci.id] || 'gelmedi'} />
-                  </div>
-                ))}
-              </div>
-            </PanelCard>
-
-            <PanelCard className="xl:col-span-2">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Aktivite akışı</h2>
-                  <p className="mt-1 text-sm text-slate-500">Bugün oluşturulan son kayıtlar.</p>
-                </div>
-                <button
-                  onClick={() => setActiveTab('aktiviteler')}
-                  className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
-                >
-                  Yeni kayıt aç
+              <div className="flex flex-wrap gap-3">
+                <Link href={`/${okul.slug}/admin`} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-[#10b981] hover:text-[#10b981]">
+                  Admin paneli
+                </Link>
+                <button onClick={() => setActiveTab('yoklama')} className="rounded-full bg-[#10b981] px-4 py-2 text-sm font-semibold text-white">
+                  Bugünün yoklaması
                 </button>
               </div>
+            </div>
+          </header>
 
-              <div className="mt-6 grid gap-3">
-                {activities.length ? activities.map((activity) => (
-                  <div key={activity.id} className="rounded-2xl border border-slate-200 px-4 py-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-slate-900">
-                          {activityOptions.find((item) => item.id === activity.tur)?.label || activity.tur} · {getActivityStudentName(activity)}
-                        </div>
-                        <div className="mt-1 text-sm text-slate-600">{getActivitySummary(activity)}</div>
-                      </div>
-                      <div className="text-xs uppercase tracking-[0.14em] text-slate-400">
-                        {formatDateTime(activity.created_at)}
-                      </div>
-                    </div>
-                  </div>
-                )) : (
-                  <EmptyState title="Henüz aktivite yok" description="Yeni kayıtlar burada görünecek." />
-                )}
+          {statusMessage && (
+            <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              {statusMessage}
+            </div>
+          )}
+
+          {activeTab === 'dashboard' && (
+            <section className="mt-6 space-y-6">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <StatCard label="Toplam Öğrenci" value={String(allStudents)} icon="👦" accent="#10b981" bg="#dcfce7" />
+                <StatCard label="Bugün Geldi" value={String(attendanceStats.geldi)} icon="✅" accent="#0284c7" bg="#dbeafe" />
+                <StatCard label="Bugün Aktivite" value={String(activityToday)} icon="⚡" accent="#d97706" bg="#fef3c7" />
+                <StatCard label="Okunmamış Mesaj" value={String(totalUnread)} icon="💬" accent="#7c3aed" bg="#ede9fe" />
               </div>
-            </PanelCard>
-          </section>
-        )}
 
-        {activeTab === 'yoklama' && (
-          <section className="mt-6">
-            <PanelCard>
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Günlük yoklama</h2>
-                  <p className="mt-1 text-sm text-slate-500">Sınıfı filtreleyin, durumları seçin ve toplu kaydedin.</p>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <select
-                    value={selectedClass}
-                    onChange={(event) => setSelectedClass(event.target.value)}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
-                  >
-                    <option value="all">Tüm sınıflar</option>
-                    {classOptions.map((sinif) => (
-                      <option key={sinif} value={sinif}>
-                        {sinif}
-                      </option>
+              <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+                <PanelCard>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900">Yoklama ilerlemesi</h2>
+                      <p className="mt-1 text-sm text-slate-500">{attendanceStats.geldi}/{filteredStudents.length || allStudents} öğrenci işaretlendi</p>
+                    </div>
+                    <button onClick={() => setActiveTab('yoklama')} className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
+                      Detaya git
+                    </button>
+                  </div>
+                  <div className="mt-5 h-3 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full rounded-full bg-[#10b981]" style={{ width: `${attendanceStats.progress}%` }} />
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                    <MiniCount label="Geldi" value={attendanceStats.geldi} tone="text-emerald-600" />
+                    <MiniCount label="Gelmedi" value={attendanceStats.gelmedi} tone="text-rose-600" />
+                    <MiniCount label="İzinli" value={attendanceStats.izinli} tone="text-amber-600" />
+                    <MiniCount label="Bekliyor" value={attendanceStats.bekliyor} tone="text-slate-500" />
+                  </div>
+                </PanelCard>
+
+                <PanelCard>
+                  <h2 className="text-lg font-semibold text-slate-900">Hızlı erişim</h2>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    {tabs.filter((tab) => tab.id !== 'dashboard').map((tab) => (
+                      <button key={tab.id} onClick={() => setActiveTab(tab.id)} className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4 text-left transition hover:border-[#10b981] hover:bg-emerald-50">
+                        <div className="text-2xl">{tab.icon}</div>
+                        <div className="mt-3 text-sm font-semibold text-slate-900">{tab.label}</div>
+                      </button>
                     ))}
-                  </select>
-                  <button
-                    onClick={handleAttendanceSave}
-                    disabled={savingAttendance}
-                    className="rounded-full bg-[#10b981] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
-                  >
-                    {savingAttendance ? 'Kaydediliyor...' : 'Toplu kaydet'}
+                  </div>
+                </PanelCard>
+              </div>
+
+              <PanelCard>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Son aktiviteler</h2>
+                    <p className="mt-1 text-sm text-slate-500">Mobil akışın web görünümü</p>
+                  </div>
+                  <button onClick={() => setActiveTab('aktiviteler')} className="rounded-full bg-[#10b981] px-4 py-2 text-sm font-semibold text-white">
+                    Aktivite ekle
                   </button>
                 </div>
-              </div>
-
-              <div className="mt-6 grid gap-3">
-                {filteredStudents.map((ogrenci) => (
-                  <div key={ogrenci.id} className="grid gap-3 rounded-2xl border border-slate-200 px-4 py-4 lg:grid-cols-[1fr_auto] lg:items-center">
-                    <div>
-                      <div className="font-medium text-slate-900">{ogrenci.ad_soyad}</div>
-                      <div className="text-xs text-slate-500">{ogrenci.sinif || 'Sınıf bilgisi yok'}</div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {attendanceOptions.map((option) => (
-                        <button
-                          key={option}
-                          onClick={() => setAttendance((current) => ({ ...current, [ogrenci.id]: option }))}
-                          className={cx(
-                            'rounded-full px-4 py-2 text-sm font-semibold capitalize transition',
-                            attendance[ogrenci.id] === option
-                              ? 'bg-[#10b981] text-white'
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                          )}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </PanelCard>
-          </section>
-        )}
-
-        {activeTab === 'aktiviteler' && (
-          <section className="mt-6 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-            <PanelCard>
-              <h2 className="text-lg font-semibold text-slate-900">Yeni aktivite</h2>
-              <div className="mt-5 space-y-4">
-                <Field label="Öğrenci">
-                  <select
-                    value={selectedActivityStudentId ?? ''}
-                    onChange={(event) => setSelectedActivityStudentId(Number(event.target.value))}
-                    className="input-base"
-                  >
-                    {ogrenciler.map((ogrenci) => (
-                      <option key={ogrenci.id} value={ogrenci.id}>
-                        {ogrenci.ad_soyad}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label="Aktivite tipi">
-                  <select
-                    value={activityType}
-                    onChange={(event) => {
-                      const nextType = event.target.value as ActivityType
-                      setActivityType(nextType)
-                      setActivityForm(createInitialActivityForm(nextType))
-                    }}
-                    className="input-base"
-                  >
-                    {activityOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                {activityFieldMap[activityType].map((field) => (
-                  <Field key={field.key} label={field.label}>
-                    {field.kind === 'textarea' && (
-                      <textarea
-                        value={String(activityForm[field.key] ?? '')}
-                        onChange={(event) => setActivityForm((current) => ({ ...current, [field.key]: event.target.value }))}
-                        className="input-base min-h-[120px] resize-none"
-                      />
-                    )}
-
-                    {field.kind === 'checkbox' && (
-                      <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(activityForm[field.key])}
-                          onChange={(event) => setActivityForm((current) => ({ ...current, [field.key]: event.target.checked }))}
-                        />
-                        Velinin günlük akışında görünür olsun
-                      </label>
-                    )}
-
-                    {field.kind === 'select' && (
-                      <select
-                        value={String(activityForm[field.key] ?? '')}
-                        onChange={(event) => setActivityForm((current) => ({ ...current, [field.key]: event.target.value }))}
-                        className="input-base"
-                      >
-                        <option value="">Seçin</option>
-                        {field.options.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-
-                    {(field.kind === 'text' || field.kind === 'number' || field.kind === 'time') && (
-                      <input
-                        type={field.kind === 'number' ? 'number' : field.kind}
-                        value={String(activityForm[field.key] ?? '')}
-                        onChange={(event) => setActivityForm((current) => ({ ...current, [field.key]: event.target.value }))}
-                        className="input-base"
-                      />
-                    )}
-                  </Field>
-                ))}
-
-                <button
-                  onClick={handleActivitySave}
-                  disabled={savingActivity || !selectedActivityStudent}
-                  className="w-full rounded-2xl bg-[#10b981] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  {savingActivity ? 'Kaydediliyor...' : 'Aktiviteyi kaydet'}
-                </button>
-              </div>
-            </PanelCard>
-
-            <PanelCard>
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Son kayıtlar</h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {selectedActivityStudent ? `${selectedActivityStudent.ad_soyad} için en yeni aktiviteler` : 'Tüm sınıf akışı'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6 space-y-3">
-                {activities
-                  .filter((activity) => !selectedActivityStudentId || activity.ogrenci_id === selectedActivityStudentId)
-                  .map((activity) => (
-                    <div key={activity.id} className="rounded-2xl border border-slate-200 px-4 py-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <div className="font-semibold text-slate-900">
-                            {activityOptions.find((item) => item.id === activity.tur)?.label || activity.tur}
+                <div className="mt-6 space-y-3">
+                  {activities.slice(0, 8).map((activity) => {
+                    const meta = activityMeta(activity.tur)
+                    return (
+                      <div key={activity.id} className="flex items-start gap-4 rounded-[22px] border border-slate-200 px-4 py-4">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: meta.bg }}>
+                          <span className="text-xl">{meta.emoji}</span>
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="text-sm font-semibold text-slate-900">{meta.label} · {activityStudentName(activity)}</div>
+                            <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{formatTime(activity.created_at || activity.olusturuldu)}</div>
                           </div>
-                          <div className="mt-1 text-sm text-slate-600">{getActivitySummary(activity)}</div>
+                          <div className="mt-2 text-sm text-slate-600">{activitySummary(activity)}</div>
                         </div>
-                        <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{formatDateTime(activity.created_at)}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </PanelCard>
+            </section>
+          )}
+
+          {activeTab === 'yoklama' && (
+            <section className="mt-6 space-y-6">
+              <div className="grid gap-4 md:grid-cols-4">
+                <StatusCard label="Geldi" value={attendanceStats.geldi} bg="bg-emerald-50" text="text-emerald-700" />
+                <StatusCard label="Gelmedi" value={attendanceStats.gelmedi} bg="bg-rose-50" text="text-rose-700" />
+                <StatusCard label="İzinli" value={attendanceStats.izinli} bg="bg-amber-50" text="text-amber-700" />
+                <StatusCard label="Bekliyor" value={attendanceStats.bekliyor} bg="bg-slate-100" text="text-slate-700" />
+              </div>
+
+              <PanelCard>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex flex-wrap gap-2">
+                    <Chip active={classFilter === 'all'} onClick={() => setClassFilter('all')}>Tümü</Chip>
+                    {classOptions.map((sinif) => (
+                      <Chip key={sinif} active={classFilter === sinif} onClick={() => setClassFilter(sinif)}>{sinif}</Chip>
+                    ))}
+                  </div>
+                  <button onClick={handleAttendanceSave} disabled={savingAttendance} className="rounded-2xl bg-[#10b981] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60">
+                    {savingAttendance ? 'Kaydediliyor...' : 'Yoklamayı Kaydet'}
+                  </button>
+                </div>
+
+                <div className="mt-6 space-y-3">
+                  {filteredStudents.map((student) => (
+                    <div key={student.id} className={cx(
+                      'grid gap-4 rounded-[22px] border px-4 py-4 lg:grid-cols-[1fr_auto] lg:items-center',
+                      attendance[student.id] === 'geldi' ? 'border-emerald-200 bg-emerald-50/60' :
+                        attendance[student.id] === 'gelmedi' ? 'border-rose-200 bg-rose-50/60' :
+                          attendance[student.id] === 'izinli' ? 'border-amber-200 bg-amber-50/60' :
+                            'border-slate-200 bg-white'
+                    )}>
+                      <div>
+                        <div className="font-semibold text-slate-900">{student.ad_soyad}</div>
+                        <div className="text-xs text-slate-500">{student.sinif || 'Sınıf bilgisi yok'}</div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { id: 'geldi', label: 'Geldi ✓' },
+                          { id: 'gelmedi', label: 'Gelmedi ✗' },
+                          { id: 'izinli', label: 'İzinli İ' },
+                        ].map((option) => (
+                          <button
+                            key={option.id}
+                            onClick={() => setAttendance((current) => ({ ...current, [student.id]: current[student.id] === option.id ? '' : option.id as AttendanceStatus }))}
+                            className={cx(
+                              'rounded-full px-4 py-2 text-sm font-semibold transition',
+                              attendance[student.id] === option.id ? 'bg-[#10b981] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            )}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   ))}
-              </div>
-            </PanelCard>
-          </section>
-        )}
-
-        {activeTab === 'mesajlar' && (
-          <section className="mt-6 grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-            <PanelCard>
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Öğrenciler</h2>
-                  <p className="mt-1 text-sm text-slate-500">Okunmamış mesaj rozetleri anlık güncellenir.</p>
                 </div>
-                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                  {Array.from(unreadByStudent.values()).reduce((sum, item) => sum + item, 0)} okunmamış
-                </span>
-              </div>
+              </PanelCard>
+            </section>
+          )}
 
-              <div className="mt-6 space-y-3">
-                {filteredStudents.map((ogrenci) => (
-                  <button
-                    key={ogrenci.id}
-                    onClick={() => setSelectedMessageStudentId(ogrenci.id)}
-                    className={cx(
-                      'flex w-full items-center justify-between rounded-2xl border px-4 py-4 text-left transition',
-                      selectedMessageStudentId === ogrenci.id ? 'border-[#10b981] bg-emerald-50' : 'border-slate-200 hover:border-slate-300'
-                    )}
-                  >
+          {activeTab === 'aktiviteler' && (
+            <section className="mt-6 grid gap-6 xl:grid-cols-[320px_1fr]">
+              <PanelCard>
+                <input
+                  value={activitySearch}
+                  onChange={(event) => setActivitySearch(event.target.value)}
+                  className="panel-input"
+                  placeholder="Öğrenci ara..."
+                />
+                <div className="mt-4 max-h-[680px] space-y-2 overflow-y-auto">
+                  {searchableStudents.map((student) => (
+                    <button
+                      key={student.id}
+                      onClick={() => setSelectedActivityStudentId(student.id)}
+                      className={cx(
+                        'flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition',
+                        selectedActivityStudentId === student.id ? 'bg-[#10b981] text-white' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                      )}
+                    >
+                      <div className={cx('flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold', selectedActivityStudentId === student.id ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700')}>
+                        {initials(student.ad_soyad)}
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold">{student.ad_soyad}</div>
+                        <div className={cx('text-xs', selectedActivityStudentId === student.id ? 'text-emerald-50' : 'text-slate-500')}>{student.sinif || 'Sınıf yok'}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </PanelCard>
+
+              <div className="space-y-6">
+                <PanelCard>
+                  <div className="flex items-center justify-between gap-4">
                     <div>
-                      <div className="font-medium text-slate-900">{ogrenci.ad_soyad}</div>
-                      <div className="text-xs text-slate-500">{ogrenci.veli_ad || 'Veli bilgisi'}</div>
+                      <h2 className="text-lg font-semibold text-slate-900">Aktivite tipi</h2>
+                      <p className="mt-1 text-sm text-slate-500">{students.find((student) => student.id === selectedActivityStudentId)?.ad_soyad || 'Öğrenci seçin'}</p>
                     </div>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                      {unreadByStudent.get(ogrenci.id) || 0}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </PanelCard>
-
-            <PanelCard>
-              <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-                <div className="rounded-[24px] border border-slate-200">
-                  <div className="border-b border-slate-200 px-5 py-4">
-                    <div className="font-semibold text-slate-900">{selectedMessageStudent?.ad_soyad || 'Öğrenci seçin'}</div>
-                    <div className="text-sm text-slate-500">{selectedMessageStudent?.sinif || 'Sınıf bilgisi'}</div>
+                  </div>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {activityTypeConfig.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => { setActivityType(item.id); setActivityForm({}); setActivityPhotoFile(null) }}
+                        className={cx(
+                          'rounded-[20px] border px-4 py-4 text-left transition',
+                          activityType === item.id ? 'border-transparent text-white' : 'border-slate-200 bg-white hover:border-slate-300'
+                        )}
+                        style={activityType === item.id ? { backgroundColor: item.color } : undefined}
+                      >
+                        <div className="text-2xl">{item.emoji}</div>
+                        <div className="mt-3 text-sm font-semibold">{item.label}</div>
+                      </button>
+                    ))}
                   </div>
 
-                  <div className="max-h-[460px] space-y-3 overflow-y-auto px-5 py-5">
-                    {threadMessages.length ? threadMessages.map((message) => (
+                  <div className="mt-6 grid gap-4 md:grid-cols-2">
+                    {activityType === 'food' && (
+                      <>
+                        <Field label="Öğün">
+                          <select className="panel-input" value={activityForm.ogun || ''} onChange={(event) => setActivityForm((current) => ({ ...current, ogun: event.target.value }))}>
+                            <option value="">Seçin</option>
+                            {['Kahvaltı', 'Kuşluk', 'Öğle', 'İkindi'].map((option) => <option key={option} value={option}>{option}</option>)}
+                          </select>
+                        </Field>
+                        <Field label="Yeme durumu">
+                          <select className="panel-input" value={activityForm.yeme || ''} onChange={(event) => setActivityForm((current) => ({ ...current, yeme: event.target.value }))}>
+                            <option value="">Seçin</option>
+                            {['Hepsini', 'Çoğunu', 'Birazını', 'Hiç'].map((option) => <option key={option} value={option}>{option}</option>)}
+                          </select>
+                        </Field>
+                      </>
+                    )}
+
+                    {activityType === 'nap' && (
+                      <Field label="Uyku süresi">
+                        <select className="panel-input" value={activityForm.sure || ''} onChange={(event) => setActivityForm((current) => ({ ...current, sure: event.target.value }))}>
+                          <option value="">Seçin</option>
+                          {['30 dk', '1 saat', '1.5 saat', '2 saat'].map((option) => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                      </Field>
+                    )}
+
+                    {activityType === 'health' && (
+                      <Field label="Ateş">
+                        <input className="panel-input" placeholder="36.5" value={activityForm.ates || ''} onChange={(event) => setActivityForm((current) => ({ ...current, ates: event.target.value }))} />
+                      </Field>
+                    )}
+
+                    {activityType === 'meds' && (
+                      <>
+                        <Field label="İlaç adı">
+                          <input className="panel-input" value={activityForm.ilac || ''} onChange={(event) => setActivityForm((current) => ({ ...current, ilac: event.target.value }))} />
+                        </Field>
+                        <Field label="Doz">
+                          <input className="panel-input" value={activityForm.doz || ''} onChange={(event) => setActivityForm((current) => ({ ...current, doz: event.target.value }))} />
+                        </Field>
+                      </>
+                    )}
+
+                    {activityType === 'photo' && (
+                      <Field label="Fotoğraf dosyası">
+                        <input type="file" accept="image/*" className="panel-input" onChange={(event) => setActivityPhotoFile(event.target.files?.[0] ?? null)} />
+                      </Field>
+                    )}
+                  </div>
+
+                  <Field label="Not" className="mt-4">
+                    <textarea className="panel-input min-h-[120px] resize-none" value={activityNote} onChange={(event) => setActivityNote(event.target.value)} placeholder="İsteğe bağlı not..." />
+                  </Field>
+
+                  <button onClick={handleActivitySave} disabled={savingActivity || !selectedActivityStudentId} className="mt-5 rounded-2xl bg-[#10b981] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60">
+                    {savingActivity ? 'Kaydediliyor...' : `${activityMeta(activityType).emoji} ${activityMeta(activityType).label} Kaydet`}
+                  </button>
+                </PanelCard>
+
+                <PanelCard>
+                  <h2 className="text-lg font-semibold text-slate-900">Bugünün aktivite feed’i</h2>
+                  <div className="mt-5 space-y-3">
+                    {activities.map((activity) => {
+                      const meta = activityMeta(activity.tur)
+                      return (
+                        <div key={activity.id} className="flex items-start gap-4 rounded-[20px] border border-slate-200 px-4 py-4">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: meta.bg }}>
+                            <span className="text-xl">{meta.emoji}</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="text-sm font-semibold text-slate-900">{activityStudentName(activity)} · {meta.label}</div>
+                              <div className="text-xs text-slate-400">{formatTime(activity.created_at || activity.olusturuldu)}</div>
+                            </div>
+                            <div className="mt-1 text-sm text-slate-600">{activitySummary(activity)}</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </PanelCard>
+              </div>
+            </section>
+          )}
+
+          {activeTab === 'mesajlar' && (
+            <section className="mt-6 grid gap-6 xl:grid-cols-[320px_1fr]">
+              <PanelCard>
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-lg font-semibold text-slate-900">Öğrenci listesi</h2>
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{totalUnread} okunmamış</span>
+                </div>
+                <div className="mt-5 space-y-2">
+                  {filteredStudents.map((student) => (
+                    <button
+                      key={student.id}
+                      onClick={() => setSelectedMessageStudentId(student.id)}
+                      className={cx(
+                        'flex w-full items-center gap-3 rounded-[20px] px-4 py-3 text-left transition',
+                        selectedMessageStudentId === student.id ? 'bg-[#10b981] text-white' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                      )}
+                    >
+                      <div className={cx('flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold', selectedMessageStudentId === student.id ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700')}>
+                        {initials(student.ad_soyad)}
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-sm font-semibold">{student.ad_soyad}</div>
+                        <div className={cx('text-xs', selectedMessageStudentId === student.id ? 'text-emerald-50' : 'text-slate-500')}>{student.sinif || 'Sınıf bilgisi'}</div>
+                      </div>
+                      {(unreadByStudent.get(student.id) || 0) > 0 && (
+                        <span className={cx('rounded-full px-2 py-1 text-xs font-bold', selectedMessageStudentId === student.id ? 'bg-white text-[#10b981]' : 'bg-[#10b981] text-white')}>
+                          {unreadByStudent.get(student.id)}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </PanelCard>
+
+              <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
+                <PanelCard>
+                  <div className="border-b border-slate-200 pb-4">
+                    <h2 className="text-lg font-semibold text-slate-900">{selectedMessageStudent?.ad_soyad || 'Öğrenci seçin'}</h2>
+                    <p className="mt-1 text-sm text-slate-500">{selectedMessageStudent?.sinif || 'Veli mesajlaşma hattı'}</p>
+                  </div>
+                  <div className="mt-5 max-h-[520px] space-y-3 overflow-y-auto">
+                    {messageThread.map((message) => (
                       <div key={message.id} className={cx('flex', message.gonderen_rol.includes('ogretmen') ? 'justify-end' : 'justify-start')}>
                         <div className={cx(
                           'max-w-[75%] rounded-[22px] px-4 py-3 text-sm shadow-sm',
-                          message.gonderen_rol.includes('ogretmen')
-                            ? 'bg-[#10b981] text-white'
-                            : 'bg-slate-100 text-slate-700'
+                          message.gonderen_rol.includes('ogretmen') ? 'bg-[#10b981] text-white' : 'bg-slate-100 text-slate-700'
                         )}>
                           <div>{message.content}</div>
-                          <div className={cx('mt-2 text-[11px]', message.gonderen_rol.includes('ogretmen') ? 'text-emerald-100' : 'text-slate-400')}>
-                            {formatDateTime(message.created_at)}
-                          </div>
+                          <div className={cx('mt-2 text-[11px]', message.gonderen_rol.includes('ogretmen') ? 'text-emerald-100' : 'text-slate-400')}>{formatDateTime(message.created_at)}</div>
                         </div>
                       </div>
-                    )) : (
-                      <EmptyState title="Henüz mesaj yok" description="Bu öğrenci ile yazışma başladığında burada görünecek." />
-                    )}
+                    ))}
                   </div>
-
-                  <div className="border-t border-slate-200 px-5 py-4">
-                    <textarea
-                      value={threadMessage}
-                      onChange={(event) => setThreadMessage(event.target.value)}
-                      className="input-base min-h-[110px] resize-none"
-                      placeholder="Öğrenci velisine mesaj yazın..."
-                    />
-                    <button
-                      onClick={handleSendMessage}
-                      disabled={sendingMessage || !selectedMessageStudent}
-                      className="mt-3 rounded-full bg-[#10b981] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                    >
-                      {sendingMessage ? 'Gönderiliyor...' : 'Mesaj gönder'}
+                  <div className="mt-5 border-t border-slate-200 pt-4">
+                    <textarea className="panel-input min-h-[110px] resize-none" value={threadDraft} onChange={(event) => setThreadDraft(event.target.value)} placeholder="Mesaj yazın..." />
+                    <button onClick={handleSendMessage} disabled={sendingThread || !selectedMessageStudent} className="mt-3 rounded-2xl bg-[#10b981] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
+                      {sendingThread ? 'Gönderiliyor...' : 'Gönder'}
                     </button>
                   </div>
-                </div>
+                </PanelCard>
 
-                <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-                  <h3 className="text-base font-semibold text-slate-900">Toplu mesaj</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">
-                    Mesaj, mevcut sınıf filtresindeki velilere gönderilir.
-                  </p>
-                  <textarea
-                    value={bulkMessage}
-                    onChange={(event) => setBulkMessage(event.target.value)}
-                    className="input-base mt-4 min-h-[160px] resize-none bg-white"
-                    placeholder="Sınıf bilgilendirmesi yazın..."
-                  />
-                  <button
-                    onClick={handleBulkMessage}
-                    disabled={sendingBulkMessage || !filteredStudents.length}
-                    className="mt-4 w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
-                  >
-                    {sendingBulkMessage ? 'Gönderiliyor...' : 'Toplu mesaj gönder'}
+                <PanelCard>
+                  <h2 className="text-lg font-semibold text-slate-900">Toplu mesaj</h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">Mevcut sınıf filtresindeki velilere tek seferde gönderilir.</p>
+                  <textarea className="panel-input mt-4 min-h-[220px] resize-none" value={bulkDraft} onChange={(event) => setBulkDraft(event.target.value)} placeholder="Duyuru niteliğinde mesaj..." />
+                  <button onClick={handleBulkMessage} disabled={sendingBulk || !filteredStudents.length} className="mt-4 w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
+                    {sendingBulk ? 'Gönderiliyor...' : 'Toplu mesaj gönder'}
+                  </button>
+                </PanelCard>
+              </div>
+            </section>
+          )}
+
+          {activeTab === 'duyurular' && (
+            <section className="mt-6 space-y-6">
+              <div className="flex items-center justify-end">
+                <button onClick={() => setAnnouncementModalOpen(true)} className="rounded-2xl bg-[#10b981] px-5 py-3 text-sm font-semibold text-white">
+                  Yeni duyuru
+                </button>
+              </div>
+              <PanelCard>
+                <div className="space-y-3">
+                  {announcements.map((announcement) => (
+                    <div key={announcement.id} className="rounded-[22px] border border-slate-200 px-5 py-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="text-base font-semibold text-slate-900">{announcement.baslik}</div>
+                          <div className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-400">{formatDateTime(announcement.created_at)}</div>
+                          <div className="mt-3 text-sm leading-7 text-slate-600">{announcement.icerik}</div>
+                        </div>
+                        <button onClick={() => handleAnnouncementDelete(announcement.id)} className="rounded-full bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600">
+                          Sil
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </PanelCard>
+            </section>
+          )}
+
+          {activeTab === 'fotograflar' && (
+            <section className="mt-6 grid gap-6 xl:grid-cols-[360px_1fr]">
+              <PanelCard>
+                <h2 className="text-lg font-semibold text-slate-900">Fotoğraf yükle</h2>
+                <div className="mt-5 flex gap-2 overflow-x-auto pb-2">
+                  {students.map((student) => (
+                    <Chip key={student.id} active={selectedPhotoStudentId === student.id} onClick={() => setSelectedPhotoStudentId(student.id)}>
+                      {student.ad_soyad.split(' ')[0]}
+                    </Chip>
+                  ))}
+                </div>
+                <div className="mt-4 space-y-4">
+                  <input type="file" accept="image/*" className="panel-input" onChange={(event) => setGalleryUpload(event.target.files?.[0] ?? null)} />
+                  <textarea className="panel-input min-h-[120px] resize-none" value={galleryNote} onChange={(event) => setGalleryNote(event.target.value)} placeholder="Fotoğraf notu..." />
+                  <button onClick={handleGalleryUpload} disabled={uploadingGallery || !selectedPhotoStudentId || !galleryUpload} className="w-full rounded-2xl bg-[#10b981] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
+                    {uploadingGallery ? 'Yükleniyor...' : 'Fotoğraf yükle'}
                   </button>
                 </div>
-              </div>
-            </PanelCard>
-          </section>
-        )}
+              </PanelCard>
 
-        {activeTab === 'duyurular' && (
-          <section className="mt-6 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-            <PanelCard>
-              <h2 className="text-lg font-semibold text-slate-900">Yeni duyuru</h2>
-              <div className="mt-5 space-y-4">
-                <Field label="Başlık">
-                  <input value={announcementTitle} onChange={(event) => setAnnouncementTitle(event.target.value)} className="input-base" />
-                </Field>
-                <Field label="İçerik">
-                  <textarea
-                    value={announcementBody}
-                    onChange={(event) => setAnnouncementBody(event.target.value)}
-                    className="input-base min-h-[160px] resize-none"
-                  />
-                </Field>
-                <button
-                  onClick={handleAnnouncementSave}
-                  disabled={savingAnnouncement}
-                  className="w-full rounded-2xl bg-[#10b981] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  {savingAnnouncement ? 'Yayınlanıyor...' : 'Duyuruyu yayınla'}
-                </button>
-              </div>
-            </PanelCard>
+              <PanelCard>
+                <h2 className="text-lg font-semibold text-slate-900">Grid galeri</h2>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {galleryItems.map((item) => (
+                    <a key={item.id} href={item.imageUrl || '#'} target="_blank" rel="noreferrer" className="overflow-hidden rounded-[22px] border border-slate-200 bg-slate-50">
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt={item.note || item.studentName} className="h-48 w-full object-cover" />
+                      ) : (
+                        <div className="flex h-48 items-center justify-center text-4xl">📸</div>
+                      )}
+                      <div className="space-y-2 p-4">
+                        <div className="text-sm font-semibold text-slate-900">{item.studentName}</div>
+                        <div className="text-sm text-slate-600">{item.note || 'Not eklenmedi'}</div>
+                        <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{formatDateTime(item.createdAt)}</div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </PanelCard>
+            </section>
+          )}
 
-            <PanelCard>
-              <h2 className="text-lg font-semibold text-slate-900">Duyuru listesi</h2>
-              <div className="mt-6 space-y-3">
-                {announcements.length ? announcements.map((announcement) => (
-                  <div key={announcement.id} className="rounded-2xl border border-slate-200 px-4 py-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
+          {activeTab === 'gunluk' && (
+            <section className="mt-6 grid gap-6 xl:grid-cols-[320px_1fr]">
+              <PanelCard>
+                <h2 className="text-lg font-semibold text-slate-900">Öğrenci seç</h2>
+                <div className="mt-5 space-y-2">
+                  {students.map((student) => (
+                    <button
+                      key={student.id}
+                      onClick={() => setSelectedReportStudentId(student.id)}
+                      className={cx(
+                        'flex w-full items-center gap-3 rounded-[20px] px-4 py-3 text-left transition',
+                        selectedReportStudentId === student.id ? 'bg-[#10b981] text-white' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                      )}
+                    >
+                      <div className={cx('flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold', selectedReportStudentId === student.id ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700')}>
+                        {initials(student.ad_soyad)}
+                      </div>
                       <div>
-                        <div className="font-semibold text-slate-900">{announcement.baslik}</div>
-                        <div className="mt-2 text-sm leading-6 text-slate-600">{announcement.icerik}</div>
-                        <div className="mt-3 text-xs uppercase tracking-[0.14em] text-slate-400">
-                          {formatDateTime(announcement.created_at)}
+                        <div className="text-sm font-semibold">{student.ad_soyad}</div>
+                        <div className={cx('text-xs', selectedReportStudentId === student.id ? 'text-emerald-50' : 'text-slate-500')}>{student.sinif || 'Sınıf yok'}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </PanelCard>
+
+              <PanelCard>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">{selectedReportStudent?.ad_soyad || 'Öğrenci seçin'}</h2>
+                    <p className="mt-1 text-sm text-slate-500">{selectedReportStudent?.sinif || 'Bugünkü timeline'}</p>
+                  </div>
+                  <span className={cx(
+                    'rounded-full px-4 py-2 text-sm font-semibold',
+                    attendance[selectedReportStudentId || 0] === 'geldi' ? 'bg-emerald-50 text-emerald-700' :
+                      attendance[selectedReportStudentId || 0] === 'gelmedi' ? 'bg-rose-50 text-rose-700' :
+                        attendance[selectedReportStudentId || 0] === 'izinli' ? 'bg-amber-50 text-amber-700' :
+                          'bg-slate-100 text-slate-600'
+                  )}>
+                    {attendance[selectedReportStudentId || 0] || 'bekleniyor'}
+                  </span>
+                </div>
+                <div className="mt-6 space-y-4">
+                  {reportActivities.map((activity, index) => {
+                    const meta = activityMeta(activity.tur)
+                    return (
+                      <div key={activity.id} className="flex gap-4">
+                        <div className="flex flex-col items-center">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: meta.bg }}>
+                            <span className="text-xl">{meta.emoji}</span>
+                          </div>
+                          {index !== reportActivities.length - 1 && <div className="mt-2 h-full w-px bg-slate-200" />}
+                        </div>
+                        <div className="flex-1 rounded-[22px] border border-slate-200 px-4 py-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="text-sm font-semibold text-slate-900">{meta.label}</div>
+                            <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{formatTime(activity.created_at || activity.olusturuldu)}</div>
+                          </div>
+                          <div className="mt-2 text-sm text-slate-600">{activitySummary(activity)}</div>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleAnnouncementDelete(announcement.id)}
-                        className="rounded-full bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-100"
-                      >
-                        Sil
-                      </button>
-                    </div>
-                  </div>
-                )) : (
-                  <EmptyState title="Duyuru bulunamadı" description="Yayınlanan duyurular burada listelenecek." />
-                )}
-              </div>
-            </PanelCard>
-          </section>
-        )}
+                    )
+                  })}
+                </div>
+              </PanelCard>
+            </section>
+          )}
+        </div>
+      </div>
 
-        {activeTab === 'fotograflar' && (
-          <section className="mt-6 grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-            <PanelCard>
-              <h2 className="text-lg font-semibold text-slate-900">Supabase Storage yükleme</h2>
-              <div className="mt-5 space-y-4">
-                <Field label="Öğrenci">
-                  <select
-                    value={selectedPhotoStudentId ?? ''}
-                    onChange={(event) => setSelectedPhotoStudentId(Number(event.target.value))}
-                    className="input-base"
-                  >
-                    {ogrenciler.map((ogrenci) => (
-                      <option key={ogrenci.id} value={ogrenci.id}>
-                        {ogrenci.ad_soyad}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Açıklama">
-                  <textarea value={photoNote} onChange={(event) => setPhotoNote(event.target.value)} className="input-base min-h-[120px] resize-none" />
-                </Field>
-                <Field label="Dosya">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
-                    className="block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
-                  />
-                </Field>
-                <button
-                  onClick={handlePhotoUpload}
-                  disabled={uploadingPhoto || !selectedPhotoStudent || !photoFile}
-                  className="w-full rounded-2xl bg-[#10b981] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  {uploadingPhoto ? 'Yükleniyor...' : 'Fotoğrafı yükle'}
+      {announcementModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
+          <div className="w-full max-w-xl rounded-[28px] bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-xl font-semibold text-slate-900">Yeni duyuru</h2>
+              <button onClick={() => setAnnouncementModalOpen(false)} className="rounded-full bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-600">Kapat</button>
+            </div>
+            <div className="mt-5 space-y-4">
+              <Field label="Başlık">
+                <input className="panel-input" value={announcementForm.baslik} onChange={(event) => setAnnouncementForm((current) => ({ ...current, baslik: event.target.value }))} />
+              </Field>
+              <Field label="İçerik">
+                <textarea className="panel-input min-h-[180px] resize-none" value={announcementForm.icerik} onChange={(event) => setAnnouncementForm((current) => ({ ...current, icerik: event.target.value }))} />
+              </Field>
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setAnnouncementModalOpen(false)} className="rounded-2xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700">İptal</button>
+                <button onClick={handleAnnouncementSave} disabled={savingAnnouncement} className="rounded-2xl bg-[#10b981] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
+                  {savingAnnouncement ? 'Yayınlanıyor...' : 'Yayınla'}
                 </button>
               </div>
-            </PanelCard>
-
-            <PanelCard>
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Galeri</h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {selectedPhotoStudent ? `${selectedPhotoStudent.ad_soyad} için son yüklemeler` : 'Tüm fotoğraflar'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {photoGallery.length ? photoGallery.map((photo) => (
-                  <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50">
-                    <img src={photo.url} alt={photo.aciklama || 'Öğrenci fotoğrafı'} className="h-48 w-full object-cover transition duration-300 group-hover:scale-[1.03]" />
-                    <div className="space-y-2 p-4">
-                      <div className="text-sm font-medium text-slate-900">{photo.aciklama || 'Açıklama yok'}</div>
-                      <div className="text-xs uppercase tracking-[0.14em] text-slate-400">
-                        {photo.sinif || selectedPhotoStudent?.sinif || 'Sınıf'} · {formatDateTime(photo.created_at || photo.tarih)}
-                      </div>
-                    </div>
-                  </a>
-                )) : (
-                  <div className="sm:col-span-2 xl:col-span-3">
-                    <EmptyState title="Galeri boş" description="İlk yükleme yapıldığında burada görünür." />
-                  </div>
-                )}
-              </div>
-            </PanelCard>
-          </section>
-        )}
-      </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
 
-function PanelCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <section className={cx('rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm', className)}>{children}</section>
+function PanelCard({ children }: { children: React.ReactNode }) {
+  return <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">{children}</section>
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, icon, accent, bg }: { label: string; value: string; icon: string; accent: string; bg: string }) {
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-5">
-      <div className="text-sm text-slate-500">{label}</div>
-      <div className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-900">{value}</div>
+    <div className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl" style={{ backgroundColor: bg }}>{icon}</div>
+      <div className="mt-4 text-3xl font-semibold tracking-[-0.05em]" style={{ color: accent }}>{value}</div>
+      <div className="mt-1 text-sm text-slate-500">{label}</div>
     </div>
   )
 }
 
-function StatusBadge({ status }: { status: AttendanceStatus }) {
-  const palette =
-    status === 'geldi'
-      ? 'bg-emerald-50 text-emerald-700'
-      : status === 'izinli'
-        ? 'bg-amber-50 text-amber-700'
-        : 'bg-rose-50 text-rose-700'
-
-  return <span className={cx('rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em]', palette)}>{status}</span>
+function StatusCard({ label, value, bg, text }: { label: string; value: number; bg: string; text: string }) {
+  return (
+    <div className={cx('rounded-[22px] px-5 py-5 shadow-sm', bg)}>
+      <div className={cx('text-3xl font-semibold tracking-[-0.05em]', text)}>{value}</div>
+      <div className="mt-1 text-sm text-slate-500">{label}</div>
+    </div>
+  )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function MiniCount({ label, value, tone }: { label: string; value: number; tone: string }) {
   return (
-    <label className="block">
-      <span className="mb-2 block text-sm font-medium text-slate-700">{label}</span>
+    <div className="rounded-2xl bg-slate-50 px-4 py-4">
+      <div className={cx('text-2xl font-semibold', tone)}>{value}</div>
+      <div className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-500">{label}</div>
+    </div>
+  )
+}
+
+function Chip({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className={cx('rounded-full px-4 py-2 text-sm font-semibold transition', active ? 'bg-[#10b981] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+      {children}
+    </button>
+  )
+}
+
+function Field({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <label className={className}>
+      <span className="mb-2 block text-sm font-semibold text-slate-700">{label}</span>
       {children}
     </label>
-  )
-}
-
-function EmptyState({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
-      <div className="text-base font-semibold text-slate-900">{title}</div>
-      <div className="mt-2 text-sm text-slate-500">{description}</div>
-    </div>
   )
 }
 

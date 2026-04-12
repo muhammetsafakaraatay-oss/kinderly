@@ -38,6 +38,8 @@ export type NormalizedMessage = {
   okundu: boolean
 }
 
+const PHOTO_BUCKET = 'photos'
+
 function errorText(error: SupabaseErrorLike) {
   return `${error?.code ?? ''} ${error?.message ?? ''} ${error?.details ?? ''} ${error?.hint ?? ''}`.toLowerCase()
 }
@@ -269,6 +271,29 @@ export async function loadAnnouncementsCompat(okulId: string | number, limit = 5
   }
 }
 
+export async function insertAnnouncementCompat(base: Record<string, unknown>, baslik: string, icerik: string) {
+  const attempts: Record<string, unknown>[] = [
+    { ...base, baslik, icerik, created_at: new Date().toISOString() },
+    { ...base, baslik, icerik, tarih: new Date().toISOString().split('T')[0] },
+    { ...base, baslik, mesaj: icerik, created_at: new Date().toISOString() },
+    { ...base, baslik, aciklama: icerik, created_at: new Date().toISOString() },
+  ]
+
+  let lastError: SupabaseErrorLike = null
+
+  for (const payload of attempts) {
+    const { error } = await supabase.from('duyurular').insert(payload)
+    if (!error) return { error: null as SupabaseErrorLike }
+    lastError = error
+
+    if (!isMissingColumnError(error, ['icerik', 'mesaj', 'aciklama', 'created_at', 'tarih'])) {
+      return { error }
+    }
+  }
+
+  return { error: lastError }
+}
+
 export async function upsertAttendanceCompat(
   okulId: string | number,
   tarih: string,
@@ -402,4 +427,12 @@ export async function markMessagesReadCompat(okulId: string | number, ogrenciId:
 
   const { error } = await query
   return { error }
+}
+
+export async function createSignedPhotoUrl(storagePath: string, expiresIn = 60 * 60) {
+  const { data, error } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrl(storagePath, expiresIn)
+  return {
+    data: data?.signedUrl ?? null,
+    error,
+  }
 }

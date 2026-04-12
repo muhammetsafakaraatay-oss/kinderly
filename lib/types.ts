@@ -77,10 +77,13 @@ export interface Aidat {
   okul_id: number
   ogrenci_id: number
   ay: string
+  donem?: string
   tutar: number
   odendi: boolean
+  son_odeme?: string
   odeme_tarihi?: string
   odenen_miktar?: number
+  aciklama?: string
   ogrenciler?: { ad_soyad: string; veli_ad: string; veli_telefon: string }
 }
 
