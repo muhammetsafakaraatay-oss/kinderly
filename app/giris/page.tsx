@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Instrument_Serif, DM_Sans } from 'next/font/google'
 import { hasSupabaseEnv, supabase } from '@/lib/supabase'
-import { useAuth } from '@/lib/auth'
+import { setAuthRememberPreference, useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
 
 const serif = Instrument_Serif({ subsets: ['latin'], weight: '400', variable: '--font-serif' })
@@ -24,7 +24,7 @@ const supportPoints = [
 ] as const
 
 const REDIRECT_RESOLUTION_TIMEOUT_MS = 3000
-const AUTH_LOADING_TIMEOUT_MS = 9000
+const AUTH_LOADING_TIMEOUT_MS = 5000
 
 export default function GirisPage() {
   const router = useRouter()
@@ -35,6 +35,8 @@ export default function GirisPage() {
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [redirectIssue, setRedirectIssue] = useState('')
+  const [rememberMe, setRememberMe] = useState(true)
+  const [redirectTarget, setRedirectTarget] = useState('')
 
   const normalizedEmail = email.trim().toLowerCase()
   const canSubmit = normalizedEmail.length > 0 && password.trim().length > 0 && !submitting && !authLoading
@@ -53,12 +55,18 @@ export default function GirisPage() {
         : 'Panele giriş yap'
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    setRedirectTarget(params.get('redirect') || '')
+  }, [])
+
+  useEffect(() => {
     if (authLoading) return
 
     if (session && okul?.slug && redirectPath) {
-      router.replace(`/${okul.slug}/${redirectPath}`)
+      router.replace(redirectTarget || `/${okul.slug}/${redirectPath}`)
     }
-  }, [authLoading, okul?.slug, redirectPath, router, session])
+  }, [authLoading, okul?.slug, redirectPath, redirectTarget, router, session])
 
   useEffect(() => {
     if (!session || authLoading) return
@@ -87,8 +95,7 @@ export default function GirisPage() {
 
     const timeout = window.setTimeout(() => {
       console.error('Auth loading beklenenden uzun sürdü.', { userId: session.user.id })
-      setError('Oturum doğrulaması beklenenden uzun sürdü. Ana sayfaya yönlendiriliyorsunuz.')
-      router.replace('/')
+      setError('Oturum doğrulaması 5 saniyeden uzun sürdü. Lütfen tekrar deneyin.')
     }, AUTH_LOADING_TIMEOUT_MS)
 
     return () => window.clearTimeout(timeout)
@@ -110,6 +117,7 @@ export default function GirisPage() {
     setSubmitting(true)
     setError('')
     setRedirectIssue('')
+    setAuthRememberPreference(rememberMe)
 
     const signInResult = await Promise.race([
       supabase.auth.signInWithPassword({
@@ -295,6 +303,17 @@ export default function GirisPage() {
                   />
                 </div>
               </div>
+
+              <label className="mt-5 flex items-center gap-3 rounded-[18px] border border-[var(--border)] bg-white/[0.03] px-4 py-3 text-sm text-[var(--muted)]">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(event) => setRememberMe(event.target.checked)}
+                  className="h-4 w-4 accent-[var(--green)]"
+                />
+                Beni hatırla
+                <span className="ml-auto text-xs text-white/40">{rememberMe ? '30 gün' : 'Tarayıcı oturumu'}</span>
+              </label>
 
               <button
                 onClick={handleLogin}

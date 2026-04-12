@@ -20,8 +20,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="tr" className={`${geist.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">
+    <html lang="tr" suppressHydrationWarning className={`${geist.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col bg-[var(--bg)] text-[var(--text)] transition-colors">
         <Providers>{children}</Providers>
       </body>
     </html>

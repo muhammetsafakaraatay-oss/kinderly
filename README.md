@@ -42,6 +42,11 @@ npm run dev
 npx tsc --noEmit --incremental false
 ```
 
+## Supabase Notlari
+
+- `supabase/migrations/20260412_create_default_aidat_trigger.sql` dosyasi yeni ogrenci eklendiginde varsayilan aidat olusturur.
+- Supabase SQL Editor'da bu migration'i calistirin ya da CLI migration akisina dahil edin.
+
 ## Deploy
 
 Detayli deploy adimlari icin [DEPLOY_VERCEL.md](/Users/safa/Desktop/kinderly-web/DEPLOY_VERCEL.md:1) dosyasina bak.

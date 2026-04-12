@@ -3,7 +3,9 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTheme } from 'next-themes'
 import Image from 'next/image'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
@@ -12,13 +14,15 @@ import { Ogrenci, Sinif, Okul } from '@/lib/types'
 export default function AdminPage({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter()
   const { session, role, okul: authOkul, loading, signOut } = useAuth()
+  const { resolvedTheme } = useTheme()
   const [slug, setSlug] = useState('')
   const [okul, setOkul] = useState<Okul | null>(null)
   const [ogrenciler, setOgrenciler] = useState<Ogrenci[]>([])
   const [siniflar, setSiniflar] = useState<Sinif[]>([])
   const [activePage, setActivePage] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const dark = false
+  const [authTimeout, setAuthTimeout] = useState(false)
+  const dark = resolvedTheme === 'dark'
 
   async function loadAll(okulId: number) {
     const [{ data: ogr }, { data: sinif }] = await Promise.all([
@@ -32,10 +36,24 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   useEffect(() => { params.then(p => setSlug(p.slug)) }, [params])
 
   useEffect(() => {
+    if (!loading) {
+      setAuthTimeout(false)
+      return
+    }
+    const timeout = window.setTimeout(() => setAuthTimeout(true), 10000)
+    return () => window.clearTimeout(timeout)
+  }, [loading])
+
+  useEffect(() => {
+    if (!authTimeout || session) return
+    router.replace(`/giris?redirect=${encodeURIComponent(`/${slug}/admin`)}`)
+  }, [authTimeout, router, session, slug])
+
+  useEffect(() => {
     if (loading || !slug) return
 
     if (!session || !authOkul) {
-      router.replace('/giris')
+      router.replace(`/giris?redirect=${encodeURIComponent(`/${slug}/admin`)}`)
       return
     }
 
@@ -56,8 +74,8 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
 
   if (loading || !session || !okul) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">
-        Panel hazirlaniyor...
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg)] text-[var(--muted-text)]">
+        {authTimeout ? 'Oturum doğrulanamadı, giriş ekranına yönlendiriliyor...' : 'Panel hazırlanıyor...'}
       </div>
     )
   }
@@ -82,7 +100,7 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   ]
 
   return (
-    <div className={`flex min-h-screen ${dark ? 'bg-gray-900' : 'bg-gray-50'}`}>
+    <div className={`flex min-h-screen ${dark ? 'bg-[var(--bg)]' : 'bg-[var(--bg)] text-[var(--text)]'}`}>
       {sidebarOpen && <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
       <aside className={`fixed top-0 left-0 h-full w-60 z-50 flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 ${dark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-r`}>
@@ -119,15 +137,13 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
       </aside>
 
       <div className="flex-1 lg:ml-60 flex flex-col min-h-screen">
-        <header className={`px-4 h-14 flex items-center justify-between sticky top-0 z-30 border-b ${dark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+        <header className={`px-4 h-14 flex items-center justify-between sticky top-0 z-30 border-b ${dark ? 'bg-[var(--card)] border-gray-700' : 'bg-[var(--card)] border-gray-200'}`}>
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-gray-500 text-xl">☰</button>
             <h1 className={`text-base font-semibold ${dark ? 'text-white' : 'text-gray-800'}`}>{navItems.find(n => n.id === activePage)?.label}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
-              Açık tema
-            </div>
+            <ThemeToggle />
             <button onClick={() => setActivePage('yoklama')} className="bg-indigo-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">✅ Yoklama</button>
           </div>
         </header>

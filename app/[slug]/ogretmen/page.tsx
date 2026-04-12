@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Instrument_Serif, DM_Sans } from 'next/font/google'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
@@ -193,6 +194,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
   const [sendingBulk, setSendingBulk] = useState(false)
   const [savingAnnouncement, setSavingAnnouncement] = useState(false)
   const [uploadingGallery, setUploadingGallery] = useState(false)
+  const [authTimeout, setAuthTimeout] = useState(false)
 
   useEffect(() => {
     void params.then((value) => setSlug(value.slug))
@@ -204,7 +206,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
     if (loading || !slug) return
 
     if (!session || !authOkul) {
-      router.replace('/giris')
+      router.replace(`/giris?redirect=${encodeURIComponent(`/${slug}/ogretmen`)}`)
       return
     }
 
@@ -218,6 +220,20 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
       router.replace(`/${authOkul.slug}/ogretmen`)
     }
   }, [authOkul, loading, role, router, session, slug])
+
+  useEffect(() => {
+    if (!loading) {
+      setAuthTimeout(false)
+      return
+    }
+    const timeout = window.setTimeout(() => setAuthTimeout(true), 10000)
+    return () => window.clearTimeout(timeout)
+  }, [loading])
+
+  useEffect(() => {
+    if (!authTimeout || session) return
+    router.replace(`/giris?redirect=${encodeURIComponent(`/${slug}/ogretmen`)}`)
+  }, [authTimeout, router, session, slug])
 
   useEffect(() => {
     if (!okul || !session) return
@@ -622,7 +638,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
   }
 
   if (loading || pageLoading || !session || !okul) {
-    return <LoadingScreen />
+    return <LoadingScreen message={authTimeout ? 'Oturum doğrulanamadı, giriş ekranına yönlendiriliyor...' : 'Panel hazırlanıyor...'} />
   }
 
   const totalUnread = Array.from(unreadByStudent.values()).reduce((sum, value) => sum + value, 0)
@@ -630,7 +646,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
   const activityToday = activities.length
 
   return (
-    <main className={`${serif.variable} ${sans.variable} min-h-screen bg-[#f8fafc] font-sans text-[#0f172a]`}>
+    <main className={`${serif.variable} ${sans.variable} min-h-screen bg-[var(--bg)] font-sans text-[var(--text)]`}>
       <style>{`
         .panel-input {
           width: 100%;
@@ -644,7 +660,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
       `}</style>
 
       <div className="flex min-h-screen flex-col lg:flex-row">
-        <aside className="w-full border-b border-slate-200 bg-white shadow-sm lg:sticky lg:top-0 lg:h-screen lg:w-[260px] lg:flex-none lg:border-b-0 lg:border-r">
+        <aside className="w-full border-b border-[var(--border-subtle)] bg-[var(--card)] shadow-sm lg:sticky lg:top-0 lg:h-screen lg:w-[260px] lg:flex-none lg:border-b-0 lg:border-r">
           <div className="flex h-full flex-col px-5 py-6">
             <div className="flex items-center gap-3">
               {okul.logo_url ? (
@@ -693,7 +709,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
         </aside>
 
         <div className="flex-1 px-4 py-5 lg:px-8 lg:py-7">
-          <header className="rounded-[24px] border border-slate-200 bg-white px-5 py-5 shadow-sm">
+          <header className="rounded-[24px] border border-[var(--border-subtle)] bg-[var(--card)] px-5 py-5 shadow-sm">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[#10b981]">{tabs.find((tab) => tab.id === activeTab)?.label}</div>
@@ -703,6 +719,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
                 <p className="mt-3 text-sm leading-7 text-slate-500">{formatDateLabel()} · {teacher?.sinif || 'Tüm sınıflar'}</p>
               </div>
               <div className="flex flex-wrap gap-3">
+                <ThemeToggle />
                 <Link href={`/${okul.slug}/admin`} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-[#10b981] hover:text-[#10b981]">
                   Admin paneli
                 </Link>
@@ -1240,12 +1257,12 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
 }
 
 function PanelCard({ children }: { children: React.ReactNode }) {
-  return <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">{children}</section>
+  return <section className="rounded-[24px] border border-[var(--border-subtle)] bg-[var(--card)] p-5 shadow-sm">{children}</section>
 }
 
 function StatCard({ label, value, icon, accent, bg }: { label: string; value: string; icon: string; accent: string; bg: string }) {
   return (
-    <div className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-[22px] border border-[var(--border-subtle)] bg-[var(--card)] p-5 shadow-sm">
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl" style={{ backgroundColor: bg }}>{icon}</div>
       <div className="mt-4 text-3xl font-semibold tracking-[-0.05em]" style={{ color: accent }}>{value}</div>
       <div className="mt-1 text-sm text-slate-500">{label}</div>
@@ -1264,7 +1281,7 @@ function StatusCard({ label, value, bg, text }: { label: string; value: number; 
 
 function MiniCount({ label, value, tone }: { label: string; value: number; tone: string }) {
   return (
-    <div className="rounded-2xl bg-slate-50 px-4 py-4">
+    <div className="rounded-2xl bg-slate-50 px-4 py-4 dark:bg-slate-800/60">
       <div className={cx('text-2xl font-semibold', tone)}>{value}</div>
       <div className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-500">{label}</div>
     </div>
@@ -1288,10 +1305,10 @@ function Field({ label, children, className = '' }: { label: string; children: R
   )
 }
 
-function LoadingScreen() {
+function LoadingScreen({ message }: { message: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f8fafc] text-slate-500">
-      Panel hazırlanıyor...
+    <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] text-[var(--muted-text)]">
+      {message}
     </div>
   )
 }

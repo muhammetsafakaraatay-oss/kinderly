@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Instrument_Serif, DM_Sans } from 'next/font/google'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
@@ -151,6 +152,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
   const [pageLoading, setPageLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [feeFilter, setFeeFilter] = useState<'hepsi' | 'bekleyen' | 'odendi'>('hepsi')
+  const [authTimeout, setAuthTimeout] = useState(false)
 
   useEffect(() => {
     void params.then((value) => setSlug(value.slug))
@@ -162,7 +164,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
     if (loading || !slug) return
 
     if (!session || !authOkul) {
-      router.replace('/giris')
+      router.replace(`/giris?redirect=${encodeURIComponent(`/${slug}/veli`)}`)
       return
     }
 
@@ -176,6 +178,20 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
       router.replace(`/${authOkul.slug}/veli`)
     }
   }, [authOkul, loading, role, router, session, slug])
+
+  useEffect(() => {
+    if (!loading) {
+      setAuthTimeout(false)
+      return
+    }
+    const timeout = window.setTimeout(() => setAuthTimeout(true), 10000)
+    return () => window.clearTimeout(timeout)
+  }, [loading])
+
+  useEffect(() => {
+    if (!authTimeout || session) return
+    router.replace(`/giris?redirect=${encodeURIComponent(`/${slug}/veli`)}`)
+  }, [authTimeout, router, session, slug])
 
   useEffect(() => {
     if (!okul || !session) return
@@ -359,13 +375,13 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
   }
 
   if (loading || pageLoading || !session || !okul) {
-    return <LoadingScreen />
+    return <LoadingScreen message={authTimeout ? 'Oturum doğrulanamadı, giriş ekranına yönlendiriliyor...' : 'Panel hazırlanıyor...'} />
   }
 
   const childAge = ageFromBirthDate(selectedChild?.dogum_tarihi)
 
   return (
-    <main className={`${serif.variable} ${sans.variable} min-h-screen bg-[#f8fafc] font-sans text-[#0f172a]`}>
+    <main className={`${serif.variable} ${sans.variable} min-h-screen bg-[var(--bg)] font-sans text-[var(--text)]`}>
       <style>{`
         .panel-input {
           width: 100%;
@@ -379,7 +395,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
       `}</style>
 
       <div className="flex min-h-screen flex-col lg:flex-row">
-        <aside className="w-full border-b border-slate-200 bg-white shadow-sm lg:sticky lg:top-0 lg:h-screen lg:w-[260px] lg:flex-none lg:border-b-0 lg:border-r">
+        <aside className="w-full border-b border-[var(--border-subtle)] bg-[var(--card)] shadow-sm lg:sticky lg:top-0 lg:h-screen lg:w-[260px] lg:flex-none lg:border-b-0 lg:border-r">
           <div className="flex h-full flex-col px-5 py-6">
             <div className="flex items-center gap-3">
               {okul.logo_url ? (
@@ -459,7 +475,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
         </aside>
 
         <div className="flex-1 px-4 py-5 lg:px-8 lg:py-7">
-          <header className="rounded-[24px] border border-slate-200 bg-white px-5 py-5 shadow-sm">
+          <header className="rounded-[24px] border border-[var(--border-subtle)] bg-[var(--card)] px-5 py-5 shadow-sm">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[#f59e0b]">{tabs.find((tab) => tab.id === activeTab)?.label}</div>
@@ -468,6 +484,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
                 </h1>
                 <p className="mt-3 text-sm leading-7 text-slate-500">{selectedChild?.ad_soyad || 'Çocuk seçin'} · {selectedChild?.sinif || 'Sınıf bilgisi'}</p>
               </div>
+              <ThemeToggle />
             </div>
           </header>
 
@@ -675,12 +692,12 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
 }
 
 function PanelCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <section className={cx('rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm', className)}>{children}</section>
+  return <section className={cx('rounded-[24px] border border-[var(--border-subtle)] bg-[var(--card)] p-5 shadow-sm', className)}>{children}</section>
 }
 
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[20px] border border-slate-200 bg-white px-4 py-4">
+    <div className="rounded-[20px] border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-4">
       <div className="text-sm text-slate-500">{label}</div>
       <div className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-slate-900">{value}</div>
     </div>
@@ -697,7 +714,7 @@ function FilterChip({ active, children, onClick }: { active: boolean; children: 
 
 function InfoRow({ label, value }: { label: string; value?: string | null }) {
   return (
-    <div className="rounded-[20px] border border-slate-200 px-4 py-4">
+    <div className="rounded-[20px] border border-[var(--border-subtle)] px-4 py-4">
       <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{label}</div>
       <div className="mt-2 text-sm font-semibold text-slate-900">{value || 'Bilgi girilmedi'}</div>
     </div>
@@ -706,7 +723,7 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
 
 function SummaryCard({ title, value }: { title: string; value: string }) {
   return (
-    <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-4">
+    <div className="rounded-[20px] border border-[var(--border-subtle)] bg-slate-50 px-4 py-4 dark:bg-slate-800/60">
       <div className="text-sm text-slate-500">{title}</div>
       <div className="mt-2 text-xl font-semibold text-slate-900">{value}</div>
     </div>
@@ -722,10 +739,10 @@ function EmptyState({ title, description }: { title: string; description: string
   )
 }
 
-function LoadingScreen() {
+function LoadingScreen({ message }: { message: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f8fafc] text-slate-500">
-      Panel hazırlanıyor...
+    <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] text-[var(--muted-text)]">
+      {message}
     </div>
   )
 }
