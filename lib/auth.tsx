@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { hasSupabaseEnv, supabase } from '@/lib/supabase'
 
@@ -43,7 +43,7 @@ type AuthContextValue = {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
-const AUTH_QUERY_TIMEOUT_MS = 5000
+const AUTH_QUERY_TIMEOUT_MS = 20000
 const AUTH_REMEMBER_KEY = 'kinderly.remember'
 const AUTH_CACHE_KEY = 'kinderly.auth.cache'
 const AUTH_SESSION_MARKER = 'kinderly.auth.browser'
@@ -130,6 +130,22 @@ async function withTimeout<T>(promise: PromiseLike<T>, timeoutMs = AUTH_QUERY_TI
   ])
 }
 
+// Timeout olursa 800ms bekleyip 1 kez daha dener.
+async function withRetryTimeout<T>(
+  factory: () => PromiseLike<T>,
+  timeoutMs = AUTH_QUERY_TIMEOUT_MS
+): Promise<T> {
+  try {
+    return await withTimeout(factory(), timeoutMs)
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Auth query timeout') {
+      await new Promise<void>(r => setTimeout(r, 800))
+      return await withTimeout(factory(), timeoutMs)
+    }
+    throw err
+  }
+}
+
 function normalizeRole(value: string | null | undefined): Role {
   if (!value) return null
 
@@ -165,7 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [personel, setPersonel] = useState<PersonelInfo | null>(null)
   const [loading, setLoading] = useState(hasSupabaseEnv)
 
-  function commitSnapshot(nextSnapshot: AuthSnapshot) {
+  const commitSnapshot = useCallback((nextSnapshot: AuthSnapshot) => {
     setSession(nextSnapshot.session)
     setRole(nextSnapshot.role)
     setOkul(nextSnapshot.okul)
@@ -180,16 +196,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       clearCachedAuth()
     }
-  }
+  }, [])
 
-  async function fetchRole(user: User, remembered = getRememberPreference(), nextSession: Session | null = null) {
+  const fetchRole = useCallback(async (user: User, remembered = getRememberPreference(), nextSession: Session | null = null) => {
     setLoading(true)
 
     try {
       const email = user.email?.trim().toLocaleLowerCase('tr-TR')
       let matchedPersonel: PersonelInfo | null = null
 
-      const { data: activeRows } = (await withTimeout(
+      const { data: activeRows } = (await withRetryTimeout(() =>
         supabase
           .from('personel')
           .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
@@ -201,7 +217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       matchedPersonel = (activeRows || []).find((row) => row.user_id === user.id) ?? null
 
       if (!matchedPersonel) {
-        const { data: userRows } = (await withTimeout(
+        const { data: userRows } = (await withRetryTimeout(() =>
           supabase
             .from('personel')
             .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
@@ -213,7 +229,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (!matchedPersonel && email) {
-        const { data: emailRows } = (await withTimeout(
+        const { data: emailRows } = (await withRetryTimeout(() =>
           supabase
             .from('personel')
             .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
@@ -233,7 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        const { data: okulData } = (await withTimeout(
+        const { data: okulData } = (await withRetryTimeout(() =>
           supabase
             .from('okullar')
             .select('id, ad, slug, logo_url')
@@ -251,7 +267,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      const { data: veli } = (await withTimeout(
+      const { data: veli } = (await withRetryTimeout(() =>
         supabase
           .from('veliler')
           .select('okul_id')
@@ -261,7 +277,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       )) as { data: { okul_id: number | string } | null }
 
       if (veli) {
-        const { data: okulData } = (await withTimeout(
+        const { data: okulData } = (await withRetryTimeout(() =>
           supabase
             .from('okullar')
             .select('id, ad, slug, logo_url')
@@ -284,13 +300,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Auth fetchRole hatası', error)
       commitSnapshot({ session: null, role: null, okul: null, personel: null, remember: remembered })
     }
-  }
+  }, [commitSnapshot])
 
   useEffect(() => {
     let active = true
+    let restoreTimeout: number | null = null
     if (!hasSupabaseEnv) {
-      setLoading(false)
-      return () => { active = false }
+      return () => {
+        active = false
+      }
     }
 
     const remember = getRememberPreference()
@@ -302,17 +320,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       const cachedSnapshot = readCachedSnapshot()
       if (cachedSnapshot) {
-        setSession(cachedSnapshot.session)
-        setRole(cachedSnapshot.role)
-        setOkul(cachedSnapshot.okul)
-        setPersonel(cachedSnapshot.personel)
-        setLoading(false)
+        restoreTimeout = window.setTimeout(() => {
+          if (!active) return
+          commitSnapshot(cachedSnapshot)
+        }, 0)
       }
     }
 
     async function hydrateSession() {
       try {
-        const { data } = await withTimeout(supabase.auth.getSession(), AUTH_QUERY_TIMEOUT_MS)
+        const { data } = await withRetryTimeout(() => supabase.auth.getSession())
         if (!active) return
 
         const nextSession = data.session
@@ -352,9 +369,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       active = false
+      if (restoreTimeout) {
+        window.clearTimeout(restoreTimeout)
+      }
       subscription.unsubscribe()
     }
-  }, [])
+  }, [commitSnapshot, fetchRole])
 
   return (
     <AuthContext.Provider

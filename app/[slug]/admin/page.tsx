@@ -373,28 +373,57 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Ogrenci | null>(null)
   const [form, setForm] = useState<any>({})
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   const filtered = ogrenciler.filter((o: Ogrenci) =>
     o.ad_soyad.toLowerCase().includes(search.toLowerCase()) &&
     (!sinifFilter || o.sinif === sinifFilter)
   )
 
-  function openAdd() { setEditing(null); setForm({ aidat_tutari: 3000 }); setModal(true) }
-  function openEdit(o: Ogrenci) { setEditing(o); setForm({ ...o }); setModal(true) }
+  function openAdd() { setEditing(null); setForm({ aidat_tutari: 3000 }); setSaveError(null); setModal(true) }
+  function openEdit(o: Ogrenci) { setEditing(o); setForm({ ...o }); setSaveError(null); setModal(true) }
 
   async function save() {
-    if (!form.ad_soyad || !form.veli_ad || !form.veli_telefon) { alert('Ad, veli ve telefon zorunlu!'); return }
-    const data = { ...form, okul_id: okul.id, aktif: true }
-    if (editing) {
-      await supabase.from('ogrenciler').update(data).eq('id', editing.id)
-    } else {
-      const { data: res } = await supabase.from('ogrenciler').insert({ ...data, kayit_tarihi: today() }).select()
-      if (res?.[0]) {
-        const ay = today().slice(0, 7)
-        await supabase.from('aidatlar').insert({ okul_id: okul.id, ogrenci_id: res[0].id, ay, tutar: form.aidat_tutari || 3000, odendi: false })
+    if (!form.ad_soyad || !form.veli_ad || !form.veli_telefon) { setSaveError('Ad, veli ve telefon zorunlu!'); return }
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const data = { ...form, okul_id: okul.id, aktif: true }
+      if (editing) {
+        const { error } = await supabase.from('ogrenciler').update(data).eq('id', editing.id)
+        if (error) throw error
+      } else {
+        const { data: res, error } = await supabase
+          .from('ogrenciler')
+          .insert({ ...data, kayit_tarihi: today() })
+          .select()
+        if (error) throw error
+        if (res?.[0]) {
+          const ay = today().slice(0, 7)
+          const { error: aidatError } = await supabase.from('aidatlar').insert({
+            okul_id: okul.id,
+            ogrenci_id: res[0].id,
+            ay,
+            tutar: form.aidat_tutari || 3000,
+            odendi: false,
+          })
+          if (aidatError) console.warn('Aidat kaydı oluşturulamadı:', aidatError.message)
+        }
       }
+      setModal(false)
+      reload()
+    } catch (err: any) {
+      const msg = err?.message || 'Bilinmeyen hata'
+      const detail = err?.code === '42501'
+        ? 'Yetki hatası (RLS): Bu işlem için yetkiniz bulunmuyor.'
+        : err?.code === '23505'
+          ? 'Bu öğrenci zaten kayıtlı.'
+          : `Kayıt hatası: ${msg}`
+      setSaveError(detail)
+    } finally {
+      setSaving(false)
     }
-    setModal(false); reload()
   }
 
   async function deleteOgr(id: number) {
@@ -496,9 +525,16 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
             </select>
           </div>
         </div>
+        {saveError && (
+          <div className="px-5 pb-3">
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{saveError}</p>
+          </div>
+        )}
         <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-gray-700' : 'border-gray-200'}`}>
-          <button onClick={() => setModal(false)} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600">İptal</button>
-          <button onClick={save} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
+          <button onClick={() => setModal(false)} disabled={saving} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600 disabled:opacity-50">İptal</button>
+          <button onClick={save} disabled={saving} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60 min-w-[80px]">
+            {saving ? 'Kaydediliyor...' : 'Kaydet'}
+          </button>
         </div>
       </Modal>
     </div>
@@ -510,24 +546,44 @@ function Siniflar({ siniflar, ogrenciler, okul, dark, reload }: any) {
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Sinif | null>(null)
   const [form, setForm] = useState<any>({ renk: '#5c6bc0', kapasite: 20 })
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   async function save() {
-    if (!form.ad) { alert('Sınıf adı zorunlu!'); return }
-    if (editing) await supabase.from('siniflar').update({ ...form, okul_id: okul.id }).eq('id', editing.id)
-    else await supabase.from('siniflar').insert({ ...form, okul_id: okul.id })
-    setModal(false); reload()
+    if (!form.ad) { setSaveError('Sınıf adı zorunlu!'); return }
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const payload = { ...form, okul_id: okul.id }
+      const { error } = editing
+        ? await supabase.from('siniflar').update(payload).eq('id', editing.id)
+        : await supabase.from('siniflar').insert(payload)
+      if (error) throw error
+      setModal(false)
+      reload()
+    } catch (err: any) {
+      const detail = err?.code === '42501'
+        ? 'Yetki hatası (RLS): Bu işlem için yetkiniz bulunmuyor.'
+        : err?.code === '23505'
+          ? 'Bu sınıf adı zaten mevcut.'
+          : `Kayıt hatası: ${err?.message || 'Bilinmeyen hata'}`
+      setSaveError(detail)
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function del(id: number) {
     if (!confirm('Silmek istediğinizden emin misiniz?')) return
-    await supabase.from('siniflar').delete().eq('id', id)
+    const { error } = await supabase.from('siniflar').delete().eq('id', id)
+    if (error) { alert(`Silme hatası: ${error.message}`); return }
     reload()
   }
 
   return (
     <div>
       <div className="flex justify-end mb-4">
-        <button onClick={() => { setEditing(null); setForm({ renk: '#5c6bc0', kapasite: 20 }); setModal(true) }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">+ Sınıf Ekle</button>
+        <button onClick={() => { setEditing(null); setForm({ renk: '#5c6bc0', kapasite: 20 }); setSaveError(null); setModal(true) }} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">+ Sınıf Ekle</button>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {siniflar.map((s: Sinif) => {
@@ -581,9 +637,16 @@ function Siniflar({ siniflar, ogrenciler, okul, dark, reload }: any) {
             </select>
           </div>
         </div>
+        {saveError && (
+          <div className="px-5 pb-3">
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{saveError}</p>
+          </div>
+        )}
         <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-gray-700' : 'border-gray-200'}`}>
-          <button onClick={() => setModal(false)} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600">İptal</button>
-          <button onClick={save} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
+          <button onClick={() => setModal(false)} disabled={saving} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600 disabled:opacity-50">İptal</button>
+          <button onClick={save} disabled={saving} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60 min-w-[80px]">
+            {saving ? 'Kaydediliyor...' : 'Kaydet'}
+          </button>
         </div>
       </Modal>
     </div>

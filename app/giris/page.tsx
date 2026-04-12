@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Instrument_Serif, DM_Sans } from 'next/font/google'
 import { hasSupabaseEnv, supabase } from '@/lib/supabase'
 import { setAuthRememberPreference, useAuth } from '@/lib/auth'
@@ -28,6 +28,7 @@ const AUTH_LOADING_TIMEOUT_MS = 5000
 
 export default function GirisPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { loading: authLoading, session, role, okul } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -36,7 +37,7 @@ export default function GirisPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [redirectIssue, setRedirectIssue] = useState('')
   const [rememberMe, setRememberMe] = useState(true)
-  const [redirectTarget, setRedirectTarget] = useState('')
+  const redirectTarget = searchParams.get('redirect') || ''
 
   const normalizedEmail = email.trim().toLowerCase()
   const canSubmit = normalizedEmail.length > 0 && password.trim().length > 0 && !submitting && !authLoading
@@ -55,12 +56,6 @@ export default function GirisPage() {
         : 'Panele giriş yap'
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const params = new URLSearchParams(window.location.search)
-    setRedirectTarget(params.get('redirect') || '')
-  }, [])
-
-  useEffect(() => {
     if (authLoading) return
 
     if (session && okul?.slug && redirectPath) {
@@ -72,7 +67,6 @@ export default function GirisPage() {
     if (!session || authLoading) return
 
     if (okul?.slug && redirectPath) {
-      setRedirectIssue('')
       return
     }
 

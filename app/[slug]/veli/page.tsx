@@ -181,12 +181,13 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
 
   useEffect(() => {
     if (!loading) {
-      setAuthTimeout(false)
-      return
+      if (!authTimeout) return
+      const resetTimeout = window.setTimeout(() => setAuthTimeout(false), 0)
+      return () => window.clearTimeout(resetTimeout)
     }
     const timeout = window.setTimeout(() => setAuthTimeout(true), 10000)
     return () => window.clearTimeout(timeout)
-  }, [loading])
+  }, [authTimeout, loading])
 
   useEffect(() => {
     if (!authTimeout || session) return
