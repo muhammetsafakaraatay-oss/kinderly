@@ -18,7 +18,7 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   const [siniflar, setSiniflar] = useState<Sinif[]>([])
   const [activePage, setActivePage] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [dark, setDark] = useState(false)
+  const dark = false
 
   async function loadAll(okulId: number) {
     const [{ data: ogr }, { data: sinif }] = await Promise.all([
@@ -30,12 +30,6 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   }
 
   useEffect(() => { params.then(p => setSlug(p.slug)) }, [params])
-
-  useEffect(() => {
-    const d = localStorage.getItem('kinderly_dark') === 'true'
-    setDark(d)
-    document.documentElement.classList.toggle('dark', d)
-  }, [])
 
   useEffect(() => {
     if (loading || !slug) return
@@ -59,12 +53,6 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
     setOkul(authOkul as Okul)
     loadAll(Number(authOkul.id))
   }, [authOkul, loading, role, router, session, slug])
-
-  function toggleDark() {
-    const next = !dark; setDark(next)
-    localStorage.setItem('kinderly_dark', String(next))
-    document.documentElement.classList.toggle('dark', next)
-  }
 
   if (loading || !session || !okul) {
     return (
@@ -131,9 +119,9 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
             <h1 className={`text-base font-semibold ${dark ? 'text-white' : 'text-gray-800'}`}>{navItems.find(n => n.id === activePage)?.label}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={toggleDark} className={`w-9 h-9 rounded-full border flex items-center justify-center text-lg ${dark ? 'border-gray-600 bg-gray-700' : 'border-gray-200'}`}>
-              {dark ? '☀️' : '🌙'}
-            </button>
+            <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+              Açık tema
+            </div>
             <button onClick={() => setActivePage('yoklama')} className="bg-indigo-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">✅ Yoklama</button>
           </div>
         </header>

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Instrument_Serif, DM_Sans } from 'next/font/google'
 import { hasSupabaseEnv, supabase } from '@/lib/supabase'
@@ -23,6 +23,9 @@ const supportPoints = [
   'Yeni premium onboarding ile acilan okul paneli burada devam eder.',
 ] as const
 
+const REDIRECT_RESOLUTION_TIMEOUT_MS = 3000
+const AUTH_LOADING_TIMEOUT_MS = 9000
+
 export default function GirisPage() {
   const router = useRouter()
   const { loading: authLoading, session, role, okul } = useAuth()
@@ -31,14 +34,16 @@ export default function GirisPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [redirectIssue, setRedirectIssue] = useState('')
 
-  const normalizedEmail = useMemo(() => email.trim().toLowerCase(), [email])
+  const normalizedEmail = email.trim().toLowerCase()
   const canSubmit = normalizedEmail.length > 0 && password.trim().length > 0 && !submitting && !authLoading
   const redirectPath = rolePath(role)
   const roleResolutionError =
-    !authLoading && session && !redirectPath
-      ? 'Giriş tamamlandı fakat bu hesap için panel rolü bulunamadı. Lütfen destek ile iletişime geçin.'
-      : ''
+    redirectIssue ||
+    (!authLoading && session && !redirectPath
+      ? 'Giriş tamamlandı fakat bu hesap için panel rolü bulunamadı. Ana sayfaya yönlendiriliyorsunuz.'
+      : '')
 
   const buttonLabel =
     submitting
@@ -55,6 +60,40 @@ export default function GirisPage() {
     }
   }, [authLoading, okul?.slug, redirectPath, router, session])
 
+  useEffect(() => {
+    if (!session || authLoading) return
+
+    if (okul?.slug && redirectPath) {
+      setRedirectIssue('')
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      const details = {
+        userId: session.user.id,
+        role,
+        slug: okul?.slug ?? null,
+      }
+      console.error('Giriş yönlendirmesi çözülemedi.', details)
+      setRedirectIssue('Rol veya okul slug bilgisi çözülemedi. Ana sayfaya yönlendiriliyorsunuz.')
+      router.replace('/')
+    }, REDIRECT_RESOLUTION_TIMEOUT_MS)
+
+    return () => window.clearTimeout(timeout)
+  }, [authLoading, okul?.slug, redirectPath, role, router, session])
+
+  useEffect(() => {
+    if (!session || !authLoading) return
+
+    const timeout = window.setTimeout(() => {
+      console.error('Auth loading beklenenden uzun sürdü.', { userId: session.user.id })
+      setError('Oturum doğrulaması beklenenden uzun sürdü. Ana sayfaya yönlendiriliyorsunuz.')
+      router.replace('/')
+    }, AUTH_LOADING_TIMEOUT_MS)
+
+    return () => window.clearTimeout(timeout)
+  }, [authLoading, router, session])
+
   async function handleLogin() {
     if (!hasSupabaseEnv) {
       setError('Supabase ayarlari Vercel ortaminda eksik. NEXT_PUBLIC_SUPABASE_URL ve NEXT_PUBLIC_SUPABASE_ANON_KEY eklenmeli.')
@@ -70,13 +109,22 @@ export default function GirisPage() {
 
     setSubmitting(true)
     setError('')
+    setRedirectIssue('')
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password: normalizedPassword,
-    })
+    const signInResult = await Promise.race([
+      supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: normalizedPassword,
+      }),
+      new Promise<{ error: { message: string } }>((resolve) => {
+        window.setTimeout(() => resolve({ error: { message: 'Giriş zaman aşımına uğradı.' } }), AUTH_LOADING_TIMEOUT_MS)
+      }),
+    ])
+
+    const signInError = signInResult.error
 
     if (signInError) {
+      console.error('Giriş hatası', signInError)
       setError(
         signInError.message === 'Invalid login credentials'
           ? 'Email veya şifre hatalı.'

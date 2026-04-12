@@ -12,13 +12,19 @@ import {
   insertMessageCompat,
   loadAnnouncementsCompat,
   loadParentChildren,
+  loadStudentMessagesCompat,
+  markMessagesReadCompat,
   normalizeAnnouncement,
   resolveParentMessageParties,
+  type AnnouncementItem,
+  type NormalizedMessage,
 } from '@/lib/supabase-helpers'
 import type { Aidat, Ogrenci, Okul } from '@/lib/types'
 
 const serif = Instrument_Serif({ subsets: ['latin'], weight: '400', variable: '--font-serif' })
 const sans = DM_Sans({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700'], variable: '--font-sans' })
+
+type ParentTab = 'bugun' | 'mesajlar' | 'duyurular' | 'aidatlar' | 'cocugum'
 
 type ActivityRow = {
   id: number
@@ -28,20 +34,32 @@ type ActivityRow = {
   created_at?: string | null
 }
 
-const activityLabels: Record<string, { label: string; emoji: string }> = {
-  food: { label: 'Yemek', emoji: '🍎' },
-  nap: { label: 'Uyku', emoji: '😴' },
-  potty: { label: 'Tuvalet', emoji: '🚽' },
-  photo: { label: 'Fotoğraf', emoji: '📷' },
-  kudos: { label: 'Tebrik', emoji: '⭐' },
-  meds: { label: 'İlaç', emoji: '💊' },
-  incident: { label: 'Kaza', emoji: '🩹' },
-  health: { label: 'Sağlık', emoji: '🌡️' },
-  note: { label: 'Not', emoji: '📝' },
+const tabs: Array<{ id: ParentTab; label: string }> = [
+  { id: 'bugun', label: 'Bugün' },
+  { id: 'mesajlar', label: 'Mesajlar' },
+  { id: 'duyurular', label: 'Duyurular' },
+  { id: 'aidatlar', label: 'Aidatlar' },
+  { id: 'cocugum', label: 'Çocuğum' },
+]
+
+const activityLabels: Record<string, string> = {
+  food: 'Yemek',
+  nap: 'Uyku',
+  potty: 'Tuvalet',
+  photo: 'Fotoğraf',
+  kudos: 'Tebrik',
+  meds: 'İlaç',
+  incident: 'Kaza',
+  health: 'Sağlık',
+  note: 'Not',
 }
 
 function today() {
   return new Date().toISOString().split('T')[0]
+}
+
+function cx(...parts: Array<string | false | null | undefined>) {
+  return parts.filter(Boolean).join(' ')
 }
 
 function formatCurrency(value: number) {
@@ -52,39 +70,45 @@ function formatCurrency(value: number) {
   }).format(value)
 }
 
-function formatTime(value?: string | null) {
+function formatDateTime(value?: string | null) {
   if (!value) return 'Bugün'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return 'Bugün'
-  return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })
+  return date.toLocaleString('tr-TR', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
-function detailText(row: ActivityRow) {
+function getActivitySummary(row: ActivityRow) {
   const detay = row.detay || {}
-  const values = ['not', 'ogun', 'yeme', 'sure', 'ates', 'ilac', 'doz']
+  const firstValue = ['not', 'aciklama', 'durum', 'ogun', 'miktar', 'ilac']
     .map((key) => detay[key])
-    .filter(Boolean)
-    .map((value) => String(value))
-  return values[0] || 'Öğretmen günlük akışa yeni kayıt ekledi.'
+    .find(Boolean)
+  return firstValue ? String(firstValue) : 'Yeni bilgi eklendi.'
 }
 
 export default function VeliPage({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter()
   const { session, role, okul: authOkul, loading, signOut } = useAuth()
   const [slug, setSlug] = useState('')
+  const [activeTab, setActiveTab] = useState<ParentTab>('bugun')
   const [children, setChildren] = useState<Ogrenci[]>([])
   const [selectedChildId, setSelectedChildId] = useState<number | null>(null)
   const [attendanceStatus, setAttendanceStatus] = useState('')
   const [activities, setActivities] = useState<ActivityRow[]>([])
-  const [announcements, setAnnouncements] = useState<ReturnType<typeof normalizeAnnouncement>[]>([])
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([])
   const [aidatlar, setAidatlar] = useState<Aidat[]>([])
+  const [messages, setMessages] = useState<NormalizedMessage[]>([])
   const [messageText, setMessageText] = useState('')
   const [messageState, setMessageState] = useState('')
   const [pageLoading, setPageLoading] = useState(true)
   const [sending, setSending] = useState(false)
 
   useEffect(() => {
-    params.then((value) => setSlug(value.slug))
+    void params.then((value) => setSlug(value.slug))
   }, [params])
 
   const okul = authOkul as Okul | null
@@ -105,26 +129,24 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
 
     if (authOkul.slug !== slug) {
       router.replace(`/${authOkul.slug}/veli`)
-      return
     }
-
   }, [authOkul, loading, role, router, session, slug])
 
   useEffect(() => {
     if (!okul || !session) return
 
-    let cancelled = false
+    let alive = true
     const currentSession = session
     const currentOkul = okul
 
     async function bootstrap() {
       setPageLoading(true)
-
       const { data, error } = await loadParentChildren(currentSession.user.id, currentOkul.id)
 
-      if (cancelled) return
+      if (!alive) return
 
       if (error) {
+        setMessageState(getSupabaseErrorMessage(error, 'Öğrenci bilgileri yüklenemedi.'))
         setChildren([])
         setSelectedChildId(null)
         setPageLoading(false)
@@ -137,62 +159,95 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
       setPageLoading(false)
     }
 
-    bootstrap()
+    void bootstrap()
 
     return () => {
-      cancelled = true
+      alive = false
     }
   }, [okul, session])
 
   useEffect(() => {
     if (!okul || !selectedChildId) return
 
-    let cancelled = false
+    let alive = true
     const currentOkul = okul
+    const currentChildId = selectedChildId
 
     async function loadDashboard() {
       setPageLoading(true)
 
-      const [{ data: activityRows }, { data: yoklama }, { data: announcementRows }, { data: feeRows }] = await Promise.all([
+      const [activityQuery, yoklamaQuery, announcementQuery, feeQuery, messageQuery] = await Promise.all([
         supabase
           .from('aktiviteler')
           .select('id,tur,detay,kaydeden,created_at')
           .eq('okul_id', currentOkul.id)
-          .eq('ogrenci_id', selectedChildId)
+          .eq('ogrenci_id', currentChildId)
           .eq('tarih', today())
           .eq('veli_gosterilsin', true)
           .order('id', { ascending: false })
-          .limit(8),
+          .limit(20),
         supabase
           .from('yoklama')
           .select('durum')
           .eq('okul_id', currentOkul.id)
-          .eq('ogrenci_id', selectedChildId)
+          .eq('ogrenci_id', currentChildId)
           .eq('tarih', today())
           .maybeSingle(),
-        loadAnnouncementsCompat(currentOkul.id, 5),
+        loadAnnouncementsCompat(currentOkul.id, 20),
         supabase
           .from('aidatlar')
           .select('*')
           .eq('okul_id', currentOkul.id)
-          .eq('ogrenci_id', selectedChildId)
+          .eq('ogrenci_id', currentChildId)
           .order('id', { ascending: false })
-          .limit(6),
+          .limit(12),
+        loadStudentMessagesCompat(currentOkul.id, currentChildId, 200),
       ])
 
-      if (cancelled) return
+      if (!alive) return
 
-      setActivities((activityRows || []) as ActivityRow[])
-      setAttendanceStatus(yoklama?.durum || '')
-      setAnnouncements(announcementRows || [])
-      setAidatlar((feeRows || []) as Aidat[])
+      setActivities((activityQuery.data || []) as ActivityRow[])
+      setAttendanceStatus(yoklamaQuery.data?.durum || '')
+      setAnnouncements(announcementQuery.data || [])
+      setAidatlar((feeQuery.data || []) as Aidat[])
+      setMessages(messageQuery.data || [])
       setPageLoading(false)
     }
 
-    loadDashboard()
+    void loadDashboard()
+
+    const channel = supabase
+      .channel(`veli-panel-${currentOkul.id}-${currentChildId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mesajlar', filter: `okul_id=eq.${currentOkul.id}` }, () => {
+        void loadStudentMessagesCompat(currentOkul.id, currentChildId, 200).then((result) => setMessages(result.data || []))
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'aktiviteler', filter: `okul_id=eq.${currentOkul.id}` }, () => {
+        void supabase
+          .from('aktiviteler')
+          .select('id,tur,detay,kaydeden,created_at')
+          .eq('okul_id', currentOkul.id)
+          .eq('ogrenci_id', currentChildId)
+          .eq('tarih', today())
+          .eq('veli_gosterilsin', true)
+          .order('id', { ascending: false })
+          .limit(20)
+          .then(({ data }) => setActivities((data || []) as ActivityRow[]))
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'yoklama', filter: `okul_id=eq.${currentOkul.id}` }, () => {
+        void supabase
+          .from('yoklama')
+          .select('durum')
+          .eq('okul_id', currentOkul.id)
+          .eq('ogrenci_id', currentChildId)
+          .eq('tarih', today())
+          .maybeSingle()
+          .then(({ data }) => setAttendanceStatus(data?.durum || ''))
+      })
+      .subscribe()
 
     return () => {
-      cancelled = true
+      alive = false
+      void supabase.removeChannel(channel)
     }
   }, [okul, selectedChildId])
 
@@ -201,10 +256,25 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
     [children, selectedChildId]
   )
 
-  const unpaidTotal = useMemo(
-    () => aidatlar.filter((item) => !item.odendi).reduce((sum, item) => sum + Number(item.tutar || 0), 0),
+  const paidFees = useMemo(
+    () => aidatlar.filter((item) => item.odendi),
     [aidatlar]
   )
+
+  const unpaidFees = useMemo(
+    () => aidatlar.filter((item) => !item.odendi),
+    [aidatlar]
+  )
+
+  const totalDebt = useMemo(
+    () => unpaidFees.reduce((sum, item) => sum + Number(item.tutar || 0), 0),
+    [unpaidFees]
+  )
+
+  useEffect(() => {
+    if (!okul || !selectedChildId || !session) return
+    void markMessagesReadCompat(okul.id, selectedChildId)
+  }, [okul, selectedChildId, session])
 
   async function sendMessage() {
     if (!session || !okul || !selectedChild || !messageText.trim()) return
@@ -234,15 +304,17 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
       messageText.trim()
     )
 
+    setSending(false)
+
     if (error) {
       setMessageState(getSupabaseErrorMessage(error, 'Mesaj gönderilemedi.'))
-      setSending(false)
       return
     }
 
     setMessageText('')
     setMessageState('Mesaj öğretmene iletildi.')
-    setSending(false)
+    const result = await loadStudentMessagesCompat(okul.id, selectedChild.id, 200)
+    setMessages(result.data || [])
   }
 
   if (loading || pageLoading || !session || !okul) {
@@ -250,233 +322,314 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
   }
 
   return (
-    <main className={`${serif.variable} ${sans.variable} min-h-screen bg-[#060a06] font-sans text-white`}>
+    <main className={`${serif.variable} ${sans.variable} min-h-screen bg-[#f8fafc] font-sans text-[#0f172a]`}>
       <style>{`
-        :root {
-          --green: #4ade80;
-          --green-dim: rgba(74, 222, 128, 0.1);
-          --border: rgba(74, 222, 128, 0.14);
-          --surface: #0b120b;
-          --muted: rgba(255, 255, 255, 0.62);
-        }
-        .serif {
-          font-family: var(--font-serif);
+        .input-base {
+          width: 100%;
+          border-radius: 1rem;
+          border: 1px solid #e2e8f0;
+          background: #f8fafc;
+          padding: 0.9rem 1rem;
+          font-size: 0.95rem;
+          color: #0f172a;
+          outline: none;
         }
       `}</style>
+      <div className="mx-auto max-w-[1440px] px-5 py-8 lg:px-10">
+        <header className="rounded-[32px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[#f59e0b]">Veli paneli</div>
+              <h1 className="mt-3 text-[clamp(2.4rem,5vw,4.4rem)] font-semibold leading-[0.92] tracking-[-0.05em] [font-family:var(--font-serif)]">
+                Günlük akışı sakin ve net takip edin.
+              </h1>
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">
+                Yoklama, öğretmen mesajları, duyurular, aidatlar ve çocuk özetiniz tek görünümde.
+              </p>
+            </div>
 
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(74,222,128,0.15),transparent_45%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(74,222,128,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(74,222,128,0.03)_1px,transparent_1px)] bg-[size:42px_42px] opacity-35" />
-      </div>
-
-      <div className="relative mx-auto min-h-screen max-w-[1440px] px-[5%] pb-10 pt-8">
-        <header className="flex flex-col gap-6 border-b border-[var(--border)] pb-8 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--green)]">Veli paneli</div>
-            <h1 className="serif mt-4 text-[clamp(2.8rem,6vw,5.6rem)] leading-[0.92] tracking-[-0.05em]">
-              Çocuğunuzun gününü
-              <br />
-              sakin ve net izleyin.
-            </h1>
-            <p className="mt-4 max-w-[620px] text-base leading-7 text-[var(--muted)]">
-              Yoklama, günlük akış, duyurular ve aidat durumu tek premium ekranda bir araya geliyor.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <Link href="/giris" className="rounded-full border border-[var(--border)] px-5 py-3 text-sm text-[var(--muted)] transition-colors hover:text-white">
-              Giriş sayfası
-            </Link>
-            <button
-              onClick={async () => {
-                await signOut()
-                router.replace('/giris')
-              }}
-              className="rounded-full bg-[var(--green)] px-5 py-3 text-sm font-semibold text-[#061006]"
-            >
-              Çıkış yap
-            </button>
-          </div>
-        </header>
-
-        {children.length > 1 && (
-          <div className="mt-8 flex flex-wrap gap-3">
-            {children.map((child) => (
+            <div className="flex flex-wrap gap-3">
+              <Link href="/giris" className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-[#f59e0b] hover:text-[#f59e0b]">
+                Giriş sayfası
+              </Link>
               <button
-                key={child.id}
-                onClick={() => setSelectedChildId(child.id)}
-                className={`rounded-full px-4 py-3 text-sm font-semibold transition-colors ${
-                  selectedChildId === child.id
-                    ? 'bg-[var(--green)] text-[#061006]'
-                    : 'border border-[var(--border)] text-[var(--muted)]'
-                }`}
+                onClick={async () => {
+                  await signOut()
+                  router.replace('/giris')
+                }}
+                className="rounded-full bg-[#f59e0b] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#d97706]"
               >
-                {child.ad_soyad.split(' ')[0]}
+                Çıkış yap
+              </button>
+            </div>
+          </div>
+
+          {children.length > 1 && (
+            <div className="mt-6 flex flex-wrap gap-3">
+              {children.map((child) => (
+                <button
+                  key={child.id}
+                  onClick={() => setSelectedChildId(child.id)}
+                  className={cx(
+                    'rounded-full px-4 py-2 text-sm font-semibold transition',
+                    selectedChildId === child.id ? 'bg-[#f59e0b] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  )}
+                >
+                  {child.ad_soyad}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cx(
+                  'rounded-full px-4 py-2 text-sm font-semibold transition',
+                  activeTab === tab.id ? 'bg-[#f59e0b] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                )}
+              >
+                {tab.label}
               </button>
             ))}
           </div>
+        </header>
+
+        {messageState && (
+          <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            {messageState}
+          </div>
         )}
 
-        {selectedChild ? (
-          <>
-            <section className="mt-8 grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-              <div className="rounded-[28px] border border-[var(--border)] bg-[linear-gradient(135deg,rgba(74,222,128,0.14),rgba(255,255,255,0.03))] p-7">
-                <div className="flex flex-wrap items-center justify-between gap-5">
-                  <div>
-                    <div className="text-sm text-[var(--muted)]">Bugünkü durum</div>
-                    <div className="mt-3 serif text-5xl text-[var(--green)]">
-                      {attendanceStatus === 'geldi' ? 'Okulda' : attendanceStatus === 'gelmedi' ? 'Gelmedi' : attendanceStatus === 'izinli' ? 'İzinli' : 'Bekleniyor'}
-                    </div>
-                  </div>
-                  <div className="rounded-[24px] border border-[var(--border)] bg-[#081008] px-5 py-4 text-right">
-                    <div className="text-sm text-[var(--muted)]">Çocuk</div>
-                    <div className="mt-2 text-2xl font-semibold text-white">{selectedChild.ad_soyad}</div>
-                    <div className="mt-1 text-sm text-[var(--muted)]">{selectedChild.sinif || 'Sınıf bilgisi yok'}</div>
+        {activeTab === 'bugun' && (
+          <section className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+            <PanelCard className="bg-[linear-gradient(135deg,#fff7ed,white)]">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <div className="text-sm font-medium text-slate-500">Bugünkü yoklama durumu</div>
+                  <div className="mt-3 inline-flex rounded-full bg-white px-5 py-3 text-2xl font-semibold text-slate-900 shadow-sm">
+                    {attendanceStatus || 'Henüz işlenmedi'}
                   </div>
                 </div>
-
-                <div className="mt-8 grid gap-4 sm:grid-cols-3">
-                  <MetricCard label="Bugünkü aktivite" value={String(activities.length)} />
-                  <MetricCard label="Bekleyen aidat" value={formatCurrency(unpaidTotal)} />
-                  <MetricCard label="Duyuru" value={String(announcements.length)} />
+                <div className="rounded-[24px] border border-amber-100 bg-white px-5 py-4">
+                  <div className="text-xs uppercase tracking-[0.16em] text-slate-500">Seçili çocuk</div>
+                  <div className="mt-2 text-xl font-semibold text-slate-900">{selectedChild?.ad_soyad || 'Öğrenci seçin'}</div>
                 </div>
               </div>
 
-              <Panel title="Öğretmene mesaj gönder" subtitle="Sınıf öğretmenine hızlıca ulaşın">
-                <textarea
-                  value={messageText}
-                  onChange={(event) => setMessageText(event.target.value)}
-                  placeholder="Bugünle ilgili kısa bir not yazın..."
-                  className="min-h-[140px] w-full rounded-[22px] border border-[var(--border)] bg-white/[0.03] px-4 py-4 text-sm text-white outline-none placeholder:text-white/25"
-                />
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
-                  <div className="text-sm text-[var(--muted)]">Mesaj doğrudan ilişkili öğretmene iletilir.</div>
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                <StatCard label="Bugünkü aktivite" value={String(activities.length)} />
+                <StatCard label="Bekleyen aidat" value={String(unpaidFees.length)} />
+                <StatCard label="Toplam borç" value={formatCurrency(totalDebt)} />
+              </div>
+            </PanelCard>
+
+            <PanelCard>
+              <h2 className="text-lg font-semibold text-slate-900">Canlı günlük akış</h2>
+              <p className="mt-1 text-sm text-slate-500">Öğretmen yeni aktivite ekledikçe bu alan güncellenir.</p>
+              <div className="mt-6 space-y-3">
+                {activities.length ? activities.map((activity) => (
+                  <div key={activity.id} className="rounded-2xl border border-slate-200 px-4 py-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-slate-900">{activityLabels[activity.tur] || activity.tur}</div>
+                        <div className="mt-1 text-sm text-slate-600">{getActivitySummary(activity)}</div>
+                      </div>
+                      <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{formatDateTime(activity.created_at)}</div>
+                    </div>
+                  </div>
+                )) : (
+                  <EmptyState title="Henüz aktivite yok" description="Gün içinde paylaşılan kayıtlar burada listelenecek." />
+                )}
+              </div>
+            </PanelCard>
+          </section>
+        )}
+
+        {activeTab === 'mesajlar' && (
+          <section className="mt-6">
+            <PanelCard>
+              <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+                <div className="rounded-[24px] border border-slate-200">
+                  <div className="border-b border-slate-200 px-5 py-4">
+                    <div className="font-semibold text-slate-900">Öğretmen ile yazışma</div>
+                    <div className="text-sm text-slate-500">{selectedChild?.ad_soyad || 'Öğrenci seçin'}</div>
+                  </div>
+
+                  <div className="max-h-[460px] space-y-3 overflow-y-auto px-5 py-5">
+                    {messages.length ? messages.map((message) => (
+                      <div key={message.id} className={cx('flex', message.gonderen_rol.includes('veli') ? 'justify-end' : 'justify-start')}>
+                        <div className={cx(
+                          'max-w-[75%] rounded-[22px] px-4 py-3 text-sm shadow-sm',
+                          message.gonderen_rol.includes('veli')
+                            ? 'bg-[#f59e0b] text-white'
+                            : 'bg-slate-100 text-slate-700'
+                        )}>
+                          <div>{message.content}</div>
+                          <div className={cx('mt-2 text-[11px]', message.gonderen_rol.includes('veli') ? 'text-amber-100' : 'text-slate-400')}>
+                            {formatDateTime(message.created_at)}
+                          </div>
+                        </div>
+                      </div>
+                    )) : (
+                      <EmptyState title="Henüz mesaj yok" description="İlk mesajı göndererek yazışmayı başlatabilirsiniz." />
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+                  <h2 className="text-lg font-semibold text-slate-900">Mesaj gönder</h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    Realtime bağlantısı açık; öğretmenin yanıtı bu ekranda anlık görünür.
+                  </p>
+                  <textarea
+                    value={messageText}
+                    onChange={(event) => setMessageText(event.target.value)}
+                    className="input-base mt-4 min-h-[180px] resize-none bg-white"
+                    placeholder="Öğretmene mesajınız..."
+                  />
                   <button
                     onClick={sendMessage}
-                    disabled={sending || !messageText.trim()}
-                    className="rounded-full bg-[var(--green)] px-5 py-3 text-sm font-semibold text-[#061006] disabled:opacity-50"
+                    disabled={sending || !selectedChild}
+                    className="mt-4 w-full rounded-2xl bg-[#f59e0b] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
                   >
                     {sending ? 'Gönderiliyor...' : 'Mesajı gönder'}
                   </button>
                 </div>
-                {messageState && <p className="mt-4 text-sm text-[var(--green)]">{messageState}</p>}
-              </Panel>
-            </section>
-
-            <section className="mt-8 grid gap-5 lg:grid-cols-2">
-              <Panel title="Günlük aktivite feed'i" subtitle="Öğretmenin bugün paylaştıkları">
-                {activities.length ? (
-                  <div className="space-y-3">
-                    {activities.map((activity) => {
-                      const meta = activityLabels[activity.tur] || { label: activity.tur, emoji: '📋' }
-                      return (
-                        <div key={activity.id} className="rounded-[22px] border border-[var(--border)] bg-white/[0.02] p-4">
-                          <div className="flex items-start gap-4">
-                            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[#081008] text-xl">
-                              {meta.emoji}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div className="font-semibold text-white">{meta.label}</div>
-                                <div className="text-xs text-[var(--muted)]">{formatTime(activity.created_at)}</div>
-                              </div>
-                              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{detailText(activity)}</p>
-                              {activity.kaydeden && <div className="mt-2 text-xs text-[var(--green)]">{activity.kaydeden}</div>}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <EmptyState text="Bugün paylaşılmış aktivite bulunmuyor." />
-                )}
-              </Panel>
-
-              <div className="grid gap-5">
-                <Panel title="Duyurular" subtitle="Okuldan son paylaşımlar">
-                  {announcements.length ? (
-                    <div className="space-y-3">
-                      {announcements.map((announcement) => (
-                        <div key={announcement.id} className="rounded-[22px] border border-[var(--border)] bg-white/[0.02] p-4">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="font-semibold text-white">{announcement.baslik}</div>
-                            <div className="text-xs text-[var(--muted)]">{formatTime(announcement.created_at)}</div>
-                          </div>
-                          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{announcement.icerik}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <EmptyState text="Henüz okul duyurusu paylaşılmadı." />
-                  )}
-                </Panel>
-
-                <Panel title="Aidat durumu" subtitle="Son kayıtlar ve bekleyen toplam">
-                  {aidatlar.length ? (
-                    <div className="space-y-3">
-                      {aidatlar.map((aidat) => (
-                        <div key={aidat.id} className="rounded-[22px] border border-[var(--border)] bg-white/[0.02] p-4">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <div className="font-semibold text-white">{aidat.ay || 'Aidat kaydı'}</div>
-                              <div className="mt-1 text-sm text-[var(--muted)]">
-                                {aidat.odendi ? 'Ödeme alındı' : 'Ödeme bekleniyor'}
-                              </div>
-                            </div>
-                            <div className={`rounded-full px-3 py-2 text-xs font-semibold ${aidat.odendi ? 'bg-white/10 text-white' : 'bg-[var(--green)] text-[#061006]'}`}>
-                              {formatCurrency(Number(aidat.tutar || 0))}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <EmptyState text="Bu çocuk için aidat kaydı bulunmuyor." />
-                  )}
-                </Panel>
               </div>
-            </section>
-          </>
-        ) : (
-          <div className="mt-8 rounded-[28px] border border-dashed border-[var(--border)] p-8 text-[var(--muted)]">
-            Bu veli hesabına bağlı öğrenci bulunamadı.
-          </div>
+            </PanelCard>
+          </section>
+        )}
+
+        {activeTab === 'duyurular' && (
+          <section className="mt-6">
+            <PanelCard>
+              <h2 className="text-lg font-semibold text-slate-900">Okul duyuruları</h2>
+              <div className="mt-6 space-y-3">
+                {announcements.length ? announcements.map((announcement) => (
+                  <div key={announcement.id} className="rounded-2xl border border-slate-200 px-4 py-4">
+                    <div className="font-semibold text-slate-900">{announcement.baslik}</div>
+                    <div className="mt-2 text-sm leading-6 text-slate-600">{announcement.icerik}</div>
+                    <div className="mt-3 text-xs uppercase tracking-[0.14em] text-slate-400">{formatDateTime(announcement.created_at)}</div>
+                  </div>
+                )) : (
+                  <EmptyState title="Duyuru bulunamadı" description="Yeni okul duyuruları burada listelenir." />
+                )}
+              </div>
+            </PanelCard>
+          </section>
+        )}
+
+        {activeTab === 'aidatlar' && (
+          <section className="mt-6 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+            <PanelCard className="bg-[linear-gradient(135deg,#fff7ed,white)]">
+              <h2 className="text-lg font-semibold text-slate-900">Borç özeti</h2>
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                <StatCard label="Bekleyen" value={String(unpaidFees.length)} />
+                <StatCard label="Ödenen" value={String(paidFees.length)} />
+                <StatCard label="Toplam borç" value={formatCurrency(totalDebt)} />
+              </div>
+            </PanelCard>
+
+            <PanelCard>
+              <h2 className="text-lg font-semibold text-slate-900">Aidat hareketleri</h2>
+              <div className="mt-6 space-y-3">
+                {aidatlar.length ? aidatlar.map((aidat) => (
+                  <div key={aidat.id} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 px-4 py-4">
+                    <div>
+                      <div className="font-semibold text-slate-900">{aidat.ay}</div>
+                      <div className="text-sm text-slate-500">{aidat.odendi ? 'Ödendi' : 'Bekliyor'}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold text-slate-900">{formatCurrency(Number(aidat.tutar || 0))}</div>
+                      <div className={cx('text-xs font-semibold uppercase tracking-[0.14em]', aidat.odendi ? 'text-emerald-600' : 'text-amber-600')}>
+                        {aidat.odendi ? 'Ödenen' : 'Bekleyen'}
+                      </div>
+                    </div>
+                  </div>
+                )) : (
+                  <EmptyState title="Aidat kaydı yok" description="Okul aidat girişi yaptığında burada görüntülenir." />
+                )}
+              </div>
+            </PanelCard>
+          </section>
+        )}
+
+        {activeTab === 'cocugum' && (
+          <section className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+            <PanelCard>
+              <h2 className="text-lg font-semibold text-slate-900">Çocuğum</h2>
+              <div className="mt-6 space-y-4">
+                <InfoRow label="Ad soyad" value={selectedChild?.ad_soyad} />
+                <InfoRow label="Sınıf" value={selectedChild?.sinif} />
+                <InfoRow label="Doğum tarihi" value={selectedChild?.dogum_tarihi} />
+                <InfoRow label="Alerji" value={selectedChild?.alerjiler} />
+                <InfoRow label="Veli adı" value={selectedChild?.veli_ad} />
+              </div>
+            </PanelCard>
+
+            <PanelCard>
+              <h2 className="text-lg font-semibold text-slate-900">Bugünkü özet</h2>
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <SummaryCard title="Yoklama" value={attendanceStatus || 'Henüz işlenmedi'} />
+                <SummaryCard title="Aktivite" value={`${activities.length} kayıt`} />
+                <SummaryCard title="Bekleyen aidat" value={`${unpaidFees.length} kalem`} />
+                <SummaryCard title="Son güncelleme" value={activities[0]?.created_at ? formatDateTime(activities[0].created_at) : 'Bugün'} />
+              </div>
+            </PanelCard>
+          </section>
         )}
       </div>
     </main>
   )
 }
 
+function PanelCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <section className={cx('rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm', className)}>{children}</section>
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-5">
+      <div className="text-sm text-slate-500">{label}</div>
+      <div className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-900">{value}</div>
+    </div>
+  )
+}
+
+function SummaryCard({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-5">
+      <div className="text-sm text-slate-500">{title}</div>
+      <div className="mt-2 text-xl font-semibold text-slate-900">{value}</div>
+    </div>
+  )
+}
+
+function InfoRow({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 px-4 py-4">
+      <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{label}</div>
+      <div className="mt-2 text-base font-medium text-slate-900">{value || 'Bilgi girilmedi'}</div>
+    </div>
+  )
+}
+
+function EmptyState({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
+      <div className="text-base font-semibold text-slate-900">{title}</div>
+      <div className="mt-2 text-sm text-slate-500">{description}</div>
+    </div>
+  )
+}
+
 function LoadingScreen() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#060a06] text-white">
+    <div className="flex min-h-screen items-center justify-center bg-[#f8fafc] text-slate-500">
       Panel hazırlanıyor...
     </div>
   )
-}
-
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[22px] border border-[var(--border)] bg-[#081008] p-5">
-      <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">{label}</div>
-      <div className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">{value}</div>
-    </div>
-  )
-}
-
-function Panel({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-[28px] border border-[var(--border)] bg-[rgba(11,18,11,0.88)] p-7">
-      <div className="mb-5">
-        <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--green)]">{title}</div>
-        <div className="mt-2 text-sm text-[var(--muted)]">{subtitle}</div>
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function EmptyState({ text }: { text: string }) {
-  return <div className="rounded-[22px] border border-dashed border-[var(--border)] p-6 text-sm text-[var(--muted)]">{text}</div>
 }
