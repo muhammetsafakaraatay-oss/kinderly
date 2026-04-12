@@ -2,14 +2,11 @@
 
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
-import { Instrument_Serif, DM_Sans } from 'next/font/google'
+import { Check, Zap, MessageCircle, Camera, Banknote, BarChart2, ArrowRight } from 'lucide-react'
 import { RoiCalculator } from '@/components/roi-calculator'
 
-const serif = Instrument_Serif({ subsets: ['latin'], weight: '400', variable: '--font-serif' })
-const sans = DM_Sans({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700'], variable: '--font-sans' })
-
 type MenuItem = {
-  icon: string
+  icon: React.ReactNode
   title: string
   description: string
   href: string
@@ -18,67 +15,75 @@ type MenuItem = {
 type DropdownKey = 'features' | 'audiences' | 'resources' | null
 
 const featureMenu: MenuItem[] = [
-  { icon: '✓', title: 'Yoklama & Devam Takibi', description: 'Saniyeler icinde sinif bazli devam kontrolu alin.', href: '#ozellikler' },
-  { icon: '⚡', title: 'Aktivite Kayitlari', description: 'Yemek, uyku, ilac ve gunluk notlari tek akisla yonetin.', href: '#ozellikler' },
-  { icon: '💬', title: 'Veli İletişimi', description: 'Mesaj, duyuru ve push bildirimlerini tek merkezde toplayin.', href: '#ozellikler' },
-  { icon: '📷', title: 'Fotoğraf Paylaşımı', description: 'Guvenli galeriyle ozel anlari ailelerle aninda paylasin.', href: '#ozellikler' },
-  { icon: '₺', title: 'Aidat Yonetimi', description: 'Tahsilat, hatirlatma ve gecikme takibini otomatiklestirin.', href: '#fiyatlar' },
-  { icon: '◌', title: 'Raporlar & Analizler', description: 'Devam, gelir ve operasyon verilerini canli dashboard ile izleyin.', href: '#metrikler' },
+  { icon: <Check size={18} />, title: 'Yoklama & Devam Takibi', description: 'Saniyeler içinde sınıf bazlı devam kontrolü alın.', href: '#ozellikler' },
+  { icon: <Zap size={18} />, title: 'Aktivite Kayıtları', description: 'Yemek, uyku, ilaç ve günlük notları tek akışla yönetin.', href: '#ozellikler' },
+  { icon: <MessageCircle size={18} />, title: 'Veli İletişimi', description: 'Mesaj, duyuru ve push bildirimlerini tek merkezde toplayın.', href: '#ozellikler' },
+  { icon: <Camera size={18} />, title: 'Fotoğraf Paylaşımı', description: 'Güvenli galeriyle özel anları ailelerle anında paylaşın.', href: '#ozellikler' },
+  { icon: <Banknote size={18} />, title: 'Aidat Yönetimi', description: 'Tahsilat, hatırlatma ve gecikme takibini otomatikleştirin.', href: '#fiyatlar' },
+  { icon: <BarChart2 size={18} />, title: 'Raporlar & Analizler', description: 'Devam, gelir ve operasyon verilerini canlı dashboard ile izleyin.', href: '#metrikler' },
 ]
 
 const audienceMenu: MenuItem[] = [
-  { icon: '👑', title: 'Anaokulu Yöneticileri', description: 'Tum operasyonu tek ekranda toplayan ust duzey kontrol merkezi.', href: '#roller' },
-  { icon: '👩‍🏫', title: 'Öğretmenler & Personel', description: 'Gunluk rutinleri hizlandiran mobil is akislarina erisin.', href: '#roller' },
-  { icon: '👨‍👩‍👧', title: 'Veliler & Aileler', description: 'Çocugunuzun gununu canli feed ve bildirimlerle takip edin.', href: '#roller' },
-  { icon: '🏢', title: 'Zincir & Cok Subeli', description: 'Birden fazla kampusu ortak standartlarla yonetin.', href: '#fiyatlar' },
+  { icon: '👑', title: 'Anaokulu Yöneticileri', description: 'Tüm operasyonu tek ekranda toplayan üst düzey kontrol merkezi.', href: '#roller' },
+  { icon: '👩‍🏫', title: 'Öğretmenler & Personel', description: 'Günlük rutinleri hızlandıran mobil iş akışlarına erişin.', href: '#roller' },
+  { icon: '👨‍👩‍👧', title: 'Veliler & Aileler', description: 'Çocuğunuzun gününü canlı feed ve bildirimlerle takip edin.', href: '#roller' },
+  { icon: '🏢', title: 'Zincir & Çok Şubeli', description: 'Birden fazla kampüsü ortak standartlarla yönetin.', href: '#fiyatlar' },
 ]
 
 const resourceMenu: MenuItem[] = [
-  { icon: '⌘', title: 'Yardım Merkezi', description: 'Kurulum, destek ve sik sorulan sorular icin kaynak merkezi.', href: '#cta' },
-  { icon: '✦', title: 'Blog', description: 'Anaokulu operasyonu ve dijital donusum icin editor secimi icerikler.', href: '#cta' },
-  { icon: '♥', title: 'Başarı Hikayeleri', description: 'Kinderly ile buyuyen okullarin gercek sonuclari.', href: '#yorumlar' },
-  { icon: '▶', title: 'Webinarlar', description: 'Canli urun turlari ve sektor uzmanlariyla online oturumlar.', href: '#cta' },
+  { icon: '⌘', title: 'Yardım Merkezi', description: 'Kurulum, destek ve sık sorulan sorular için kaynak merkezi.', href: '#cta' },
+  { icon: '✦', title: 'Blog', description: 'Anaokulu operasyonu ve dijital dönüşüm için editör seçimi içerikler.', href: '#cta' },
+  { icon: '♥', title: 'Başarı Hikayeleri', description: 'KinderX ile büyüyen okulların gerçek sonuçları.', href: '#yorumlar' },
+  { icon: '▶', title: 'Webinarlar', description: 'Canlı ürün turları ve sektör uzmanlarıyla online oturumlar.', href: '#cta' },
 ]
 
 const stats = [
   ['512+', 'aktif okul'],
   ['48.000+', 'öğrenci profili'],
-  ['%98', 'yenileme orani'],
-  ['23 saat', 'aylik zaman kazanci'],
+  ['%98', 'yenileme oranı'],
+  ['23 saat', 'aylık zaman kazancı'],
 ]
 
-const proofSchools = ['Nova Kids', 'Papatya Koleji', 'Atolye Cocuk', 'Gokkusagi Kampusu', 'Mimoza Akademi']
+const proofSchools = ['Nova Kids', 'Papatya Koleji', 'Atölye Çocuk', 'Gökkuşağı Kampüsü', 'Mimoza Akademi']
 
-const features = [
+type Feature = {
+  icon: React.ReactNode
+  title: string
+  description: string
+  tag: string
+  wide?: boolean
+}
+
+const features: Feature[] = [
   {
-    icon: '✓',
-    title: 'Anlik Yoklama',
-    description: 'Sinifa girer girmez devam durumunu kaydedin, aileler bildirimle ayni anda haberdar olsun.',
+    icon: <Check size={28} />,
+    title: 'Anlık Yoklama',
+    description: 'Sınıfa girer girmez devam durumunu kaydedin, aileler bildirimle aynı anda haberdar olsun.',
     tag: 'Operasyon',
     wide: true,
   },
   {
-    icon: '⚡',
-    title: 'Aktivite Akisi',
-    description: 'Yemek, uyku, ilac ve gunluk notlari bir feed mantigiyla kaydedin.',
+    icon: <Zap size={28} />,
+    title: 'Aktivite Akışı',
+    description: 'Yemek, uyku, ilaç ve günlük notları bir feed mantığıyla kaydedin.',
     tag: 'Öğretmen deneyimi',
   },
   {
-    icon: '💬',
+    icon: <MessageCircle size={28} />,
     title: 'Veli İletişimi',
-    description: 'Mesaj, duyuru ve toplu bilgilendirme modulleriyle WhatsApp daginikligini bitirin.',
+    description: 'Mesaj, duyuru ve toplu bilgilendirme modülleriyle WhatsApp dağınıklığını bitirin.',
     tag: 'İletişim',
   },
   {
-    icon: '📷',
+    icon: <Camera size={28} />,
     title: 'Premium Galeri',
-    description: 'Her sinif icin filtrelenebilir, guvenli ve zarif bir fotoğraf deneyimi sunun.',
+    description: 'Her sınıf için filtrelenebilir, güvenli ve zarif bir fotoğraf deneyimi sunun.',
     tag: 'Deneyim',
   },
   {
-    icon: '₺',
+    icon: <Banknote size={28} />,
     title: 'Finans Komut Merkezi',
-    description: 'Aidat takibi, hatirlatma ve tahsilat raporlarini tek bakista yonetin.',
+    description: 'Aidat takibi, hatırlatma ve tahsilat raporlarını tek bakışta yönetin.',
     tag: 'Gelir',
     wide: true,
   },
@@ -88,44 +93,44 @@ const roleCards = [
   {
     icon: '👑',
     title: 'Yöneticiler',
-    description: 'Satis, finans, devamsizlik ve ekip gorunurlugunu tek ekrandan alin.',
-    bullets: ['Canli kampus genel gorunumu', 'Tahsilat ve raporlama', 'Personel ve sinif yonetimi'],
+    description: 'Satış, finans, devamsızlık ve ekip görünürlüğünü tek ekrandan alın.',
+    bullets: ['Canlı kampüs genel görünümü', 'Tahsilat ve raporlama', 'Personel ve sınıf yönetimi'],
   },
   {
     icon: '👩‍🏫',
     title: 'Öğretmenler',
-    description: 'Gun boyunca hizli veri girisi, daha az tekrar ve daha fazla odak.',
-    bullets: ['Tek dokunusla aktivite kaydi', 'Gunluk rapor akisi', 'Aile ile kontrollu mesajlasma'],
+    description: 'Gün boyunca hızlı veri girişi, daha az tekrar ve daha fazla odak.',
+    bullets: ['Tek dokunuşla aktivite kaydı', 'Günlük rapor akışı', 'Aile ile kontrollü mesajlaşma'],
   },
   {
     icon: '👨‍👩‍👧',
     title: 'Veliler',
-    description: 'Çocugunuzun gununu sakin, guvenli ve premium bir uygulama deneyimiyle izleyin.',
-    bullets: ['Canli feed ve bildirimler', 'Aidat ve duyuru ekranlari', 'Fotoğraf ve mesajlaşma'],
+    description: 'Çocuğunuzun gününü sakin, güvenli ve premium bir uygulama deneyimiyle izleyin.',
+    bullets: ['Canlı feed ve bildirimler', 'Aidat ve duyuru ekranları', 'Fotoğraf ve mesajlaşma'],
   },
 ]
 
 const timeline = [
-  { step: '01', title: 'Okulu kur', description: 'Dakikalar icinde kurumunu ac, siniflari ve planini tanimla.' },
+  { step: '01', title: 'Okulu kur', description: 'Dakikalar içinde kurumunu aç, sınıfları ve planını tanımla.' },
   { step: '02', title: 'Ekip davet et', description: 'Öğretmenleri, personeli ve aileleri rolleriyle sisteme al.' },
-  { step: '03', title: 'Basla', description: 'Yoklama, mesaj, aidat ve raporlari ayni gun kullanmaya basla.' },
+  { step: '03', title: 'Başla', description: 'Yoklama, mesaj, aidat ve raporları aynı gün kullanmaya başla.' },
 ]
 
 const testimonials = [
   {
-    quote: 'Kinderly ile sabah operasyonu ilk kez sakin hissettirdi. Her seyin tek akista olmasi ekibi dogrudan rahatlatti.',
-    name: 'Ayse H.',
-    role: 'Mudur, Nova Kids',
+    quote: 'KinderX ile sabah operasyonu ilk kez sakin hissettirdi. Her şeyin tek akışta olması ekibi doğrudan rahatlattı.',
+    name: 'Ayşe H.',
+    role: 'Müdür, Nova Kids',
   },
   {
-    quote: 'Velilerden gelen geri bildirim tek kelimeyle premium. Uygulama okul markamizin bir parcasi gibi hissettiriyor.',
+    quote: 'Velilerden gelen geri bildirim tek kelimeyle premium. Uygulama okul markamızın bir parçası gibi hissettiriyor.',
     name: 'Fatma K.',
     role: 'Öğretmen, Papatya Koleji',
   },
   {
-    quote: 'Tahsilat ve duyuru tarafinda kaybettigimiz gunleri geri aldik. Yonetim paneli gercekten gelir yaratan bir arac oldu.',
+    quote: 'Tahsilat ve duyuru tarafında kaybettiğimiz günleri geri aldık. Yönetim paneli gerçekten gelir yaratan bir araç oldu.',
     name: 'Mehmet A.',
-    role: 'Kurucu, Gokkusagi Kampusu',
+    role: 'Kurucu, Gökkuşağı Kampüsü',
   },
 ]
 
@@ -133,23 +138,23 @@ const pricing = [
   {
     name: 'Starter',
     price: 'Ücretsiz',
-    detail: 'ilk kampusunu acan okullar',
+    detail: 'ilk kampüsünü açan okullar',
     featured: false,
-    items: ['50 ogrenciye kadar', 'Temel yoklama ve mesajlasma', 'Mobil veli deneyimi', 'Standart destek'],
+    items: ['50 öğrenciye kadar', 'Temel yoklama ve mesajlaşma', 'Mobil veli deneyimi', 'Standart destek'],
   },
   {
     name: 'Pro',
     price: '₺1.000',
     detail: '/ ay',
     featured: true,
-    items: ['Sinirsiz ogrenci', 'Tum modul ve rol ekranlari', 'Aidat ve fotograf yonetimi', 'Premium destek ve onboarding'],
+    items: ['Sınırsız öğrenci', 'Tüm modül ve rol ekranları', 'Aidat ve fotoğraf yönetimi', 'Premium destek ve onboarding'],
   },
   {
     name: 'Scale',
-    price: 'Ozel',
-    detail: 'cok subeli kurumlar',
+    price: 'Özel',
+    detail: 'çok şubeli kurumlar',
     featured: false,
-    items: ['Coklu sube yonetimi', 'Kurumsal raporlama', 'Ozel entegrasyonlar', 'SLA ve oncelikli cozum ekibi'],
+    items: ['Çoklu şube yönetimi', 'Kurumsal raporlama', 'Özel entegrasyonlar', 'SLA ve öncelikli çözüm ekibi'],
   },
 ]
 
@@ -257,7 +262,7 @@ export default function Home() {
   }, [])
 
   return (
-    <main className={`${serif.variable} ${sans.variable} min-h-screen bg-[#060a06] font-sans text-white`}>
+    <main className="min-h-screen bg-[#060a06] font-sans text-white">
       <style>{`
         :root {
           --green: #4ade80;
@@ -314,7 +319,7 @@ export default function Home() {
               K
             </div>
             <div>
-              <div className="text-base font-semibold tracking-tight text-white">Kinderly</div>
+              <div className="text-base font-semibold tracking-tight text-white">KinderX</div>
               <div className="text-xs text-[var(--muted)]">Premium anaokulu operasyon sistemi</div>
             </div>
           </Link>
@@ -328,7 +333,7 @@ export default function Home() {
               onLeave={() => setActiveDropdown(null)}
             />
             <MegaMenu
-              title="Kim Icin"
+              title="Kim İçin"
               items={audienceMenu}
               active={activeDropdown === 'audiences'}
               onEnter={() => setActiveDropdown('audiences')}
@@ -378,7 +383,7 @@ export default function Home() {
           <div className="space-y-6 px-[5%] py-6">
             {[
               { label: 'Özellikler', items: featureMenu },
-              { label: 'Kim Icin', items: audienceMenu },
+              { label: 'Kim İçin', items: audienceMenu },
               { label: 'Kaynaklar', items: resourceMenu },
             ].map((section) => (
               <div key={section.label}>
@@ -410,28 +415,28 @@ export default function Home() {
           <Reveal className="pt-10">
             <div className="mb-8 inline-flex items-center gap-3 rounded-full border border-[var(--border)] bg-[var(--green-dim)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--green)]">
               <span className="h-2 w-2 rounded-full bg-[var(--green)] shadow-[0_0_16px_#4ade80]" />
-              Turkiye&apos;nin #1 Anaokulu Platformu
+              Türkiye&apos;nin #1 Anaokulu Platformu
             </div>
             <h1 className="serif max-w-[720px] text-[clamp(3.7rem,8vw,7.2rem)] leading-[0.9] tracking-[-0.05em] text-white">
               Okulunuzu
               <br />
-              guvenle yonetin,
+              güvenle yönetin,
               <br />
               aileleri sakince
               <br />
-              yaninizda tutun.
+              yanınızda tutun.
             </h1>
             <p className="mt-8 max-w-[620px] text-lg leading-relaxed text-[var(--muted)] md:text-xl">
-              Kinderly; yonetim, ogretmen ve veli deneyimini tek bir premium sistemde birlestirir.
-              Daha az operasyon stresi, daha guclu marka algisi ve daha yuksek gelir gorunurlugu sunar.
+              KinderX; yönetim, öğretmen ve veli deneyimini tek bir premium sistemde birleştirir.
+              Daha az operasyon stresi, daha güçlü marka algısı ve daha yüksek gelir görünürlüğü sunar.
             </p>
             <div className="mt-10 flex flex-wrap gap-4">
               <Link
                 href="/kayit"
-                className="group rounded-full bg-[var(--green)] px-7 py-4 text-sm font-bold text-[#060a06] transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_50px_rgba(74,222,128,0.2)]"
+                className="group inline-flex items-center rounded-full bg-[var(--green)] px-7 py-4 text-sm font-bold text-[#060a06] transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_50px_rgba(74,222,128,0.2)]"
               >
                 Ücretsiz Başla
-                <span className="ml-2 transition-transform group-hover:translate-x-1">→</span>
+                <ArrowRight size={14} className="ml-2 transition-transform group-hover:translate-x-1" />
               </Link>
               <Link
                 href="/giris"
@@ -458,7 +463,7 @@ export default function Home() {
                 <span className="h-3 w-3 rounded-full bg-[#facc15]" />
                 <span className="h-3 w-3 rounded-full bg-[#4ade80]" />
                 <div className="ml-3 flex-1 rounded-full border border-[var(--border)] bg-white/[0.03] px-4 py-1 text-center text-xs text-[var(--muted)]">
-                  kinderly.app/admin
+                  kinderx.app/admin
                 </div>
               </div>
 
@@ -467,8 +472,8 @@ export default function Home() {
                   <div className="mb-5 flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--green)] font-black text-[#060a06]">K</div>
                     <div>
-                      <div className="text-sm font-semibold text-white">Kinderly</div>
-                      <div className="text-xs text-[var(--muted)]">Mimoza Kampusu</div>
+                      <div className="text-sm font-semibold text-white">KinderX</div>
+                      <div className="text-xs text-[var(--muted)]">Mimoza Kampüsü</div>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -493,7 +498,7 @@ export default function Home() {
                       ['94%', 'devam'],
                       ['18', 'yeni mesaj'],
                       ['₺84K', 'bekleyen tahsilat'],
-                      ['32', 'bugun aktivite'],
+                      ['32', 'bugün aktivite'],
                     ].map(([value, label]) => (
                       <div key={label} className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-4 backdrop-blur-xl transition-all hover:-translate-y-1 hover:border-[rgba(74,222,128,0.28)]">
                         <div className="serif text-3xl text-white">{value}</div>
@@ -506,16 +511,16 @@ export default function Home() {
                     <div className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-5 backdrop-blur-xl transition-all hover:border-[rgba(74,222,128,0.28)]">
                       <div className="mb-5 flex items-center justify-between">
                         <div>
-                          <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">Gunluk operasyon</div>
-                          <div className="mt-1 serif text-2xl text-white">Bugunun nabzi</div>
+                          <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">Günlük operasyon</div>
+                          <div className="mt-1 serif text-2xl text-white">Bugünün nabzı</div>
                         </div>
-                        <div className="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--green)]">canli</div>
+                        <div className="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--green)]">canlı</div>
                       </div>
                       <div className="space-y-3">
                         {[
-                          ['✓', 'Yoklama tamamlandi', '08:47', '26 ogrenci isaretlendi'],
-                          ['⚡', 'Aktivite akisi guncellendi', '10:12', '14 yeni feed kaydi'],
-                          ['💬', 'Toplu veli mesaji gonderildi', '11:05', '18 aileye teslim edildi'],
+                          ['✓', 'Yoklama tamamlandı', '08:47', '26 öğrenci işaretlendi'],
+                          ['⚡', 'Aktivite akışı güncellendi', '10:12', '14 yeni feed kaydı'],
+                          ['💬', 'Toplu veli mesajı gönderildi', '11:05', '18 aileye teslim edildi'],
                         ].map(([icon, title, time, note]) => (
                           <div key={title} className="flex items-center gap-4 rounded-2xl border border-[var(--border)] bg-white/[0.02] px-4 py-3">
                             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--green-dim)] text-lg text-[var(--green)]">
@@ -532,9 +537,9 @@ export default function Home() {
                     </div>
 
                     <div className="rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(74,222,128,0.14),rgba(74,222,128,0.03))] p-5 backdrop-blur-xl transition-all hover:-translate-y-1">
-                      <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">Tahsilat sagligi</div>
+                      <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">Tahsilat sağlığı</div>
                       <div className="mt-2 serif text-4xl text-[var(--green)]">₺1.2M</div>
-                      <div className="mt-2 text-sm text-[var(--muted)]">12 aylik tahmini yillik gelir gorunurlugu</div>
+                      <div className="mt-2 text-sm text-[var(--muted)]">12 aylık tahmini yıllık gelir görünürlüğü</div>
                       <div className="mt-6 rounded-[20px] border border-[var(--border)] bg-black/20 p-4">
                         <div className="mb-2 flex items-center justify-between text-sm">
                           <span className="text-[var(--muted)]">Tahsil edilen</span>
@@ -549,8 +554,8 @@ export default function Home() {
                             <div className="mt-1 font-semibold text-white">₺216K</div>
                           </div>
                           <div className="rounded-2xl border border-[var(--border)] bg-white/[0.03] p-3">
-                            <div className="text-[var(--muted)]">Otomatik hatirlatma</div>
-                            <div className="mt-1 font-semibold text-white">bugun 09:00</div>
+                            <div className="text-[var(--muted)]">Otomatik hatırlatma</div>
+                            <div className="mt-1 font-semibold text-white">bugün 09:00</div>
                           </div>
                         </div>
                       </div>
@@ -565,7 +570,7 @@ export default function Home() {
 
       <Reveal className="border-y border-[var(--border)] bg-white/[0.02] px-[5%] py-6">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-8">
-          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">Bize guvenen okullar</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">Bize güvenen okullar</div>
           <div className="flex flex-1 flex-wrap items-center gap-6 text-sm text-white/28">
             {proofSchools.map((school) => (
               <span key={school} className="transition-colors hover:text-white/70">
@@ -590,7 +595,7 @@ export default function Home() {
               premium bir ürün deneyimine çevirin.
             </h2>
             <p className="mt-5 max-w-[660px] text-lg leading-relaxed text-[var(--muted)]">
-              Her modulu, kurumunuza daha fazla sakinlik, gorunurluk ve profesyonellik vermek icin tasarladik.
+              Her modülü, kurumunuza daha fazla sakinlik, görünürlük ve profesyonellik vermek için tasarladık.
             </p>
           </Reveal>
 
@@ -603,7 +608,7 @@ export default function Home() {
               >
                 <article className="group rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-7 backdrop-blur-xl transition-all hover:-translate-y-1 hover:border-[rgba(74,222,128,0.28)] hover:shadow-[0_24px_60px_rgba(0,0,0,0.22)]">
                   <div className={`grid gap-6 ${feature.wide ? 'md:grid-cols-[120px_1fr]' : ''}`}>
-                    <div className="flex h-16 w-16 items-center justify-center rounded-[20px] border border-[var(--border)] bg-[var(--green-dim)] text-3xl text-[var(--green)] transition-transform group-hover:-translate-y-1">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-[20px] border border-[var(--border)] bg-[var(--green-dim)] text-[var(--green)] transition-transform group-hover:-translate-y-1">
                       {feature.icon}
                     </div>
                     <div>
@@ -624,11 +629,11 @@ export default function Home() {
       <section className="px-[5%] pb-24">
         <div className="mx-auto max-w-[1400px] rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-8 backdrop-blur-xl md:p-10">
           <Reveal>
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--green)]">Nasil calisir?</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--green)]">Nasıl çalışır?</div>
             <h2 className="serif mt-4 text-[clamp(2.5rem,4.4vw,4.4rem)] leading-[0.95] tracking-[-0.04em] text-white">
-              Kurulumdan canli kullanima
+              Kurulumdan canlı kullanıma
               <br />
-              kadar tek akis.
+              kadar tek akış.
             </h2>
           </Reveal>
           <div className="mt-12 grid gap-6 lg:grid-cols-3">
@@ -651,9 +656,9 @@ export default function Home() {
       <section id="roller" className="px-[5%] pb-24">
         <div className="mx-auto max-w-[1400px]">
           <Reveal>
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--green)]">Kim icin</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--green)]">Kim için</div>
             <h2 className="serif mt-4 text-[clamp(2.5rem,4.5vw,4.5rem)] leading-[0.95] tracking-[-0.04em] text-white">
-              Her rolde ayni seviye
+              Her rolde aynı seviye
               <br />
               kalite hissi.
             </h2>
@@ -685,10 +690,10 @@ export default function Home() {
       <section id="metrikler" className="px-[5%] pb-24">
         <div className="mx-auto grid max-w-[1400px] gap-4 md:grid-cols-4">
           {[
-            ['18 dakika', 'ortalama sabah check-in suresi'],
-            ['%82', 'aidat tahsilat gorunurlugu'],
-            ['3.4x', 'veli uygulama etkilesimi'],
-            ['0 daginik arac', 'tek platform operasyonu'],
+            ['18 dakika', 'ortalama sabah check-in süresi'],
+            ['%82', 'aidat tahsilat görünürlüğü'],
+            ['3.4x', 'veli uygulama etkileşimi'],
+            ['0 dağınık araç', 'tek platform operasyonu'],
           ].map(([value, label], index) => (
             <Reveal key={label} delay={index * 60}>
               <div className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-7 text-center backdrop-blur-xl transition-all hover:-translate-y-1 hover:border-[rgba(74,222,128,0.28)]">
@@ -705,11 +710,11 @@ export default function Home() {
       <section id="yorumlar" className="px-[5%] py-24">
         <div className="mx-auto max-w-[1400px]">
           <Reveal>
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--green)]">Musteri gorusleri</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--green)]">Müşteri görüşleri</div>
             <h2 className="serif mt-4 text-[clamp(2.5rem,4.5vw,4.5rem)] leading-[0.95] tracking-[-0.04em] text-white">
-              Urunun kalitesi,
+              Ürünün kalitesi,
               <br />
-              ekiplerin gunune yansiyor.
+              ekiplerin gününe yansıyor.
             </h2>
           </Reveal>
           <div className="mt-12 grid gap-4 lg:grid-cols-3">
@@ -734,11 +739,11 @@ export default function Home() {
       <section id="fiyatlar" className="px-[5%] pb-24">
         <div className="mx-auto max-w-[1400px]">
           <Reveal>
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--green)]">Fiyatlandirma</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--green)]">Fiyatlandırma</div>
             <h2 className="serif mt-4 text-[clamp(2.5rem,4.5vw,4.5rem)] leading-[0.95] tracking-[-0.04em] text-white">
-              Buyurken degil,
+              Büyürken değil,
               <br />
-              kullanirken mutlu eden planlar.
+              kullanırken mutlu eden planlar.
             </h2>
           </Reveal>
           <div className="mt-12 grid gap-4 lg:grid-cols-3">
@@ -753,7 +758,7 @@ export default function Home() {
                 >
                   {plan.featured && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[var(--green)] px-4 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-[#060a06]">
-                      en populer
+                      en popüler
                     </div>
                   )}
                   <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--green)]">{plan.name}</div>
@@ -762,7 +767,7 @@ export default function Home() {
                   <div className="mt-8 space-y-3">
                     {plan.items.map((item) => (
                       <div key={item} className="flex items-start gap-3 text-sm text-[var(--muted)]">
-                        <span className="text-[var(--green)]">✓</span>
+                        <Check size={14} className="mt-0.5 flex-shrink-0 text-[var(--green)]" />
                         <span>{item}</span>
                       </div>
                     ))}
@@ -775,7 +780,7 @@ export default function Home() {
                         : 'border border-[var(--border)] text-white hover:bg-white/5'
                     }`}
                   >
-                    {plan.name === 'Scale' ? 'Teklif Al' : 'Baslayin'}
+                    {plan.name === 'Scale' ? 'Teklif Al' : 'Başlayın'}
                   </Link>
                 </article>
               </Reveal>
@@ -787,14 +792,14 @@ export default function Home() {
       <section id="cta" className="px-[5%] pb-24">
         <Reveal className="mx-auto max-w-[1200px]">
           <div className="rounded-[28px] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-10 text-center backdrop-blur-xl md:p-16">
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--green)]">Hazirsaniz</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--green)]">Hazırsanız</div>
             <h2 className="serif mt-5 text-[clamp(2.8rem,5vw,5.4rem)] leading-[0.92] tracking-[-0.05em]">
               <span className="glow-text">Okulunuzun premium</span>
               <br />
-              operasyon donemine gecin.
+              operasyon dönemine geçin.
             </h2>
             <p className="mx-auto mt-5 max-w-[700px] text-lg leading-relaxed text-[var(--muted)]">
-              Kurulum 5 dakika surer. Ekip ve aileler ayni gun icinde kullanmaya baslar. Urun, markanizin kalite algisini ilk giriste hissettirir.
+              Kurulum 5 dakika sürer. Ekip ve aileler aynı gün içinde kullanmaya başlar. Ürün, markanızın kalite algısını ilk girişte hissettirir.
             </p>
             <div className="mt-10 flex flex-wrap justify-center gap-4">
               <Link
@@ -804,7 +809,7 @@ export default function Home() {
                 Ücretsiz Başla
               </Link>
               <a
-                href="mailto:info@kinderly.app"
+                href="mailto:info@kinderx.app"
                 className="rounded-full border border-[var(--border)] px-7 py-4 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-white/5"
               >
                 Demo Planla
@@ -821,15 +826,15 @@ export default function Home() {
               K
             </div>
             <div>
-              <div className="text-sm font-semibold text-white">Kinderly</div>
-              <div className="text-sm text-[var(--muted)]">Anaokullari icin premium operasyon platformu</div>
+              <div className="text-sm font-semibold text-white">KinderX</div>
+              <div className="text-sm text-[var(--muted)]">Anaokullları için premium operasyon platformu</div>
             </div>
           </div>
           <div className="flex flex-wrap gap-6 text-sm text-[var(--muted)]">
             <a href="#ozellikler" className="transition-colors hover:text-white">Özellikler</a>
             <a href="#roller" className="transition-colors hover:text-white">Roller</a>
             <a href="#fiyatlar" className="transition-colors hover:text-white">Fiyatlar</a>
-            <a href="mailto:info@kinderly.app" className="transition-colors hover:text-white">İletişim</a>
+            <a href="mailto:info@kinderx.app" className="transition-colors hover:text-white">İletişim</a>
           </div>
         </div>
       </footer>
