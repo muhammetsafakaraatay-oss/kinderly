@@ -150,6 +150,35 @@ export async function resolveParentMessageParties(userId: string, okulId: string
   }
 }
 
+export async function resolveTeacherMessageParties(userId: string, okulId: string | number, ogrenciId: number) {
+  const { data: personel, error: personelError } = await supabase
+    .from('personel')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('okul_id', okulId)
+    .maybeSingle()
+
+  if (personelError || !personel?.id) {
+    return { data: null as MessagePartyResult | null, error: personelError ?? { message: 'Personel kaydı bulunamadı.' } }
+  }
+
+  const { data: veli, error: veliError } = await supabase
+    .from('veliler')
+    .select('id')
+    .eq('okul_id', okulId)
+    .eq('ogrenci_id', ogrenciId)
+    .eq('aktif', true)
+    .limit(1)
+
+  return {
+    data: {
+      senderId: Number(personel.id),
+      receiverId: veli?.[0]?.id ? Number(veli[0].id) : null,
+    },
+    error: veliError,
+  }
+}
+
 export async function insertMessageCompat(base: Record<string, unknown>, content: string) {
   const attempts: Record<string, unknown>[] = [
     { ...base, gonderen_tip: base.gonderen_rol, icerik: content },
