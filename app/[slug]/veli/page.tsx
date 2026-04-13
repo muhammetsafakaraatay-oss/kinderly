@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTheme } from 'next-themes'
 import { Instrument_Serif, DM_Sans } from 'next/font/google'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { supabase } from '@/lib/supabase'
@@ -137,6 +138,7 @@ function isSameDay(a: string, b?: string) {
 
 export default function VeliPage({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter()
+  const { resolvedTheme } = useTheme()
   const { session, role, okul: authOkul, loading, signOut } = useAuth()
   const [slug, setSlug] = useState('')
   const [activeTab, setActiveTab] = useState<ParentTab>('bugun')
@@ -153,6 +155,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
   const [sending, setSending] = useState(false)
   const [feeFilter, setFeeFilter] = useState<'hepsi' | 'bekleyen' | 'odendi'>('hepsi')
   const [authTimeout, setAuthTimeout] = useState(false)
+  const dark = resolvedTheme === 'dark'
 
   useEffect(() => {
     void params.then((value) => setSlug(value.slug))
@@ -382,7 +385,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
   const childAge = ageFromBirthDate(selectedChild?.dogum_tarihi)
 
   return (
-    <main className={`${serif.variable} ${sans.variable} min-h-screen bg-[var(--bg)] font-sans text-[var(--text)]`}>
+    <main className={`${serif.variable} ${sans.variable} ${dark ? 'panel-skin-dark' : ''} min-h-screen bg-[var(--bg)] font-sans text-[var(--text)]`}>
       <style>{`
         .panel-input {
           width: 100%;
@@ -393,6 +396,28 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
           color: #0f172a;
           outline: none;
         }
+        .panel-skin-dark {
+          --bg: #090b10;
+          --card: #111317;
+          --border-subtle: #252a33;
+          --text: #f3f4f6;
+          --muted-text: #9ca3af;
+        }
+        .panel-skin-dark .panel-input {
+          background: #1a1d23;
+          border-color: #343a45;
+          color: #f3f4f6;
+        }
+        .panel-skin-dark .text-slate-900 { color: #f3f4f6 !important; }
+        .panel-skin-dark .text-slate-700 { color: #e2e8f0 !important; }
+        .panel-skin-dark .text-slate-600 { color: #d1d5db !important; }
+        .panel-skin-dark .text-slate-500 { color: #9ca3af !important; }
+        .panel-skin-dark .text-slate-400 { color: #94a3b8 !important; }
+        .panel-skin-dark .bg-slate-50 { background: #111317 !important; }
+        .panel-skin-dark .bg-white { background: #111317 !important; }
+        .panel-skin-dark .border-slate-200 { border-color: #252a33 !important; }
+        .panel-skin-dark .ring-slate-200 { --tw-ring-color: #252a33 !important; }
+        .panel-skin-dark .hover\\:bg-slate-100:hover { background: #1a1d23 !important; }
       `}</style>
 
       <div className="flex min-h-screen flex-col lg:flex-row">
