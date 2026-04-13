@@ -206,28 +206,34 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
 
     async function loadChildren() {
       setPageLoading(true)
-      const { data, error } = await loadParentChildren(currentSession.user.id, currentOkul.id)
+      try {
+        const { data, error } = await loadParentChildren(currentSession.user.id, currentOkul.id)
 
-      if (!alive) return
+        if (!alive) return
 
-      if (error) {
-        setMessageState(getSupabaseErrorMessage(error, 'Çocuk bilgileri yüklenemedi.'))
+        if (error) {
+          setMessageState(getSupabaseErrorMessage(error, 'Çocuk bilgileri yüklenemedi.'))
+        }
+
+        const childIds = data.map((item) => item.id)
+        let detailedChildren = data as ChildDetails[]
+
+        if (childIds.length) {
+          const { data: detailRows } = await supabase
+            .from('ogrenciler')
+            .select('*')
+            .in('id', childIds)
+          detailedChildren = (detailRows || []) as ChildDetails[]
+        }
+
+        setChildren(detailedChildren)
+        setSelectedChildId((current) => current ?? detailedChildren[0]?.id ?? null)
+      } catch (error) {
+        if (!alive) return
+        setMessageState(getSupabaseErrorMessage(error as { message?: string }, 'Çocuk bilgileri yüklenemedi.'))
+      } finally {
+        if (alive) setPageLoading(false)
       }
-
-      const childIds = data.map((item) => item.id)
-      let detailedChildren = data as ChildDetails[]
-
-      if (childIds.length) {
-        const { data: detailRows } = await supabase
-          .from('ogrenciler')
-          .select('*')
-          .in('id', childIds)
-        detailedChildren = (detailRows || []) as ChildDetails[]
-      }
-
-      setChildren(detailedChildren)
-      setSelectedChildId((current) => current ?? detailedChildren[0]?.id ?? null)
-      setPageLoading(false)
     }
 
     void loadChildren()
@@ -246,41 +252,47 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
 
     async function loadData() {
       setPageLoading(true)
-      const [activityQuery, attendanceQuery, announcementQuery, feeQuery, messageQuery] = await Promise.all([
-        supabase
-          .from('aktiviteler')
-          .select('id,tur,detay,kaydeden,created_at,olusturuldu')
-          .eq('okul_id', currentOkul.id)
-          .eq('ogrenci_id', currentChildId)
-          .eq('tarih', today())
-          .eq('veli_gosterilsin', true)
-          .order('id', { ascending: false })
-          .limit(60),
-        supabase
-          .from('yoklama')
-          .select('durum')
-          .eq('okul_id', currentOkul.id)
-          .eq('ogrenci_id', currentChildId)
-          .eq('tarih', today())
-          .maybeSingle(),
-        loadAnnouncementsCompat(currentOkul.id, 30),
-        supabase
-          .from('aidatlar')
-          .select('*')
-          .eq('okul_id', currentOkul.id)
-          .eq('ogrenci_id', currentChildId)
-          .order('son_odeme', { ascending: true }),
-        loadStudentMessagesCompat(currentOkul.id, currentChildId, 200),
-      ])
+      try {
+        const [activityQuery, attendanceQuery, announcementQuery, feeQuery, messageQuery] = await Promise.all([
+          supabase
+            .from('aktiviteler')
+            .select('id,tur,detay,kaydeden,created_at,olusturuldu')
+            .eq('okul_id', currentOkul.id)
+            .eq('ogrenci_id', currentChildId)
+            .eq('tarih', today())
+            .eq('veli_gosterilsin', true)
+            .order('id', { ascending: false })
+            .limit(60),
+          supabase
+            .from('yoklama')
+            .select('durum')
+            .eq('okul_id', currentOkul.id)
+            .eq('ogrenci_id', currentChildId)
+            .eq('tarih', today())
+            .maybeSingle(),
+          loadAnnouncementsCompat(currentOkul.id, 30),
+          supabase
+            .from('aidatlar')
+            .select('*')
+            .eq('okul_id', currentOkul.id)
+            .eq('ogrenci_id', currentChildId)
+            .order('son_odeme', { ascending: true }),
+          loadStudentMessagesCompat(currentOkul.id, currentChildId, 200),
+        ])
 
-      if (!alive) return
+        if (!alive) return
 
-      setActivities((activityQuery.data || []) as ActivityRow[])
-      setAttendanceStatus(attendanceQuery.data?.durum || '')
-      setAnnouncements(announcementQuery.data || [])
-      setFees((feeQuery.data || []) as Aidat[])
-      setMessages(messageQuery.data || [])
-      setPageLoading(false)
+        setActivities((activityQuery.data || []) as ActivityRow[])
+        setAttendanceStatus(attendanceQuery.data?.durum || '')
+        setAnnouncements(announcementQuery.data || [])
+        setFees((feeQuery.data || []) as Aidat[])
+        setMessages(messageQuery.data || [])
+      } catch (error) {
+        if (!alive) return
+        setMessageState(getSupabaseErrorMessage(error as { message?: string }, 'Çocuk verileri yüklenemedi.'))
+      } finally {
+        if (alive) setPageLoading(false)
+      }
     }
 
     void loadData()

@@ -248,90 +248,94 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
 
     async function loadData() {
       setPageLoading(true)
+      try {
+        const [{ data: personel, error: personelError }, { data: studentRows, error: studentError }, { data: classRows }] = await Promise.all([
+          supabase
+            .from('personel')
+            .select('id,ad_soyad,sinif')
+            .eq('user_id', currentSession.user.id)
+            .eq('okul_id', currentOkul.id)
+            .maybeSingle(),
+          supabase
+            .from('ogrenciler')
+            .select('*')
+            .eq('okul_id', currentOkul.id)
+            .eq('aktif', true)
+            .order('ad_soyad'),
+          supabase.from('siniflar').select('id,ad').eq('okul_id', currentOkul.id).order('ad'),
+        ])
 
-      const [{ data: personel, error: personelError }, { data: studentRows, error: studentError }, { data: classRows }] = await Promise.all([
-        supabase
-          .from('personel')
-          .select('id,ad_soyad,sinif')
-          .eq('user_id', currentSession.user.id)
-          .eq('okul_id', currentOkul.id)
-          .maybeSingle(),
-        supabase
-          .from('ogrenciler')
-          .select('*')
-          .eq('okul_id', currentOkul.id)
-          .eq('aktif', true)
-          .order('ad_soyad'),
-        supabase.from('siniflar').select('id,ad').eq('okul_id', currentOkul.id).order('ad'),
-      ])
+        if (!alive) return
 
-      if (!alive) return
+        if (personelError || !personel?.id) {
+          setStatusMessage(getSupabaseErrorMessage(personelError, 'Öğretmen bilgisi yüklenemedi.'))
+          return
+        }
 
-      if (personelError || !personel?.id) {
-        setStatusMessage(getSupabaseErrorMessage(personelError, 'Öğretmen bilgisi yüklenemedi.'))
-        setPageLoading(false)
-        return
-      }
+        if (studentError) {
+          setStatusMessage(getSupabaseErrorMessage(studentError, 'Öğrenciler yüklenemedi.'))
+        }
 
-      if (studentError) {
-        setStatusMessage(getSupabaseErrorMessage(studentError, 'Öğrenciler yüklenemedi.'))
-      }
+        const nextStudents = (studentRows || []) as Ogrenci[]
 
-      const nextStudents = (studentRows || []) as Ogrenci[]
+        const [attendanceQuery, activityQuery, messageQuery, announcementQuery] = await Promise.all([
+          supabase.from('yoklama').select('ogrenci_id,durum').eq('okul_id', currentOkul.id).eq('tarih', today()),
+          supabase
+            .from('aktiviteler')
+            .select('id,ogrenci_id,tur,detay,kaydeden,created_at,olusturuldu,ogrenciler(ad_soyad)')
+            .eq('okul_id', currentOkul.id)
+            .eq('tarih', today())
+            .order('id', { ascending: false })
+            .limit(120),
+          loadSchoolMessagesCompat(currentOkul.id, 400),
+          loadAnnouncementsCompat(currentOkul.id, 30),
+        ])
 
-      const [attendanceQuery, activityQuery, messageQuery, announcementQuery] = await Promise.all([
-        supabase.from('yoklama').select('ogrenci_id,durum').eq('okul_id', currentOkul.id).eq('tarih', today()),
-        supabase
-          .from('aktiviteler')
-          .select('id,ogrenci_id,tur,detay,kaydeden,created_at,olusturuldu,ogrenciler(ad_soyad)')
-          .eq('okul_id', currentOkul.id)
-          .eq('tarih', today())
-          .order('id', { ascending: false })
-          .limit(120),
-        loadSchoolMessagesCompat(currentOkul.id, 400),
-        loadAnnouncementsCompat(currentOkul.id, 30),
-      ])
+        if (!alive) return
 
-      if (!alive) return
-
-      const nextAttendance: Record<number, AttendanceStatus> = {}
-      ;(attendanceQuery.data || []).forEach((row: { ogrenci_id: number; durum: AttendanceStatus }) => {
-        nextAttendance[row.ogrenci_id] = row.durum
-      })
-
-      const activityRows = (activityQuery.data || []) as ActivityRow[]
-      const photoRows = activityRows.filter((item) => item.tur === 'photo')
-      const nextPhotos = await Promise.all(
-        photoRows.map(async (row) => {
-          const detay = row.detay || {}
-          const existingUrl = typeof detay.url === 'string' ? detay.url : null
-          const storagePath = getStoragePath(detay)
-          const signed = storagePath ? await createSignedPhotoUrl(storagePath) : { data: existingUrl, error: null }
-          return {
-            id: row.id,
-            ogrenci_id: row.ogrenci_id,
-            studentName: activityStudentName(row),
-            note: typeof detay.not === 'string' ? detay.not : typeof detay.aciklama === 'string' ? detay.aciklama : '',
-            imageUrl: signed.data || existingUrl,
-            createdAt: row.created_at || row.olusturuldu || null,
-          } satisfies PhotoCard
+        const nextAttendance: Record<number, AttendanceStatus> = {}
+        ;(attendanceQuery.data || []).forEach((row: { ogrenci_id: number; durum: AttendanceStatus }) => {
+          nextAttendance[row.ogrenci_id] = row.durum
         })
-      )
 
-      const teacherClass = personel.sinif || (classRows || [])[0]?.ad || 'all'
-      setTeacher(personel as TeacherProfile)
-      setStudents(nextStudents)
-      setAttendance(nextAttendance)
-      setActivities(activityRows)
-      setMessages(messageQuery.data || [])
-      setAnnouncements(announcementQuery.data || [])
-      setPhotoCards(nextPhotos.filter((item) => item.imageUrl))
-      setClassFilter((current) => (current === 'all' ? teacherClass : current))
-      setSelectedActivityStudentId((current) => current ?? nextStudents[0]?.id ?? null)
-      setSelectedMessageStudentId((current) => current ?? nextStudents[0]?.id ?? null)
-      setSelectedReportStudentId((current) => current ?? nextStudents[0]?.id ?? null)
-      setSelectedPhotoStudentId((current) => current ?? nextStudents[0]?.id ?? null)
-      setPageLoading(false)
+        const activityRows = (activityQuery.data || []) as ActivityRow[]
+        const photoRows = activityRows.filter((item) => item.tur === 'photo')
+        const nextPhotos = await Promise.all(
+          photoRows.map(async (row) => {
+            const detay = row.detay || {}
+            const existingUrl = typeof detay.url === 'string' ? detay.url : null
+            const storagePath = getStoragePath(detay)
+            const signed = storagePath ? await createSignedPhotoUrl(storagePath) : { data: existingUrl, error: null }
+            return {
+              id: row.id,
+              ogrenci_id: row.ogrenci_id,
+              studentName: activityStudentName(row),
+              note: typeof detay.not === 'string' ? detay.not : typeof detay.aciklama === 'string' ? detay.aciklama : '',
+              imageUrl: signed.data || existingUrl,
+              createdAt: row.created_at || row.olusturuldu || null,
+            } satisfies PhotoCard
+          })
+        )
+
+        const teacherClass = personel.sinif || (classRows || [])[0]?.ad || 'all'
+        setTeacher(personel as TeacherProfile)
+        setStudents(nextStudents)
+        setAttendance(nextAttendance)
+        setActivities(activityRows)
+        setMessages(messageQuery.data || [])
+        setAnnouncements(announcementQuery.data || [])
+        setPhotoCards(nextPhotos.filter((item) => item.imageUrl))
+        setClassFilter((current) => (current === 'all' ? teacherClass : current))
+        setSelectedActivityStudentId((current) => current ?? nextStudents[0]?.id ?? null)
+        setSelectedMessageStudentId((current) => current ?? nextStudents[0]?.id ?? null)
+        setSelectedReportStudentId((current) => current ?? nextStudents[0]?.id ?? null)
+        setSelectedPhotoStudentId((current) => current ?? nextStudents[0]?.id ?? null)
+      } catch (error) {
+        if (!alive) return
+        setStatusMessage(getSupabaseErrorMessage(error as { message?: string }, 'Panel verileri yüklenemedi.'))
+      } finally {
+        if (alive) setPageLoading(false)
+      }
     }
 
     void loadData()
