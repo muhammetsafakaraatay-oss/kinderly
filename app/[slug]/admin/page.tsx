@@ -103,8 +103,8 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
     <div className={`flex min-h-screen ${dark ? 'bg-[var(--bg)] text-[var(--text)]' : 'bg-[#fafafa] text-gray-900'}`}>
       {sidebarOpen && <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
-      <aside className={`fixed top-0 left-0 h-full w-60 z-50 flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 border-r shadow-sm ${dark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
-        <div className={`p-4 border-b flex items-center gap-3 ${dark ? 'border-gray-800' : 'border-gray-200'}`}>
+      <aside className={`fixed top-0 left-0 h-full w-60 z-50 flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 border-r shadow-sm ${dark ? 'bg-[#0d1117] border-[#2a2f36]' : 'bg-white border-gray-200'}`}>
+        <div className={`p-4 border-b flex items-center gap-3 ${dark ? 'border-[#2a2f36]' : 'border-gray-200'}`}>
           {okul?.logo_url ? (
             <img src={okul.logo_url} alt={okul.ad} className="h-9 w-9 rounded-lg object-cover" />
           ) : (
@@ -121,25 +121,27 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
           {navItems.map(item => (
             <button key={item.id} onClick={() => { setActivePage(item.id); setSidebarOpen(false) }}
               className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-all border-l-2 ${activePage === item.id
-                ? 'bg-green-50 text-green-700 border-l-green-600'
+                ? dark
+                  ? 'bg-[#1f242d] text-white border-l-green-500'
+                  : 'bg-green-50 text-green-700 border-l-green-600'
                 : dark
-                  ? 'border-l-transparent text-gray-300 hover:bg-gray-800'
+                  ? 'border-l-transparent text-gray-200 hover:bg-[#161b22]'
                   : 'border-l-transparent text-gray-600 hover:bg-gray-50'}`}>
-              <span className={`inline-flex h-5 min-w-5 items-center justify-center rounded px-1 text-[10px] font-semibold ${dark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-500'}`}>{item.icon}</span>
+              <span className={`inline-flex h-5 min-w-5 items-center justify-center rounded px-1 text-[10px] font-semibold ${dark ? 'bg-[#161b22] text-gray-200' : 'bg-gray-100 text-gray-500'}`}>{item.icon}</span>
               {item.label}
             </button>
           ))}
         </nav>
-        <div className={`p-3 border-t ${dark ? 'border-gray-800' : 'border-gray-200'}`}>
+        <div className={`p-3 border-t ${dark ? 'border-[#2a2f36]' : 'border-gray-200'}`}>
           <button onClick={async () => { await signOut(); router.replace('/giris') }}
-            className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg ${dark ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-500 hover:bg-gray-50'}`}>
+            className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg ${dark ? 'text-gray-400 hover:bg-[#161b22]' : 'text-gray-500 hover:bg-gray-50'}`}>
             Çıkış Yap
           </button>
         </div>
       </aside>
 
       <div className="flex-1 lg:ml-60 flex flex-col min-h-screen">
-        <header className={`px-4 h-14 flex items-center justify-between sticky top-0 z-30 border-b shadow-sm ${dark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
+        <header className={`px-4 h-14 flex items-center justify-between sticky top-0 z-30 border-b shadow-sm ${dark ? 'bg-[#0d1117] border-[#2a2f36]' : 'bg-white border-gray-200'}`}>
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-gray-500 text-xl">☰</button>
             <h1 className={`text-base font-semibold ${dark ? 'text-white' : 'text-gray-900'}`}>{navItems.find(n => n.id === activePage)?.label}</h1>
@@ -175,15 +177,15 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
 
 // ── YARDIMCI ──
 function Card({ children, dark, className = '' }: any) {
-  return <div className={`rounded-xl border shadow-sm overflow-hidden ${dark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} ${className}`}>{children}</div>
+  return <div className={`rounded-xl border shadow-sm overflow-hidden ${dark ? 'border-[#2a2f36] bg-[#161b22]' : 'border-gray-200 bg-white'} ${className}`}>{children}</div>
 }
 
 function Modal({ open, onClose, title, children, dark }: any) {
   if (!open) return null
   return (
     <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-      <div className={`rounded-xl w-full max-w-lg max-h-screen overflow-y-auto border shadow-sm ${dark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-        <div className={`px-5 py-4 border-b flex items-center justify-between ${dark ? 'border-gray-700' : 'border-gray-200'}`}>
+      <div className={`rounded-xl w-full max-w-lg max-h-screen overflow-y-auto border shadow-sm ${dark ? 'bg-[#161b22] border-[#2a2f36]' : 'bg-white border-gray-200'}`}>
+        <div className={`px-5 py-4 border-b flex items-center justify-between ${dark ? 'border-[#2a2f36]' : 'border-gray-200'}`}>
           <h3 className={`font-semibold ${dark ? 'text-white' : 'text-gray-900'}`}>{title}</h3>
           <button onClick={onClose} className="text-gray-400 text-xl">×</button>
         </div>
@@ -314,12 +316,12 @@ function Dashboard({ okul, ogrenciler, dark, setActivePage }: any) {
         </Card>
 
         <Card dark={dark}>
-          <div className={`px-4 py-3 border-b ${dark ? 'border-gray-700' : 'border-gray-100'}`}>
+          <div className={`px-4 py-3 border-b ${dark ? 'border-[#2a2f36]' : 'border-gray-100'}`}>
             <h3 className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>⚡ Son Aktiviteler</h3>
           </div>
           <div className="p-4">
             {activities.length ? activities.map((a, i) => (
-              <div key={i} className={`flex items-center gap-3 py-2 border-b last:border-0 text-sm ${dark ? 'border-gray-700' : 'border-gray-50'}`}>
+              <div key={i} className={`flex items-center gap-3 py-2 border-b last:border-0 text-sm ${dark ? 'border-[#2a2f36]' : 'border-gray-50'}`}>
                 <span>{AKT_E[a.tur] || '📋'}</span>
                 <span className={`flex-1 font-medium ${dark ? 'text-white' : ''}`}>{(a.ogrenciler as any)?.ad_soyad || '—'}</span>
                 <span className="text-gray-400 text-xs">{a.tarih}</span>
@@ -329,7 +331,7 @@ function Dashboard({ okul, ogrenciler, dark, setActivePage }: any) {
         </Card>
 
         <Card dark={dark}>
-          <div className={`px-4 py-3 border-b ${dark ? 'border-gray-700' : 'border-gray-100'}`}>
+          <div className={`px-4 py-3 border-b ${dark ? 'border-[#2a2f36]' : 'border-gray-100'}`}>
             <h3 className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>🎂 Bu Hafta Doğum Günleri</h3>
           </div>
           <div className="p-4">
@@ -346,7 +348,7 @@ function Dashboard({ okul, ogrenciler, dark, setActivePage }: any) {
               const thisYear = new Date(now.getFullYear(), bd.getMonth(), bd.getDate())
               const diff = Math.round((thisYear.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
               return (
-                <div key={o.id} className={`flex items-center gap-3 py-2 border-b last:border-0 ${dark ? 'border-gray-700' : 'border-gray-50'}`}>
+                <div key={o.id} className={`flex items-center gap-3 py-2 border-b last:border-0 ${dark ? 'border-[#2a2f36]' : 'border-gray-50'}`}>
                   <span className="text-xl">🎂</span>
                   <span className={`flex-1 text-sm font-medium ${dark ? 'text-white' : ''}`}>{o.ad_soyad}</span>
                   <span className="text-xs text-orange-500 font-semibold">{diff === 0 ? '🎉 Bugün!' : diff + ' gün'}</span>
@@ -445,13 +447,13 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
     <div>
       <div className="flex gap-2 mb-4 flex-wrap">
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Öğrenci ara..."
-          className={`flex-1 min-w-48 border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+          className={`flex-1 min-w-48 border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
         <select value={sinifFilter} onChange={e => setSinifFilter(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
+          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
           <option value="">Tüm Sınıflar</option>
           {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
         </select>
-        <button onClick={exportCSV} className={`border px-4 py-2 rounded-lg text-sm font-semibold ${dark ? 'border-gray-600 text-gray-300' : 'border-gray-300 text-gray-600'}`}>📥 CSV</button>
+        <button onClick={exportCSV} className={`border px-4 py-2 rounded-lg text-sm font-semibold ${dark ? 'border-gray-600 text-gray-200' : 'border-gray-300 text-gray-600'}`}>📥 CSV</button>
         <button onClick={openAdd} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">+ Ekle</button>
       </div>
 
@@ -459,7 +461,7 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className={dark ? 'bg-gray-700' : 'bg-gray-50'}>
+              <tr className={dark ? 'bg-[#1f242d]' : 'bg-gray-50'}>
                 {['Öğrenci', 'Sınıf', 'Veli', 'Telefon', 'Alerji', 'İşlem'].map(h => (
                   <th key={h} className={`text-left px-4 py-3 text-xs font-semibold uppercase ${dark ? 'text-gray-400' : 'text-gray-500'}`}>{h}</th>
                 ))}
@@ -467,14 +469,14 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
             </thead>
             <tbody>
               {filtered.map((o: Ogrenci) => (
-                <tr key={o.id} className={`border-t ${dark ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-100 hover:bg-gray-50'}`}>
+                <tr key={o.id} className={`border-t ${dark ? 'border-[#2a2f36] hover:bg-[#1f242d]' : 'border-gray-100 hover:bg-gray-50'}`}>
                   <td className="px-4 py-3">
                     <div className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>{o.ad_soyad}</div>
                     {o.alerjiler && <div className="text-xs text-red-500 font-semibold">🚨 {o.alerjiler}</div>}
                   </td>
                   <td className="px-4 py-3"><span className="bg-green-50 text-green-700 text-xs font-semibold px-2 py-1 rounded-full">{o.sinif || '—'}</span></td>
-                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-300' : 'text-gray-600'}`}>{o.veli_ad || '—'}</td>
-                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-300' : 'text-gray-600'}`}>{o.veli_telefon || '—'}</td>
+                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-200' : 'text-gray-600'}`}>{o.veli_ad || '—'}</td>
+                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-200' : 'text-gray-600'}`}>{o.veli_telefon || '—'}</td>
                   <td className="px-4 py-3">{o.alerjiler ? <span className="bg-red-100 text-red-600 text-xs font-semibold px-2 py-1 rounded-full">⚠️ Var</span> : <span className="text-gray-400 text-xs">Yok</span>}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
@@ -508,13 +510,13 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
             <div key={f.key} className={f.full ? 'col-span-2' : ''}>
               <label className="block text-xs font-semibold text-gray-500 mb-1">{f.label}</label>
               <input type={f.type || 'text'} value={form[f.key] || ''} onChange={e => setForm({ ...form, [f.key]: e.target.value })}
-                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
             </div>
           ))}
           <div className="col-span-2">
             <label className="block text-xs font-semibold text-gray-500 mb-1">Sınıf</label>
             <select value={form.sinif || ''} onChange={e => setForm({ ...form, sinif: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
               <option value="">— Seçin —</option>
               {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
             </select>
@@ -522,7 +524,7 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
           <div className="col-span-2">
             <label className="block text-xs font-semibold text-gray-500 mb-1">Kan Grubu</label>
             <select value={form.kan_grubu || ''} onChange={e => setForm({ ...form, kan_grubu: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
               {['—', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', '0+', '0-'].map(v => <option key={v} value={v}>{v}</option>)}
             </select>
           </div>
@@ -532,7 +534,7 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
             <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{saveError}</p>
           </div>
         )}
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#2a2f36]' : 'border-gray-200'}`}>
           <button onClick={() => setModal(false)} disabled={saving} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600 disabled:opacity-50">İptal</button>
           <button onClick={save} disabled={saving} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60 min-w-[80px]">
             {saving ? 'Kaydediliyor...' : 'Kaydet'}
@@ -592,12 +594,12 @@ function Siniflar({ siniflar, ogrenciler, okul, dark, reload }: any) {
           const cnt = ogrenciler.filter((o: Ogrenci) => o.sinif === s.ad).length
           const pct = Math.min(Math.round(cnt / (s.kapasite || 20) * 100), 100)
           return (
-            <div key={s.id} className={`rounded-lg border overflow-hidden ${dark ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div key={s.id} className={`rounded-lg border overflow-hidden ${dark ? 'border-[#2a2f36]' : 'border-gray-200'}`}>
               <div className="p-4 text-white" style={{ background: s.renk || '#5c6bc0' }}>
                 <div className="font-bold text-lg">{s.ad}</div>
                 <div className="text-sm opacity-80">{s.yas_grubu || ''} {s.ogretmen ? '· ' + s.ogretmen : ''}</div>
               </div>
-              <div className={`p-4 ${dark ? 'bg-gray-800' : 'bg-white'}`}>
+              <div className={`p-4 ${dark ? 'bg-[#161b22]' : 'bg-white'}`}>
                 <div className="flex justify-between text-sm mb-2">
                   <span className="text-gray-500">Doluluk</span>
                   <span className={`font-semibold ${dark ? 'text-white' : ''}`}>{cnt}/{s.kapasite || 20}</span>
@@ -626,13 +628,13 @@ function Siniflar({ siniflar, ogrenciler, okul, dark, reload }: any) {
             <div key={f.key} className={f.full ? 'col-span-2' : ''}>
               <label className="block text-xs font-semibold text-gray-500 mb-1">{f.label}</label>
               <input type={f.type || 'text'} value={form[f.key] || ''} onChange={e => setForm({ ...form, [f.key]: e.target.value })}
-                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
             </div>
           ))}
           <div className="col-span-2">
             <label className="block text-xs font-semibold text-gray-500 mb-1">Renk</label>
             <select value={form.renk} onChange={e => setForm({ ...form, renk: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
               {[['#5c6bc0','🔵 Mor'],['#26a69a','🟢 Yeşil'],['#ffa726','🟡 Sarı'],['#ef5350','🔴 Kırmızı'],['#42a5f5','🔵 Mavi'],['#ec407a','🩷 Pembe']].map(([v,l]) => (
                 <option key={v} value={v}>{l}</option>
               ))}
@@ -644,7 +646,7 @@ function Siniflar({ siniflar, ogrenciler, okul, dark, reload }: any) {
             <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{saveError}</p>
           </div>
         )}
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#2a2f36]' : 'border-gray-200'}`}>
           <button onClick={() => setModal(false)} disabled={saving} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600 disabled:opacity-50">İptal</button>
           <button onClick={save} disabled={saving} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60 min-w-[80px]">
             {saving ? 'Kaydediliyor...' : 'Kaydet'}
@@ -692,9 +694,9 @@ function Yoklama({ ogrenciler, siniflar, okul, dark }: any) {
     <div>
       <div className="flex gap-2 mb-4 flex-wrap items-center">
         <input type="date" value={tarih} onChange={e => setTarih(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
         <select value={sinifFilter} onChange={e => setSinifFilter(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
+          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
           <option value="">Tüm Sınıflar</option>
           {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
         </select>
@@ -710,7 +712,7 @@ function Yoklama({ ogrenciler, siniflar, okul, dark }: any) {
         {filtered.map((o: Ogrenci) => {
           const d = state[o.id] || ''
           return (
-            <div key={o.id} className={`border-2 rounded-xl p-3 text-center transition-all ${d === 'geldi' ? 'border-green-300 bg-green-50' : d === 'gelmedi' ? 'border-red-400 bg-red-50' : d === 'izinli' ? 'border-orange-400 bg-orange-50' : dark ? 'border-gray-600 bg-gray-800' : 'border-gray-200 bg-white'}`}>
+            <div key={o.id} className={`border-2 rounded-xl p-3 text-center transition-all ${d === 'geldi' ? 'border-green-300 bg-green-50' : d === 'gelmedi' ? 'border-red-400 bg-red-50' : d === 'izinli' ? 'border-orange-400 bg-orange-50' : dark ? 'border-gray-600 bg-[#161b22]' : 'border-gray-200 bg-white'}`}>
               <div className="text-2xl mb-1">🌸</div>
               <div className={`text-xs font-semibold mb-2 ${dark ? 'text-white' : ''}`}>{o.ad_soyad.split(' ')[0]}</div>
               <div className="flex gap-1 justify-center">
@@ -760,14 +762,14 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <Card dark={dark}>
-        <div className={`px-4 py-3 border-b font-semibold text-sm ${dark ? 'border-gray-700 text-white' : 'border-gray-100'}`}>👦 Öğrenci Seç</div>
+        <div className={`px-4 py-3 border-b font-semibold text-sm ${dark ? 'border-[#2a2f36] text-white' : 'border-gray-100'}`}>👦 Öğrenci Seç</div>
         <div className="p-2">
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Ara..."
-            className={`w-full border rounded-lg px-3 py-2 text-sm outline-none mb-2 ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+            className={`w-full border rounded-lg px-3 py-2 text-sm outline-none mb-2 ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
           <div className="max-h-80 overflow-y-auto">
             {filtered.map((o: Ogrenci) => (
               <div key={o.id} onClick={() => setSelected(o)}
-                className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer ${selected?.id === o.id ? 'bg-green-50' : dark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}>
+                className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer ${selected?.id === o.id ? 'bg-green-50' : dark ? 'hover:bg-[#1f242d]' : 'hover:bg-gray-50'}`}>
                 <span className="text-lg">🌸</span>
                 <div>
                   <div className={`text-sm font-medium ${dark ? 'text-white' : ''}`}>{o.ad_soyad}</div>
@@ -781,7 +783,7 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
 
       <div className="lg:col-span-2 space-y-4">
         <Card dark={dark}>
-          <div className={`px-4 py-3 border-b font-semibold text-sm ${dark ? 'border-gray-700 text-white' : 'border-gray-100'}`}>
+          <div className={`px-4 py-3 border-b font-semibold text-sm ${dark ? 'border-[#2a2f36] text-white' : 'border-gray-100'}`}>
             {selected ? selected.ad_soyad : 'Öğrenci seçin'}
           </div>
           <div className="p-4 grid grid-cols-3 sm:grid-cols-5 gap-2">
@@ -797,15 +799,15 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
         </Card>
 
         <Card dark={dark}>
-          <div className={`px-4 py-3 border-b flex items-center justify-between ${dark ? 'border-gray-700' : 'border-gray-100'}`}>
+          <div className={`px-4 py-3 border-b flex items-center justify-between ${dark ? 'border-[#2a2f36]' : 'border-gray-100'}`}>
             <span className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>📋 Aktivite Geçmişi</span>
             <input type="date" value={tarih} onChange={e => setTarih(e.target.value)}
-              className={`border rounded-lg px-2 py-1 text-xs outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+              className={`border rounded-lg px-2 py-1 text-xs outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
           </div>
           <div>
             {feed.length ? feed.map(a => {
               const tp = AKT_TYPES.find(x => x.id === a.tur)
-              return <div key={a.id} className={`flex items-center gap-3 px-4 py-3 border-b last:border-0 ${dark ? 'border-gray-700' : 'border-gray-50'}`}>
+              return <div key={a.id} className={`flex items-center gap-3 px-4 py-3 border-b last:border-0 ${dark ? 'border-[#2a2f36]' : 'border-gray-50'}`}>
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base flex-shrink-0" style={{ background: tp?.color || '#9e9e9e' }}>{tp?.emoji || '📋'}</div>
                 <div>
                   <div className={`text-sm font-medium ${dark ? 'text-white' : ''}`}>{tp?.label || a.tur}{a.detay?.not ? ' · ' + a.detay.not : ''}</div>
@@ -842,27 +844,27 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
           {aktType === 'health' && <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">Ateş (°C)</label>
             <input type="number" step="0.1" value={form.ates || ''} onChange={e => setForm({...form, ates: e.target.value})}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
           </div>}
           {aktType === 'meds' && <>
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">İlaç Adı *</label>
               <input value={form.ilac || ''} onChange={e => setForm({...form, ilac: e.target.value})}
-                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">Doz</label>
               <input value={form.doz || ''} onChange={e => setForm({...form, doz: e.target.value})}
-                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
             </div>
           </>}
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">Not</label>
             <textarea value={form.not || ''} onChange={e => setForm({...form, not: e.target.value}) }
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none resize-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} rows={3} />
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none resize-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} rows={3} />
           </div>
         </div>
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#2a2f36]' : 'border-gray-200'}`}>
           <button onClick={() => setModal(false)} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600">İptal</button>
           <button onClick={saveAkt} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
         </div>
@@ -903,9 +905,9 @@ function GunlukRaporPage({ ogrenciler, siniflar, okul, dark }: any) {
     <div>
       <div className="flex gap-2 mb-4 flex-wrap items-center">
         <input type="date" value={tarih} onChange={e => setTarih(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
         <select value={sinifFilter} onChange={e => setSinifFilter(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
+          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
           <option value="">Tüm Sınıflar</option>
           {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
         </select>
@@ -915,7 +917,7 @@ function GunlukRaporPage({ ogrenciler, siniflar, okul, dark }: any) {
           const r = raporlar[o.id] || {}
           return (
             <Card key={o.id} dark={dark}>
-              <div className={`px-4 py-3 border-b flex items-center gap-3 ${dark ? 'border-gray-700' : 'border-gray-100'}`}>
+              <div className={`px-4 py-3 border-b flex items-center gap-3 ${dark ? 'border-[#2a2f36]' : 'border-gray-100'}`}>
                 <span className="text-xl">🌸</span>
                 <span className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>{o.ad_soyad}</span>
                 <span className="text-xs text-gray-400">{o.sinif}</span>
@@ -933,7 +935,7 @@ function GunlukRaporPage({ ogrenciler, siniflar, okul, dark }: any) {
                       defaultValue={r[f.key] || ''}
                       placeholder={f.placeholder}
                       onBlur={e => saveRapor(o.id, { ...r, [f.key]: e.target.value })}
-                      className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`}
+                      className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`}
                     />
                   </div>
                 ))}
@@ -943,7 +945,7 @@ function GunlukRaporPage({ ogrenciler, siniflar, okul, dark }: any) {
                     defaultValue={r.aciklama || ''}
                     placeholder="Günle ilgili not..."
                     onBlur={e => saveRapor(o.id, { ...r, aciklama: e.target.value })}
-                    className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`}
+                    className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`}
                   />
                 </div>
               </div>
@@ -996,12 +998,12 @@ function GelisimPage({ ogrenciler, okul, dark }: any) {
     <div>
       <div className="flex gap-2 mb-4 flex-wrap items-center">
         <select value={selectedOgr} onChange={e => setSelectedOgr(Number(e.target.value))}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
+          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
           <option value="">— Öğrenci Seç —</option>
           {ogrenciler.map((o: Ogrenci) => <option key={o.id} value={o.id}>{o.ad_soyad}</option>)}
         </select>
         <select value={donem} onChange={e => setDonem(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
+          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
           <option>2025-2026 1. Dönem</option>
           <option>2025-2026 2. Dönem</option>
         </select>
@@ -1010,14 +1012,14 @@ function GelisimPage({ ogrenciler, okul, dark }: any) {
 
       {data.length > 0 && (
         <Card dark={dark}>
-          <div className={`px-4 py-3 border-b ${dark ? 'border-gray-700' : 'border-gray-100'}`}>
+          <div className={`px-4 py-3 border-b ${dark ? 'border-[#2a2f36]' : 'border-gray-100'}`}>
             <h3 className={`font-semibold ${dark ? 'text-white' : ''}`}>{donem}</h3>
           </div>
           <div className="p-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
             {GEL_CATS.map(k => {
               const d = data.find(x => x.kategori === k.id)
               return (
-                <div key={k.id} className={`rounded-lg p-3 ${dark ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                <div key={k.id} className={`rounded-lg p-3 ${dark ? 'bg-[#1f242d]' : 'bg-gray-50'}`}>
                   <div className="text-xs font-semibold text-gray-500 mb-1">{k.ad}</div>
                   <div className="text-lg">{'⭐'.repeat(d?.puan || 0)}{'☆'.repeat(5 - (d?.puan || 0))}</div>
                 </div>
@@ -1025,7 +1027,7 @@ function GelisimPage({ ogrenciler, okul, dark }: any) {
             })}
           </div>
           {data.find(x => x.kategori === 'genel')?.not_text && (
-            <div className={`mx-4 mb-4 p-3 rounded-lg border-l-4 border-green-600 ${dark ? 'bg-gray-700' : 'bg-green-50'}`}>
+            <div className={`mx-4 mb-4 p-3 rounded-lg border-l-4 border-green-600 ${dark ? 'bg-[#1f242d]' : 'bg-green-50'}`}>
               <p className={`text-sm ${dark ? 'text-white' : ''}`}>📝 {data.find(x => x.kategori === 'genel')?.not_text}</p>
             </div>
           )}
@@ -1053,10 +1055,10 @@ function GelisimPage({ ogrenciler, okul, dark }: any) {
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">Genel Değerlendirme</label>
             <textarea value={genelNot} onChange={e => setGenelNot(e.target.value)}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none resize-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} rows={3} />
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none resize-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} rows={3} />
           </div>
         </div>
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#2a2f36]' : 'border-gray-200'}`}>
           <button onClick={() => setModal(false)} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600">İptal</button>
           <button onClick={save} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
         </div>
@@ -1151,18 +1153,18 @@ function Fotograflar({ siniflar, okul, dark }: any) {
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">Açıklama</label>
             <input value={form.aciklama || ''} onChange={e => setForm({ ...form, aciklama: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">Sınıf</label>
             <select value={form.sinif || ''} onChange={e => setForm({ ...form, sinif: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
               <option value="">Tüm okul</option>
               {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
             </select>
           </div>
         </div>
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#2a2f36]' : 'border-gray-200'}`}>
           <button onClick={() => setModal(false)} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600">İptal</button>
           <button onClick={upload} disabled={uploading} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60">
             {uploading ? '⏳ Yükleniyor...' : '💾 Yükle'}
@@ -1216,7 +1218,7 @@ function AidatPage({ ogrenciler, okul, dark }: any) {
     <div>
       <div className="flex gap-2 mb-4 flex-wrap items-center">
         <input type="month" value={ay} onChange={e => setAy(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
         <button onClick={generate} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">📋 Ay Oluştur</button>
         <button onClick={sendWA} className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-semibold">📱 WA Hatırlatma</button>
       </div>
@@ -1232,7 +1234,7 @@ function AidatPage({ ogrenciler, okul, dark }: any) {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className={dark ? 'bg-gray-700' : 'bg-gray-50'}>
+              <tr className={dark ? 'bg-[#1f242d]' : 'bg-gray-50'}>
                 {['Öğrenci', 'Veli', 'Tutar', 'Durum', 'Tarih', 'İşlem'].map(h => (
                   <th key={h} className={`text-left px-4 py-3 text-xs font-semibold uppercase ${dark ? 'text-gray-400' : 'text-gray-500'}`}>{h}</th>
                 ))}
@@ -1240,9 +1242,9 @@ function AidatPage({ ogrenciler, okul, dark }: any) {
             </thead>
             <tbody>
               {data.map(a => (
-                <tr key={a.id} className={`border-t ${dark ? 'border-gray-700' : 'border-gray-100'}`}>
+                <tr key={a.id} className={`border-t ${dark ? 'border-[#2a2f36]' : 'border-gray-100'}`}>
                   <td className={`px-4 py-3 text-sm font-semibold ${dark ? 'text-white' : ''}`}>{(a.ogrenciler as any)?.ad_soyad || '—'}</td>
-                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-300' : 'text-gray-600'}`}>{(a.ogrenciler as any)?.veli_ad || '—'}</td>
+                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-200' : 'text-gray-600'}`}>{(a.ogrenciler as any)?.veli_ad || '—'}</td>
                   <td className={`px-4 py-3 text-sm font-semibold ${dark ? 'text-white' : ''}`}>{fmtM(a.tutar)}</td>
                   <td className="px-4 py-3">{a.odendi ? <span className="bg-green-50 text-green-700 text-xs font-semibold px-2 py-1 rounded-full">✅ Ödendi</span> : <span className="bg-red-100 text-red-600 text-xs font-semibold px-2 py-1 rounded-full">⏳ Bekliyor</span>}</td>
                   <td className={`px-4 py-3 text-xs ${dark ? 'text-gray-400' : 'text-gray-500'}`}>{a.odeme_tarihi || '—'}</td>
@@ -1311,17 +1313,17 @@ function YemekListesi({ okul, dark }: any) {
     <div>
       <div className="flex gap-2 mb-4 items-center flex-wrap">
         <button onClick={() => { const d = new Date(hafta); d.setDate(d.getDate() - 7); setHafta(d.toISOString().split('T')[0]) }}
-          className={`border px-3 py-2 rounded-lg text-sm ${dark ? 'border-gray-600 text-gray-300' : 'border-gray-300'}`}>‹</button>
+          className={`border px-3 py-2 rounded-lg text-sm ${dark ? 'border-gray-600 text-gray-200' : 'border-gray-300'}`}>‹</button>
         <span className={`text-sm font-medium flex-1 text-center ${dark ? 'text-white' : ''}`}>{new Date(hafta).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} haftası</span>
         <button onClick={() => { const d = new Date(hafta); d.setDate(d.getDate() + 7); setHafta(d.toISOString().split('T')[0]) }}
-          className={`border px-3 py-2 rounded-lg text-sm ${dark ? 'border-gray-600 text-gray-300' : 'border-gray-300'}`}>›</button>
+          className={`border px-3 py-2 rounded-lg text-sm ${dark ? 'border-gray-600 text-gray-200' : 'border-gray-300'}`}>›</button>
         <button onClick={sendWA} className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-semibold">📱 WA</button>
       </div>
       <Card dark={dark}>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className={dark ? 'bg-gray-700' : 'bg-gray-50'}>
+              <tr className={dark ? 'bg-[#1f242d]' : 'bg-gray-50'}>
                 {['Gün', 'Kahvaltı', 'Öğle', 'İkindi', ''].map(h => (
                   <th key={h} className={`text-left px-4 py-3 text-xs font-semibold ${dark ? 'text-gray-400' : 'text-gray-500'}`}>{h}</th>
                 ))}
@@ -1329,17 +1331,17 @@ function YemekListesi({ okul, dark }: any) {
             </thead>
             <tbody>
               {rows.map(r => (
-                <tr key={r.tarih} className={`border-t ${dark ? 'border-gray-700' : 'border-gray-100'}`}>
+                <tr key={r.tarih} className={`border-t ${dark ? 'border-[#2a2f36]' : 'border-gray-100'}`}>
                   <td className="px-4 py-3">
                     <div className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>{r.gun}</div>
                     <div className="text-xs text-gray-400">{r.tarih}</div>
                   </td>
-                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-300' : 'text-gray-600'}`}>{r.yemek.kahvalti || <span className="text-gray-300">—</span>}</td>
-                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-300' : 'text-gray-600'}`}>{r.yemek.ogle || <span className="text-gray-300">—</span>}</td>
-                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-300' : 'text-gray-600'}`}>{r.yemek.ikindi || <span className="text-gray-300">—</span>}</td>
+                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-200' : 'text-gray-600'}`}>{r.yemek.kahvalti || <span className="text-gray-200">—</span>}</td>
+                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-200' : 'text-gray-600'}`}>{r.yemek.ogle || <span className="text-gray-200">—</span>}</td>
+                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-200' : 'text-gray-600'}`}>{r.yemek.ikindi || <span className="text-gray-200">—</span>}</td>
                   <td className="px-4 py-3">
                     <button onClick={() => { setForm({ tarih: r.tarih, kahvalti: r.yemek.kahvalti || '', ogle: r.yemek.ogle || '', ikindi: r.yemek.ikindi || '' }); setModal(true) }}
-                      className={`text-xs border px-2 py-1 rounded hover:border-green-600 hover:text-green-700 ${dark ? 'border-gray-600 text-gray-300' : 'border-gray-300'}`}>✏️</button>
+                      className={`text-xs border px-2 py-1 rounded hover:border-green-600 hover:text-green-700 ${dark ? 'border-gray-600 text-gray-200' : 'border-gray-300'}`}>✏️</button>
                   </td>
                 </tr>
               ))}
@@ -1354,11 +1356,11 @@ function YemekListesi({ okul, dark }: any) {
             <div key={k}>
               <label className="block text-xs font-semibold text-gray-500 mb-1">{l}</label>
               <input value={form[k] || ''} onChange={e => setForm({ ...form, [k]: e.target.value })}
-                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
             </div>
           ))}
         </div>
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#2a2f36]' : 'border-gray-200'}`}>
           <button onClick={() => setModal(false)} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600">İptal</button>
           <button onClick={save} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
         </div>
@@ -1398,7 +1400,7 @@ function Personel({ siniflar, okul, dark }: any) {
       <Card dark={dark}>
         <div className="divide-y divide-gray-100">
           {data.map(p => (
-            <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${dark ? 'border-gray-700' : ''}`}>
+            <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${dark ? 'border-[#2a2f36]' : ''}`}>
               <div className="w-10 h-10 rounded-full bg-green-50 text-green-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
                 {p.ad_soyad.split(' ').map((w: string) => w[0]).join('').slice(0, 2)}
               </div>
@@ -1419,13 +1421,13 @@ function Personel({ siniflar, okul, dark }: any) {
             <div key={k}>
               <label className="block text-xs font-semibold text-gray-500 mb-1">{l}</label>
               <input value={form[k] || ''} onChange={e => setForm({ ...form, [k]: e.target.value })}
-                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
             </div>
           ))}
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">Rol</label>
             <select value={form.rol} onChange={e => setForm({ ...form, rol: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
               <option value="ogretmen">Öğretmen</option>
               <option value="mudur">Müdür</option>
               <option value="yardimci">Yardımcı</option>
@@ -1434,13 +1436,13 @@ function Personel({ siniflar, okul, dark }: any) {
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">Sınıf</label>
             <select value={form.sinif || ''} onChange={e => setForm({ ...form, sinif: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
               <option value="">—</option>
               {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
             </select>
           </div>
         </div>
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#2a2f36]' : 'border-gray-200'}`}>
           <button onClick={() => setModal(false)} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600">İptal</button>
           <button onClick={save} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
         </div>
@@ -1486,9 +1488,9 @@ function ServisPage({ ogrenciler, siniflar, okul, dark }: any) {
     <div>
       <div className="flex gap-2 mb-4 flex-wrap items-center">
         <input type="date" value={tarih} onChange={e => setTarih(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
         <select value={sinifFilter} onChange={e => setSinifFilter(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
+          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
           <option value="">Tüm Sınıflar</option>
           {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
         </select>
@@ -1503,7 +1505,7 @@ function ServisPage({ ogrenciler, siniflar, okul, dark }: any) {
         {filtered.map((o: Ogrenci) => {
           const d = state[o.id] || ''
           return (
-            <div key={o.id} className={`border-2 rounded-xl p-3 text-center transition-all ${d === 'bindi' ? 'border-green-300 bg-green-50' : d === 'indi' ? 'border-orange-400 bg-orange-50' : dark ? 'border-gray-600 bg-gray-800' : 'border-gray-200 bg-white'}`}>
+            <div key={o.id} className={`border-2 rounded-xl p-3 text-center transition-all ${d === 'bindi' ? 'border-green-300 bg-green-50' : d === 'indi' ? 'border-orange-400 bg-orange-50' : dark ? 'border-gray-600 bg-[#161b22]' : 'border-gray-200 bg-white'}`}>
               <div className="text-2xl mb-1">🌸</div>
               <div className={`text-xs font-semibold mb-2 ${dark ? 'text-white' : ''}`}>{o.ad_soyad.split(' ')[0]}</div>
               <div className="flex gap-1 justify-center">
@@ -1557,7 +1559,7 @@ function MesajlarPage({ ogrenciler, okul, dark }: any) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[600px]">
       <Card dark={dark} className="flex flex-col overflow-hidden">
-        <div className={`px-4 py-3 border-b font-semibold text-sm flex items-center justify-between ${dark ? 'border-gray-700 text-white' : 'border-gray-100'}`}>
+        <div className={`px-4 py-3 border-b font-semibold text-sm flex items-center justify-between ${dark ? 'border-[#2a2f36] text-white' : 'border-gray-100'}`}>
           💬 Mesajlar
           {unread > 0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{unread}</span>}
         </div>
@@ -1566,7 +1568,7 @@ function MesajlarPage({ ogrenciler, okul, dark }: any) {
             const unreadCount = mesajlar.filter(m => m.gonderen_id === o.id && !m.okundu).length
             return (
               <div key={o.id} onClick={() => setSelected(o)}
-                className={`flex items-center gap-3 px-4 py-3 cursor-pointer border-b ${dark ? 'border-gray-700' : 'border-gray-50'} ${selected?.id === o.id ? 'bg-green-50' : dark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}>
+                className={`flex items-center gap-3 px-4 py-3 cursor-pointer border-b ${dark ? 'border-[#2a2f36]' : 'border-gray-50'} ${selected?.id === o.id ? 'bg-green-50' : dark ? 'hover:bg-[#1f242d]' : 'hover:bg-gray-50'}`}>
                 <div className="w-9 h-9 rounded-full bg-green-50 flex items-center justify-center text-lg flex-shrink-0">🌸</div>
                 <div className="flex-1">
                   <div className={`text-sm font-medium ${dark ? 'text-white' : ''}`}>{o.ad_soyad.split(' ')[0]}</div>
@@ -1581,7 +1583,7 @@ function MesajlarPage({ ogrenciler, okul, dark }: any) {
 
       <Card dark={dark} className="lg:col-span-2 flex flex-col overflow-hidden">
         {selected ? <>
-          <div className={`px-4 py-3 border-b flex items-center gap-3 ${dark ? 'border-gray-700' : 'border-gray-100'}`}>
+          <div className={`px-4 py-3 border-b flex items-center gap-3 ${dark ? 'border-[#2a2f36]' : 'border-gray-100'}`}>
             <div className="w-9 h-9 rounded-full bg-green-50 flex items-center justify-center text-lg">🌸</div>
             <div>
               <div className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>{selected.ad_soyad}</div>
@@ -1591,7 +1593,7 @@ function MesajlarPage({ ogrenciler, okul, dark }: any) {
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {thread.map(m => (
               <div key={m.id} className={`flex ${m.gonderen_tip === 'okul' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${m.gonderen_tip === 'okul' ? 'bg-green-600 text-white rounded-br-sm' : dark ? 'bg-gray-700 text-white rounded-bl-sm' : 'bg-gray-100 rounded-bl-sm'}`}>
+                <div className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${m.gonderen_tip === 'okul' ? 'bg-green-600 text-white rounded-br-sm' : dark ? 'bg-[#1f242d] text-white rounded-bl-sm' : 'bg-gray-100 rounded-bl-sm'}`}>
                   {m.icerik}
                   <div className={`text-xs mt-1 ${m.gonderen_tip === 'okul' ? 'text-green-100' : 'text-gray-400'}`}>{new Date(m.olusturuldu).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</div>
                 </div>
@@ -1599,10 +1601,10 @@ function MesajlarPage({ ogrenciler, okul, dark }: any) {
             ))}
             {!thread.length && <div className="text-center py-8 text-gray-400 text-sm">Henüz mesaj yok</div>}
           </div>
-          <div className={`p-3 border-t flex gap-2 ${dark ? 'border-gray-700' : 'border-gray-100'}`}>
+          <div className={`p-3 border-t flex gap-2 ${dark ? 'border-[#2a2f36]' : 'border-gray-100'}`}>
             <input value={icerik} onChange={e => setIcerik(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()}
               placeholder="Mesaj yaz..."
-              className={`flex-1 border rounded-xl px-4 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+              className={`flex-1 border rounded-xl px-4 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
             <button onClick={send} className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-semibold">➤</button>
           </div>
         </> : (
@@ -1643,7 +1645,7 @@ function Duyurular({ okul, dark }: any) {
       </div>
       <div className="space-y-3">
         {data.map(d => (
-          <div key={d.id} className={`rounded-lg border p-4 ${d.onemli ? 'border-l-4 border-l-red-500 border-red-200' : dark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`}>
+          <div key={d.id} className={`rounded-lg border p-4 ${d.onemli ? 'border-l-4 border-l-red-500 border-red-200' : dark ? 'border-[#2a2f36] bg-[#161b22]' : 'border-gray-200 bg-white'}`}>
             <div className="flex items-center justify-between mb-1">
               <h3 className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>{d.onemli ? '⚠️ ' : ''}{d.baslik}</h3>
               <div className="flex items-center gap-2">
@@ -1664,9 +1666,9 @@ function Duyurular({ okul, dark }: any) {
               <label className="block text-xs font-semibold text-gray-500 mb-1">{l}</label>
               {k === 'icerik'
                 ? <textarea value={form[k] || ''} onChange={e => setForm({ ...form, [k]: e.target.value })}
-                    className={`w-full border rounded-lg px-3 py-2 text-sm outline-none resize-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} rows={4} />
+                    className={`w-full border rounded-lg px-3 py-2 text-sm outline-none resize-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} rows={4} />
                 : <input type={k === 'tarih' ? 'date' : 'text'} value={form[k] || ''} onChange={e => setForm({ ...form, [k]: e.target.value })}
-                    className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+                    className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
               }
             </div>
           ))}
@@ -1675,7 +1677,7 @@ function Duyurular({ okul, dark }: any) {
             <label htmlFor="onemli" className={`text-sm font-medium ${dark ? 'text-white' : ''}`}>⚠️ Önemli</label>
           </div>
         </div>
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#2a2f36]' : 'border-gray-200'}`}>
           <button onClick={() => setModal(false)} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600">İptal</button>
           <button onClick={save} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Yayınla</button>
         </div>
@@ -1711,7 +1713,7 @@ function Etkinlikler({ siniflar, okul, dark }: any) {
         {data.map(e => {
           const d = new Date(e.tarih); const gecti = d < new Date()
           return (
-            <div key={e.id} className={`rounded-lg border p-4 flex items-center gap-4 ${gecti ? 'opacity-60' : ''} ${dark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+            <div key={e.id} className={`rounded-lg border p-4 flex items-center gap-4 ${gecti ? 'opacity-60' : ''} ${dark ? 'bg-[#161b22] border-[#2a2f36]' : 'bg-white border-gray-200'}`}>
               <div className={`${gecti ? 'bg-gray-400' : 'bg-green-600'} text-white rounded-xl p-3 text-center min-w-12 flex-shrink-0`}>
                 <div className="text-xl font-bold leading-none">{d.getDate()}</div>
                 <div className="text-xs opacity-80">{d.toLocaleDateString('tr-TR', { month: 'short' })}</div>
@@ -1733,20 +1735,20 @@ function Etkinlikler({ siniflar, okul, dark }: any) {
             <div key={k}>
               <label className="block text-xs font-semibold text-gray-500 mb-1">{l}</label>
               <input type={k === 'tarih' ? 'date' : 'text'} value={form[k] || ''} onChange={e => setForm({ ...form, [k]: e.target.value })}
-                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
             </div>
           ))}
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">Hedef Kitle</label>
             <select value={form.hedef_kitle || ''} onChange={e => setForm({ ...form, hedef_kitle: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300 bg-white'}`}>
               <option value="Tüm öğrenciler">Tüm öğrenciler</option>
               <option value="Veliler">Veliler</option>
               {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
             </select>
           </div>
         </div>
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#2a2f36]' : 'border-gray-200'}`}>
           <button onClick={() => setModal(false)} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600">İptal</button>
           <button onClick={save} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
         </div>
@@ -1801,7 +1803,7 @@ function OkulAyarlari({ okul, dark, setOkul }: any) {
               </div>
             )}
             <input type="file" accept="image/*" onChange={e => handleLogoUpload(e.target.files?.[0] ?? null)}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
           </div>
           <p className="mt-2 text-xs text-gray-500">{uploadingLogo ? 'Logo yükleniyor...' : 'Bucket: logos'}</p>
         </div>
@@ -1809,13 +1811,13 @@ function OkulAyarlari({ okul, dark, setOkul }: any) {
           <div key={k}>
             <label className="block text-xs font-semibold text-gray-500 mb-1">{l}</label>
             <input value={form[k] || ''} onChange={e => setForm({ ...form, [k]: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
           </div>
         ))}
         <div>
           <label className="block text-xs font-semibold text-gray-500 mb-1">Yönetici Şifresi</label>
           <input type="password" value={form.sifre || ''} onChange={e => setForm({ ...form, sifre: e.target.value })}
-            className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`} />
+            className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-[#1f242d] border-gray-600 text-white' : 'border-gray-300'}`} />
         </div>
         <button onClick={save} className="w-full bg-green-600 text-white py-3 rounded-lg text-sm font-semibold">
           {saved ? '✅ Kaydedildi!' : 'Kaydet'}
