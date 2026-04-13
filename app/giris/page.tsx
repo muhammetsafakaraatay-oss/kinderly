@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Instrument_Serif, DM_Sans } from 'next/font/google'
 import { hasSupabaseEnv, supabase } from '@/lib/supabase'
@@ -27,6 +27,18 @@ const REDIRECT_RESOLUTION_TIMEOUT_MS = 3000
 const AUTH_LOADING_TIMEOUT_MS = 5000
 
 export default function GirisPage() {
+  return (
+    <Suspense fallback={<GirisFallback />}>
+      <GirisContent />
+    </Suspense>
+  )
+}
+
+function GirisFallback() {
+  return <main className="min-h-screen bg-[#060a06]" />
+}
+
+function GirisContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { loading: authLoading, session, role, okul } = useAuth()
