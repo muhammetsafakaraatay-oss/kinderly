@@ -26,6 +26,7 @@ const supportPoints = [
 const REDIRECT_RESOLUTION_TIMEOUT_MS = 3000
 const AUTH_LOADING_HINT_TIMEOUT_MS = 12000
 const SIGNIN_TIMEOUT_MS = 15000
+const PREPARE_OVERLAY_MAX_MS = 15000
 
 export default function GirisPage() {
   return (
@@ -52,6 +53,7 @@ function GirisContent() {
   const [rememberMe, setRememberMe] = useState(true)
   const [authDelayHint, setAuthDelayHint] = useState('')
   const [loadingStage, setLoadingStage] = useState(0)
+  const [prepareOverlayTimedOut, setPrepareOverlayTimedOut] = useState(false)
   const redirectTarget = searchParams.get('redirect') || ''
 
   const normalizedEmail = email.trim().toLowerCase()
@@ -70,7 +72,7 @@ function GirisContent() {
         ? 'Panel hazirlaniyor...'
         : 'Panele giriş yap'
   const isPreparingPanel = authLoading && !!session
-  const isBusy = submitting || isPreparingPanel
+  const isBusy = submitting || (isPreparingPanel && !prepareOverlayTimedOut)
   const loadingMessages = [
     'Kimlik doğrulanıyor...',
     'Rol ve okul bilgisi hazırlanıyor...',
@@ -109,6 +111,7 @@ function GirisContent() {
   useEffect(() => {
     if (!session || !authLoading) {
       setAuthDelayHint('')
+      setPrepareOverlayTimedOut(false)
       return
     }
 
@@ -119,6 +122,20 @@ function GirisContent() {
 
     return () => window.clearTimeout(timeout)
   }, [authLoading, session])
+
+  useEffect(() => {
+    if (!isPreparingPanel) {
+      setPrepareOverlayTimedOut(false)
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      setPrepareOverlayTimedOut(true)
+      setAuthDelayHint('Yönlendirme beklenenden uzun sürdü. Lütfen tekrar giriş yapın.')
+    }, PREPARE_OVERLAY_MAX_MS)
+
+    return () => window.clearTimeout(timeout)
+  }, [isPreparingPanel])
 
   useEffect(() => {
     if (!isBusy) {
@@ -148,6 +165,7 @@ function GirisContent() {
     setError('')
     setRedirectIssue('')
     setAuthDelayHint('')
+    setPrepareOverlayTimedOut(false)
     setAuthRememberPreference(rememberMe)
 
     const signInResult = await Promise.race([
@@ -359,6 +377,15 @@ function GirisContent() {
               )}
               {!error && !roleResolutionError && authDelayHint && (
                 <p className="mt-4 text-sm leading-6 text-[var(--muted)]">{authDelayHint}</p>
+              )}
+              {prepareOverlayTimedOut && (
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="mt-3 text-sm font-semibold text-[var(--green-strong)] underline underline-offset-4"
+                >
+                  Sayfayı yenile ve tekrar dene
+                </button>
               )}
 
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
