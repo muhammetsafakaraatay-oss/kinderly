@@ -3,7 +3,9 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTheme } from 'next-themes'
 import Image from 'next/image'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
@@ -12,6 +14,7 @@ import { Ogrenci, Sinif, Okul } from '@/lib/types'
 export default function AdminPage({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter()
   const { session, role, okul: authOkul, loading, signOut } = useAuth()
+  const { resolvedTheme } = useTheme()
   const [slug, setSlug] = useState('')
   const [okul, setOkul] = useState<Okul | null>(null)
   const [ogrenciler, setOgrenciler] = useState<Ogrenci[]>([])
@@ -19,7 +22,7 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   const [activePage, setActivePage] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [authTimeout, setAuthTimeout] = useState(false)
-  const dark = false
+  const dark = resolvedTheme === 'dark'
 
   async function loadAll(okulId: number) {
     const [{ data: ogr }, { data: sinif }] = await Promise.all([
@@ -97,11 +100,11 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   ]
 
   return (
-    <div className="flex min-h-screen bg-[#fafafa] text-gray-900">
+    <div className={`flex min-h-screen ${dark ? 'bg-[var(--bg)] text-[var(--text)]' : 'bg-[#fafafa] text-gray-900'}`}>
       {sidebarOpen && <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
-      <aside className={`fixed top-0 left-0 h-full w-60 z-50 flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 bg-white border-gray-200 border-r shadow-sm`}>
-        <div className="p-4 border-b flex items-center gap-3 border-gray-200">
+      <aside className={`fixed top-0 left-0 h-full w-60 z-50 flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 border-r shadow-sm ${dark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
+        <div className={`p-4 border-b flex items-center gap-3 ${dark ? 'border-gray-800' : 'border-gray-200'}`}>
           {okul?.logo_url ? (
             <img src={okul.logo_url} alt={okul.ad} className="h-9 w-9 rounded-lg object-cover" />
           ) : (
@@ -110,7 +113,7 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
             </div>
           )}
           <div>
-            <div className="text-sm font-semibold text-gray-900">{okul?.ad || 'Kinderly'}</div>
+            <div className={`text-sm font-semibold ${dark ? 'text-white' : 'text-gray-900'}`}>{okul?.ad || 'Kinderly'}</div>
             <div className="text-xs text-gray-500">Yönetim Paneli</div>
           </div>
         </div>
@@ -119,27 +122,30 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
             <button key={item.id} onClick={() => { setActivePage(item.id); setSidebarOpen(false) }}
               className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-all border-l-2 ${activePage === item.id
                 ? 'bg-green-50 text-green-700 border-l-green-600'
-                : 'border-l-transparent text-gray-600 hover:bg-gray-50'}`}>
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-gray-100 px-1 text-[10px] font-semibold text-gray-500">{item.icon}</span>
+                : dark
+                  ? 'border-l-transparent text-gray-300 hover:bg-gray-800'
+                  : 'border-l-transparent text-gray-600 hover:bg-gray-50'}`}>
+              <span className={`inline-flex h-5 min-w-5 items-center justify-center rounded px-1 text-[10px] font-semibold ${dark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-500'}`}>{item.icon}</span>
               {item.label}
             </button>
           ))}
         </nav>
-        <div className="p-3 border-t border-gray-200">
+        <div className={`p-3 border-t ${dark ? 'border-gray-800' : 'border-gray-200'}`}>
           <button onClick={async () => { await signOut(); router.replace('/giris') }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-gray-500 hover:bg-gray-50">
+            className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg ${dark ? 'text-gray-400 hover:bg-gray-800' : 'text-gray-500 hover:bg-gray-50'}`}>
             Çıkış Yap
           </button>
         </div>
       </aside>
 
       <div className="flex-1 lg:ml-60 flex flex-col min-h-screen">
-        <header className="px-4 h-14 flex items-center justify-between sticky top-0 z-30 border-b bg-white border-gray-200 shadow-sm">
+        <header className={`px-4 h-14 flex items-center justify-between sticky top-0 z-30 border-b shadow-sm ${dark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-gray-500 text-xl">☰</button>
-            <h1 className="text-base font-semibold text-gray-900">{navItems.find(n => n.id === activePage)?.label}</h1>
+            <h1 className={`text-base font-semibold ${dark ? 'text-white' : 'text-gray-900'}`}>{navItems.find(n => n.id === activePage)?.label}</h1>
           </div>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <button onClick={() => setActivePage('yoklama')} className="bg-green-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">Yoklama Al</button>
           </div>
         </header>
@@ -169,16 +175,16 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
 
 // ── YARDIMCI ──
 function Card({ children, dark, className = '' }: any) {
-  return <div className={`rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden ${className}`}>{children}</div>
+  return <div className={`rounded-xl border shadow-sm overflow-hidden ${dark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'} ${className}`}>{children}</div>
 }
 
 function Modal({ open, onClose, title, children, dark }: any) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center p-4">
-      <div className="rounded-xl w-full max-w-lg max-h-screen overflow-y-auto bg-white border border-gray-200 shadow-sm">
-        <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-900">{title}</h3>
+    <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
+      <div className={`rounded-xl w-full max-w-lg max-h-screen overflow-y-auto border shadow-sm ${dark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+        <div className={`px-5 py-4 border-b flex items-center justify-between ${dark ? 'border-gray-700' : 'border-gray-200'}`}>
+          <h3 className={`font-semibold ${dark ? 'text-white' : 'text-gray-900'}`}>{title}</h3>
           <button onClick={onClose} className="text-gray-400 text-xl">×</button>
         </div>
         {children}

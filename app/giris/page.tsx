@@ -24,7 +24,8 @@ const supportPoints = [
 ] as const
 
 const REDIRECT_RESOLUTION_TIMEOUT_MS = 3000
-const AUTH_LOADING_TIMEOUT_MS = 5000
+const AUTH_LOADING_HINT_TIMEOUT_MS = 12000
+const SIGNIN_TIMEOUT_MS = 15000
 
 export default function GirisPage() {
   return (
@@ -49,6 +50,8 @@ function GirisContent() {
   const [showPassword, setShowPassword] = useState(false)
   const [redirectIssue, setRedirectIssue] = useState('')
   const [rememberMe, setRememberMe] = useState(true)
+  const [authDelayHint, setAuthDelayHint] = useState('')
+  const [loadingStage, setLoadingStage] = useState(0)
   const redirectTarget = searchParams.get('redirect') || ''
 
   const normalizedEmail = email.trim().toLowerCase()
@@ -66,6 +69,13 @@ function GirisContent() {
       : authLoading && session
         ? 'Panel hazirlaniyor...'
         : 'Panele giriş yap'
+  const isPreparingPanel = authLoading && !!session
+  const isBusy = submitting || isPreparingPanel
+  const loadingMessages = [
+    'Kimlik doğrulanıyor...',
+    'Rol ve okul bilgisi hazırlanıyor...',
+    'Panele yönlendiriliyorsunuz...',
+  ] as const
 
   useEffect(() => {
     if (authLoading) return
@@ -97,15 +107,29 @@ function GirisContent() {
   }, [authLoading, okul?.slug, redirectPath, role, router, session])
 
   useEffect(() => {
-    if (!session || !authLoading) return
+    if (!session || !authLoading) {
+      setAuthDelayHint('')
+      return
+    }
 
     const timeout = window.setTimeout(() => {
-      console.error('Auth loading beklenenden uzun sürdü.', { userId: session.user.id })
-      setError('Oturum doğrulaması 5 saniyeden uzun sürdü. Lütfen tekrar deneyin.')
-    }, AUTH_LOADING_TIMEOUT_MS)
+      console.warn('Auth loading beklenenden uzun sürdü.', { userId: session.user.id })
+      setAuthDelayHint('Oturum doğrulaması beklenenden uzun sürüyor, yönlendirme devam ediyor.')
+    }, AUTH_LOADING_HINT_TIMEOUT_MS)
 
     return () => window.clearTimeout(timeout)
-  }, [authLoading, router, session])
+  }, [authLoading, session])
+
+  useEffect(() => {
+    if (!isBusy) {
+      setLoadingStage(0)
+      return
+    }
+    const timer = window.setInterval(() => {
+      setLoadingStage((prev) => Math.min(prev + 1, loadingMessages.length - 1))
+    }, 1300)
+    return () => window.clearInterval(timer)
+  }, [isBusy])
 
   async function handleLogin() {
     if (!hasSupabaseEnv) {
@@ -123,6 +147,7 @@ function GirisContent() {
     setSubmitting(true)
     setError('')
     setRedirectIssue('')
+    setAuthDelayHint('')
     setAuthRememberPreference(rememberMe)
 
     const signInResult = await Promise.race([
@@ -131,7 +156,7 @@ function GirisContent() {
         password: normalizedPassword,
       }),
       new Promise<{ error: { message: string } }>((resolve) => {
-        window.setTimeout(() => resolve({ error: { message: 'Giriş zaman aşımına uğradı.' } }), AUTH_LOADING_TIMEOUT_MS)
+        window.setTimeout(() => resolve({ error: { message: 'Giriş zaman aşımına uğradı.' } }), SIGNIN_TIMEOUT_MS)
       }),
     ])
 
@@ -332,6 +357,9 @@ function GirisContent() {
               {(error || roleResolutionError) && (
                 <p className="mt-4 text-sm leading-6 text-[#fda4af]">{error || roleResolutionError}</p>
               )}
+              {!error && !roleResolutionError && authDelayHint && (
+                <p className="mt-4 text-sm leading-6 text-[var(--muted)]">{authDelayHint}</p>
+              )}
 
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-[20px] border border-[var(--border)] bg-white/[0.02] p-4">
@@ -357,6 +385,15 @@ function GirisContent() {
           </section>
         </div>
       </div>
+      {isBusy && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 px-4 backdrop-blur-[1px]">
+          <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[#0b120b] p-5 text-center shadow-2xl">
+            <div className="mx-auto mb-4 h-9 w-9 animate-spin rounded-full border-2 border-white/20 border-t-[var(--green)]" />
+            <p className="text-sm font-semibold text-white">Panel hazırlanıyor</p>
+            <p className="mt-2 text-xs text-[var(--muted)]">{loadingMessages[loadingStage]}</p>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
