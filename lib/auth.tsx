@@ -54,7 +54,7 @@ const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30
 // Prevents redundant Supabase round-trips when TOKEN_REFRESHED or INITIAL_SESSION fires.
 type MemCache = { snapshot: AuthSnapshot; userId: string; ts: number }
 let _memCache: MemCache | null = null
-const MEM_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+const MEM_CACHE_TTL = 30 * 60 * 1000 // 30 minutes
 
 function getStorageTarget(remember: boolean) {
   if (typeof window === 'undefined') return null
@@ -173,10 +173,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(hasSupabaseEnv)
 
   const commitSnapshot = useCallback((nextSnapshot: AuthSnapshot) => {
-    setSession(nextSnapshot.session)
-    setRole(nextSnapshot.role)
-    setOkul(nextSnapshot.okul)
-    setPersonel(nextSnapshot.personel)
+    // Use functional setters with reference equality — if nothing meaningful changed,
+    // the same object reference is returned so React skips re-rendering that state.
+    // This prevents panel useEffects from re-firing when auth emits TOKEN_REFRESHED
+    // with the same user/token (which would trigger loadData → alive=false → stuck loading).
+    setSession((prev) => {
+      if (
+        prev?.user?.id === nextSnapshot.session?.user?.id &&
+        prev?.access_token === nextSnapshot.session?.access_token
+      ) return prev
+      return nextSnapshot.session
+    })
+    setRole((prev) => (prev === nextSnapshot.role ? prev : nextSnapshot.role))
+    setOkul((prev) => (prev?.id === nextSnapshot.okul?.id ? prev : nextSnapshot.okul))
+    setPersonel((prev) => (prev?.id === nextSnapshot.personel?.id ? prev : nextSnapshot.personel))
     setLoading(false)
 
     if (nextSnapshot.session?.user) {

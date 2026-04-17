@@ -247,7 +247,11 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
     // Guard: skip if we already loaded data for this exact school+user combo.
     // Prevents duplicate loads when auth fires TOKEN_REFRESHED or INITIAL_SESSION.
     const loadKey = `${okul.id}-${session.user.id}`
-    if (loadedRef.current === loadKey) return
+    if (loadedRef.current === loadKey) {
+      // Effect re-ran (auth emitted) but data is already loaded — ensure loading is cleared.
+      setPageLoading(false)
+      return
+    }
     loadedRef.current = loadKey
 
     let alive = true
@@ -342,7 +346,8 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
         if (!alive) return
         setStatusMessage(getSupabaseErrorMessage(error as { message?: string }, 'Panel verileri yüklenemedi.'))
       } finally {
-        if (alive) setPageLoading(false)
+        // Always clear loading — even if effect re-ran (alive=false) we must not stay stuck.
+        setPageLoading(false)
       }
     }
 

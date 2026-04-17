@@ -206,7 +206,11 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
 
     // Guard: skip children re-fetch for the same school+user
     const loadKey = `${okul.id}-${session.user.id}`
-    if (childrenLoadedRef.current === loadKey) return
+    if (childrenLoadedRef.current === loadKey) {
+      // Effect re-ran but data is already loaded — ensure loading is cleared.
+      setPageLoading(false)
+      return
+    }
     childrenLoadedRef.current = loadKey
 
     let alive = true
@@ -241,7 +245,8 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
         if (!alive) return
         setMessageState(getSupabaseErrorMessage(error as { message?: string }, 'Çocuk bilgileri yüklenemedi.'))
       } finally {
-        if (alive) setPageLoading(false)
+        // Always clear loading — even if effect re-ran (alive=false) we must not stay stuck.
+        setPageLoading(false)
       }
     }
 
@@ -302,7 +307,8 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
         if (!alive) return
         setMessageState(getSupabaseErrorMessage(error as { message?: string }, 'Çocuk verileri yüklenemedi.'))
       } finally {
-        if (alive && isFirstLoad) setPageLoading(false)
+        // Always clear loading when this was a first-load — even if effect re-ran (alive=false).
+        if (isFirstLoad) setPageLoading(false)
       }
     }
 
