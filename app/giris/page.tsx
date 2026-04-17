@@ -24,9 +24,10 @@ const supportPoints = [
 ] as const
 
 const REDIRECT_RESOLUTION_TIMEOUT_MS = 3000
-const AUTH_LOADING_HINT_TIMEOUT_MS = 12000
-const SIGNIN_TIMEOUT_MS = 15000
-const PREPARE_OVERLAY_MAX_MS = 15000
+const AUTH_LOADING_HINT_TIMEOUT_MS = 15000
+const SIGNIN_SLOW_HINT_MS = 8000
+const SIGNIN_TIMEOUT_MS = 35000
+const PREPARE_OVERLAY_MAX_MS = 30000
 
 export default function GirisPage() {
   return (
@@ -52,6 +53,7 @@ function GirisContent() {
   const [redirectIssue, setRedirectIssue] = useState('')
   const [rememberMe, setRememberMe] = useState(true)
   const [authDelayHint, setAuthDelayHint] = useState('')
+  const [signinSlowHint, setSigninSlowHint] = useState(false)
   const [loadingStage, setLoadingStage] = useState(0)
   const [prepareOverlayTimedOut, setPrepareOverlayTimedOut] = useState(false)
   const redirectTarget = searchParams.get('redirect') || ''
@@ -172,8 +174,12 @@ function GirisContent() {
     setError('')
     setRedirectIssue('')
     setAuthDelayHint('')
+    setSigninSlowHint(false)
     setPrepareOverlayTimedOut(false)
     setAuthRememberPreference(rememberMe)
+
+    // Show a "bağlantı yavaş" hint after SIGNIN_SLOW_HINT_MS without cancelling the request
+    const slowHintTimer = window.setTimeout(() => setSigninSlowHint(true), SIGNIN_SLOW_HINT_MS)
 
     const signInResult = await Promise.race([
       supabase.auth.signInWithPassword({
@@ -181,9 +187,15 @@ function GirisContent() {
         password: normalizedPassword,
       }),
       new Promise<{ error: { message: string } }>((resolve) => {
-        window.setTimeout(() => resolve({ error: { message: 'Giriş zaman aşımına uğradı.' } }), SIGNIN_TIMEOUT_MS)
+        window.setTimeout(
+          () => resolve({ error: { message: 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.' } }),
+          SIGNIN_TIMEOUT_MS
+        )
       }),
     ])
+
+    window.clearTimeout(slowHintTimer)
+    setSigninSlowHint(false)
 
     const signInError = signInResult.error
 
@@ -382,8 +394,10 @@ function GirisContent() {
               {(error || roleResolutionError) && (
                 <p className="mt-4 text-sm leading-6 text-[#fda4af]">{error || roleResolutionError}</p>
               )}
-              {!error && !roleResolutionError && authDelayHint && (
-                <p className="mt-4 text-sm leading-6 text-[var(--muted)]">{authDelayHint}</p>
+              {!error && !roleResolutionError && (authDelayHint || signinSlowHint) && (
+                <p className="mt-4 text-sm leading-6 text-[var(--muted)]">
+                  {authDelayHint || 'Sunucuya bağlanılıyor, lütfen bekleyin...'}
+                </p>
               )}
               {prepareOverlayTimedOut && (
                 <button

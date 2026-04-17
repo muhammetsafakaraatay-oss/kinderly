@@ -43,7 +43,7 @@ type AuthContextValue = {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
-const AUTH_QUERY_TIMEOUT_MS = 6000
+const AUTH_QUERY_TIMEOUT_MS = 10000
 const AUTH_REMEMBER_KEY = 'kinderly.remember'
 const AUTH_CACHE_KEY = 'kinderly.auth.cache'
 const AUTH_SESSION_MARKER = 'kinderly.auth.browser'
