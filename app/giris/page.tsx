@@ -51,7 +51,7 @@ function GirisContent() {
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [redirectIssue, setRedirectIssue] = useState('')
-  const [rememberMe] = useState(false)
+  const [rememberMe, setRememberMe] = useState(true)
   const [authDelayHint, setAuthDelayHint] = useState('')
   const [signinSlowHint, setSigninSlowHint] = useState(false)
   const [loadingStage, setLoadingStage] = useState(0)
@@ -176,7 +176,7 @@ function GirisContent() {
     setAuthDelayHint('')
     setSigninSlowHint(false)
     setPrepareOverlayTimedOut(false)
-    setAuthRememberPreference(false)
+    setAuthRememberPreference(rememberMe)
 
     // Show a "bağlantı yavaş" hint after SIGNIN_SLOW_HINT_MS without cancelling the request
     const slowHintTimer = window.setTimeout(() => setSigninSlowHint(true), SIGNIN_SLOW_HINT_MS)
@@ -372,9 +372,16 @@ function GirisContent() {
                 </div>
               </div>
 
-              <div className="mt-5 rounded-[18px] border border-[var(--border)] bg-white/[0.03] px-4 py-3 text-sm text-[var(--muted)]">
-                Otomatik giriş kapalı. Tarayıcıyı kapatınca yeniden giriş yapmanız gerekir.
-              </div>
+              <label className="mt-5 flex items-center gap-3 rounded-[18px] border border-[var(--border)] bg-white/[0.03] px-4 py-3 text-sm text-[var(--muted)]">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(event) => setRememberMe(event.target.checked)}
+                  className="h-4 w-4 accent-[var(--green)]"
+                />
+                Beni hatırla
+                <span className="ml-auto text-xs text-white/40">{rememberMe ? '30 gün' : 'Tarayıcı oturumu'}</span>
+              </label>
 
               <button
                 onClick={handleLogin}

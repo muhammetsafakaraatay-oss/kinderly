@@ -73,12 +73,15 @@ function clearSessionCookie() {
 
 export function setAuthRememberPreference(remember: boolean) {
   if (typeof window === 'undefined') return
-  window.localStorage.setItem(AUTH_REMEMBER_KEY, '0')
-  window.sessionStorage.removeItem(AUTH_SESSION_MARKER)
+  window.localStorage.setItem(AUTH_REMEMBER_KEY, remember ? '1' : '0')
+  if (!remember) {
+    window.sessionStorage.setItem(AUTH_SESSION_MARKER, '1')
+  }
 }
 
 function getRememberPreference() {
-  return false
+  if (typeof window === 'undefined') return true
+  return window.localStorage.getItem(AUTH_REMEMBER_KEY) !== '0'
 }
 
 function clearCachedAuth() {
@@ -91,11 +94,38 @@ function clearCachedAuth() {
 }
 
 function persistSnapshot(snapshot: AuthSnapshot) {
-  void snapshot
+  if (typeof window === 'undefined') return
+
+  const remember = snapshot.remember
+  const storage = getStorageTarget(remember)
+  if (!storage) return
+
+  window.localStorage.removeItem(AUTH_CACHE_KEY)
+  window.sessionStorage.removeItem(AUTH_CACHE_KEY)
+  storage.setItem(AUTH_CACHE_KEY, JSON.stringify(snapshot))
+  setAuthRememberPreference(remember)
+  setSessionCookie(remember)
 }
 
 function readCachedSnapshot() {
-  return null
+  if (typeof window === 'undefined') return null
+
+  const remember = getRememberPreference()
+  const storage = getStorageTarget(remember)
+  const raw = storage?.getItem(AUTH_CACHE_KEY) ?? null
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(raw) as AuthSnapshot
+    if (parsed.expiresAt && parsed.expiresAt < Date.now()) {
+      clearCachedAuth()
+      return null
+    }
+    return parsed
+  } catch {
+    clearCachedAuth()
+    return null
+  }
 }
 
 function normalizeRole(value: string | null | undefined): Role {
@@ -340,7 +370,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    const remember = false
+    const remember = getRememberPreference()
+
+    const browserSessionActive = typeof window !== 'undefined' && window.sessionStorage.getItem(AUTH_SESSION_MARKER) === '1'
+
+    if (!remember && !browserSessionActive) {
+      clearCachedAuth()
+      void supabase.auth.signOut()
+    } else {
+      const cachedSnapshot = readCachedSnapshot()
+      if (cachedSnapshot) {
+        restoreTimeout = window.setTimeout(() => {
+          if (!active) return
+          commitSnapshot(cachedSnapshot)
+        }, 0)
+      }
+    }
 
     async function hydrateSession() {
       try {
