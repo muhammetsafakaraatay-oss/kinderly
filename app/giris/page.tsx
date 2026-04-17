@@ -110,9 +110,11 @@ function GirisContent() {
 
   useEffect(() => {
     if (!session || !authLoading) {
-      setAuthDelayHint('')
-      setPrepareOverlayTimedOut(false)
-      return
+      const resetTimer = window.setTimeout(() => {
+        setAuthDelayHint('')
+        setPrepareOverlayTimedOut(false)
+      }, 0)
+      return () => window.clearTimeout(resetTimer)
     }
 
     const timeout = window.setTimeout(() => {
@@ -125,8 +127,10 @@ function GirisContent() {
 
   useEffect(() => {
     if (!isPreparingPanel) {
-      setPrepareOverlayTimedOut(false)
-      return
+      const resetTimer = window.setTimeout(() => {
+        setPrepareOverlayTimedOut(false)
+      }, 0)
+      return () => window.clearTimeout(resetTimer)
     }
 
     const timeout = window.setTimeout(() => {
@@ -139,14 +143,17 @@ function GirisContent() {
 
   useEffect(() => {
     if (!isBusy) {
-      setLoadingStage(0)
-      return
+      const resetTimer = window.setTimeout(() => {
+        setLoadingStage(0)
+      }, 0)
+      return () => window.clearTimeout(resetTimer)
     }
+
     const timer = window.setInterval(() => {
       setLoadingStage((prev) => Math.min(prev + 1, loadingMessages.length - 1))
     }, 1300)
     return () => window.clearInterval(timer)
-  }, [isBusy])
+  }, [isBusy, loadingMessages.length])
 
   async function handleLogin() {
     if (!hasSupabaseEnv) {

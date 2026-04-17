@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { Instrument_Serif, DM_Sans } from 'next/font/google'
@@ -198,6 +198,8 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
   const [uploadingGallery, setUploadingGallery] = useState(false)
   const [authTimeout, setAuthTimeout] = useState(false)
   const dark = resolvedTheme === 'dark'
+  // Prevents re-fetching when auth fires TOKEN_REFRESHED for the same user/school
+  const loadedRef = useRef<string | null>(null)
 
   useEffect(() => {
     void params.then((value) => setSlug(value.slug))
@@ -242,6 +244,12 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
   useEffect(() => {
     if (!okul || !session) return
 
+    // Guard: skip if we already loaded data for this exact school+user combo.
+    // Prevents duplicate loads when auth fires TOKEN_REFRESHED or INITIAL_SESSION.
+    const loadKey = `${okul.id}-${session.user.id}`
+    if (loadedRef.current === loadKey) return
+    loadedRef.current = loadKey
+
     let alive = true
     const currentOkul = okul
     const currentSession = session
@@ -258,7 +266,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
             .maybeSingle(),
           supabase
             .from('ogrenciler')
-            .select('*')
+            .select('id,ad_soyad,sinif,okul_id,aktif,dogum_tarihi')
             .eq('okul_id', currentOkul.id)
             .eq('aktif', true)
             .order('ad_soyad'),
@@ -646,7 +654,8 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
   }
 
   if (loading || pageLoading || !session || !okul) {
-    return <LoadingScreen message={authTimeout ? 'Oturum doğrulanamadı, giriş ekranına yönlendiriliyor...' : 'Panel hazırlanıyor...'} />
+    if (authTimeout) return <LoadingScreen message="Oturum doğrulanamadı, giriş ekranına yönlendiriliyor..." />
+    return <TeacherPanelSkeleton dark={dark} />
   }
 
   const totalUnread = Array.from(unreadByStudent.values()).reduce((sum, value) => sum + value, 0)
@@ -1338,6 +1347,49 @@ function LoadingScreen({ message }: { message: string }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] text-[var(--muted-text)]">
       {message}
+    </div>
+  )
+}
+
+function TeacherPanelSkeleton({ dark }: { dark: boolean }) {
+  const skBase = dark ? 'bg-[#1a1d23]' : 'bg-slate-200'
+  const cardBase = dark ? 'bg-[#111317] border-[#252a33]' : 'bg-white border-slate-200'
+  return (
+    <div className={`flex min-h-screen flex-col lg:flex-row ${dark ? 'bg-[#090b10]' : 'bg-slate-50'}`}>
+      <aside className={`w-full border-b lg:w-[260px] lg:border-b-0 lg:border-r border-[${dark ? '#252a33' : '#e2e8f0'}] ${dark ? 'bg-[#111317]' : 'bg-white'} px-5 py-6`}>
+        <div className="flex items-center gap-3">
+          <div className={`h-14 w-14 rounded-2xl animate-pulse ${skBase}`} />
+          <div className="flex-1 space-y-2">
+            <div className={`h-3 w-28 rounded animate-pulse ${skBase}`} />
+            <div className={`h-2 w-20 rounded animate-pulse ${skBase}`} />
+          </div>
+        </div>
+        <div className="mt-8 space-y-2">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className={`h-11 rounded-2xl animate-pulse ${skBase}`} style={{ animationDelay: `${i * 40}ms` }} />
+          ))}
+        </div>
+      </aside>
+      <div className="flex-1 px-4 py-5 lg:px-8 lg:py-7 space-y-6">
+        <div className={`rounded-[24px] border p-5 animate-pulse ${cardBase}`}>
+          <div className={`h-3 w-24 rounded ${skBase}`} />
+          <div className={`mt-3 h-12 w-3/4 rounded-xl ${skBase}`} />
+          <div className={`mt-3 h-3 w-40 rounded ${skBase}`} />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className={`rounded-[22px] border p-5 animate-pulse ${cardBase}`} style={{ animationDelay: `${i * 60}ms` }}>
+              <div className={`h-12 w-12 rounded-2xl ${skBase}`} />
+              <div className={`mt-4 h-8 w-16 rounded ${skBase}`} />
+              <div className={`mt-2 h-3 w-24 rounded ${skBase}`} />
+            </div>
+          ))}
+        </div>
+        <div className="grid gap-6 xl:grid-cols-2">
+          <div className={`rounded-[24px] border p-5 animate-pulse h-48 ${cardBase}`} />
+          <div className={`rounded-[24px] border p-5 animate-pulse h-48 ${cardBase}`} />
+        </div>
+      </div>
     </div>
   )
 }

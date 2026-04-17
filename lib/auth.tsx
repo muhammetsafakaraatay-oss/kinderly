@@ -43,12 +43,18 @@ type AuthContextValue = {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
-const AUTH_QUERY_TIMEOUT_MS = 20000
+const AUTH_QUERY_TIMEOUT_MS = 6000
 const AUTH_REMEMBER_KEY = 'kinderly.remember'
 const AUTH_CACHE_KEY = 'kinderly.auth.cache'
 const AUTH_SESSION_MARKER = 'kinderly.auth.browser'
 const AUTH_COOKIE_NAME = 'kinderly_has_session'
 const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30
+
+// Module-level in-memory cache — survives browser tab switches within the same session.
+// Prevents redundant Supabase round-trips when TOKEN_REFRESHED or INITIAL_SESSION fires.
+type MemCache = { snapshot: AuthSnapshot; userId: string; ts: number }
+let _memCache: MemCache | null = null
+const MEM_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 function getStorageTarget(remember: boolean) {
   if (typeof window === 'undefined') return null
@@ -80,6 +86,7 @@ function getRememberPreference() {
 
 function clearCachedAuth() {
   if (typeof window === 'undefined') return
+  _memCache = null
   window.localStorage.removeItem(AUTH_CACHE_KEY)
   window.sessionStorage.removeItem(AUTH_CACHE_KEY)
   window.sessionStorage.removeItem(AUTH_SESSION_MARKER)
@@ -130,22 +137,6 @@ async function withTimeout<T>(promise: PromiseLike<T>, timeoutMs = AUTH_QUERY_TI
   ])
 }
 
-// Timeout olursa 800ms bekleyip 1 kez daha dener.
-async function withRetryTimeout<T>(
-  factory: () => PromiseLike<T>,
-  timeoutMs = AUTH_QUERY_TIMEOUT_MS
-): Promise<T> {
-  try {
-    return await withTimeout(factory(), timeoutMs)
-  } catch (err) {
-    if (err instanceof Error && err.message === 'Auth query timeout') {
-      await new Promise<void>(r => setTimeout(r, 800))
-      return await withTimeout(factory(), timeoutMs)
-    }
-    throw err
-  }
-}
-
 function normalizeRole(value: string | null | undefined): Role {
   if (!value) return null
 
@@ -189,47 +180,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false)
 
     if (nextSnapshot.session?.user) {
+      _memCache = { snapshot: { ...nextSnapshot }, userId: nextSnapshot.session.user.id, ts: Date.now() }
       persistSnapshot({
         ...nextSnapshot,
         expiresAt: nextSnapshot.remember ? Date.now() + (THIRTY_DAYS_IN_SECONDS * 1000) : null,
       })
     } else {
+      _memCache = null
       clearCachedAuth()
     }
   }, [])
 
   const fetchRole = useCallback(async (user: User, remembered = getRememberPreference(), nextSession: Session | null = null) => {
+    // Use in-memory cache if same user and fresh enough — skips all Supabase queries.
+    if (_memCache && _memCache.userId === user.id && Date.now() - _memCache.ts < MEM_CACHE_TTL) {
+      commitSnapshot({
+        ..._memCache.snapshot,
+        session: nextSession ?? _memCache.snapshot.session,
+        remember: remembered,
+      })
+      return
+    }
+
     setLoading(true)
 
     try {
       const email = user.email?.trim().toLocaleLowerCase('tr-TR')
       let matchedPersonel: PersonelInfo | null = null
 
-      const { data: activeRows } = (await withRetryTimeout(() =>
+      const { data: userRows } = (await withTimeout(
         supabase
           .from('personel')
           .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
           .eq('user_id', user.id)
-          .eq('aktif', true)
           .limit(5)
       )) as { data: PersonelInfo[] | null }
 
-      matchedPersonel = (activeRows || []).find((row) => row.user_id === user.id) ?? null
+      const matchedByUser = (userRows || []).find((row) => row.user_id === user.id && row.aktif) ??
+        (userRows || []).find((row) => row.user_id === user.id) ??
+        null
 
-      if (!matchedPersonel) {
-        const { data: userRows } = (await withRetryTimeout(() =>
-          supabase
-            .from('personel')
-            .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
-            .eq('user_id', user.id)
-            .limit(5)
-        )) as { data: PersonelInfo[] | null }
-
-        matchedPersonel = (userRows || []).find((row) => row.user_id === user.id) ?? null
-      }
+      matchedPersonel = matchedByUser
 
       if (!matchedPersonel && email) {
-        const { data: emailRows } = (await withRetryTimeout(() =>
+        const { data: emailRows } = (await withTimeout(
           supabase
             .from('personel')
             .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
@@ -238,7 +232,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         )) as { data: PersonelInfo[] | null }
 
         matchedPersonel =
-          (emailRows || []).find((row) => row.email?.trim().toLocaleLowerCase('tr-TR') === email) ?? null
+          (emailRows || []).find((row) => row.email?.trim().toLocaleLowerCase('tr-TR') === email && row.aktif) ??
+          (emailRows || []).find((row) => row.email?.trim().toLocaleLowerCase('tr-TR') === email) ??
+          null
       }
 
       if (matchedPersonel) {
@@ -249,7 +245,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        const { data: okulData } = (await withRetryTimeout(() =>
+        const { data: okulData } = (await withTimeout(
           supabase
             .from('okullar')
             .select('id, ad, slug, logo_url')
@@ -267,7 +263,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      const { data: veli } = (await withRetryTimeout(() =>
+      const { data: veli } = (await withTimeout(
         supabase
           .from('veliler')
           .select('okul_id')
@@ -277,7 +273,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       )) as { data: { okul_id: number | string } | null }
 
       if (veli) {
-        const { data: okulData } = (await withRetryTimeout(() =>
+        const { data: okulData } = (await withTimeout(
           supabase
             .from('okullar')
             .select('id, ad, slug, logo_url')
@@ -329,7 +325,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function hydrateSession() {
       try {
-        const { data } = await withRetryTimeout(() => supabase.auth.getSession())
+        const { data } = await withTimeout(supabase.auth.getSession())
         if (!active) return
 
         const nextSession = data.session

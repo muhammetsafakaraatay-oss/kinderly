@@ -1,7 +1,7 @@
 'use client'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import Image from 'next/image'
@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { supabase } from '@/lib/supabase'
+import { createSignedStorageUrl } from '@/lib/supabase-helpers'
 import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
 import { Ogrenci, Sinif, Okul } from '@/lib/types'
@@ -41,11 +42,19 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [authTimeout, setAuthTimeout] = useState(false)
   const dark = resolvedTheme === 'dark'
+  // Prevents re-loading when auth fires TOKEN_REFRESHED for the same user/school
+  const loadedRef = useRef<string | null>(null)
 
   async function loadAll(okulId: number) {
     const [{ data: ogr }, { data: sinif }] = await Promise.all([
-      supabase.from('ogrenciler').select('*').eq('okul_id', okulId).eq('aktif', true).order('ad_soyad'),
-      supabase.from('siniflar').select('*').eq('okul_id', okulId).order('ad'),
+      supabase
+        .from('ogrenciler')
+        .select('id,ad_soyad,sinif,okul_id,aktif,dogum_tarihi,alerjiler,notlar')
+        .eq('okul_id', okulId)
+        .eq('aktif', true)
+        .order('ad_soyad')
+        .limit(500),
+      supabase.from('siniflar').select('id,ad,okul_id').eq('okul_id', okulId).order('ad'),
     ])
     if (ogr) setOgrenciler(ogr)
     if (sinif) setSiniflar(sinif)
@@ -86,16 +95,27 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
       return
     }
 
-    setOkul(authOkul as Okul)
-    loadAll(Number(authOkul.id))
+    // Guard: skip if we already loaded data for this exact school+user combo.
+    // Prevents duplicate loadAll when auth fires TOKEN_REFRESHED or INITIAL_SESSION.
+    const loadKey = `${authOkul.id}-${session.user.id}`
+    if (loadedRef.current !== loadKey) {
+      loadedRef.current = loadKey
+      setOkul(authOkul as Okul)
+      void loadAll(Number(authOkul.id))
+    } else {
+      setOkul(authOkul as Okul)
+    }
   }, [authOkul, loading, role, router, session, slug])
 
   if (loading || !session || !okul) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#090b10] text-gray-400">
-        {authTimeout ? 'Oturum doğrulanamadı, giriş ekranına yönlendiriliyor...' : 'Panel hazırlanıyor...'}
-      </div>
-    )
+    if (authTimeout) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#090b10] text-gray-400">
+          Oturum doğrulanamadı, giriş ekranına yönlendiriliyor...
+        </div>
+      )
+    }
+    return <AdminSkeleton />
   }
 
   const navItems = [
@@ -195,6 +215,41 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   )
 }
 
+function AdminSkeleton() {
+  return (
+    <div className="flex min-h-screen bg-[#090b10]">
+      <aside className="hidden lg:flex w-60 flex-col border-r border-[#252a33] bg-[#090b10]">
+        <div className="p-4 border-b border-[#252a33] flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-[#1a1d23] animate-pulse" />
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3 rounded bg-[#1a1d23] animate-pulse w-24" />
+            <div className="h-2 rounded bg-[#1a1d23] animate-pulse w-16" />
+          </div>
+        </div>
+        <div className="flex-1 py-2 space-y-1 px-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-9 rounded-lg bg-[#111317] animate-pulse" style={{ animationDelay: `${i * 40}ms` }} />
+          ))}
+        </div>
+      </aside>
+      <div className="flex-1 flex flex-col">
+        <header className="h-14 border-b border-[#252a33] bg-[#090b10] flex items-center px-4 gap-3">
+          <div className="h-4 w-32 rounded bg-[#1a1d23] animate-pulse" />
+        </header>
+        <main className="flex-1 p-6 space-y-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-24 rounded-xl bg-[#111317] animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
+            ))}
+          </div>
+          <div className="h-64 rounded-xl bg-[#111317] animate-pulse" />
+          <div className="h-48 rounded-xl bg-[#111317] animate-pulse" />
+        </main>
+      </div>
+    </div>
+  )
+}
+
 // ── YARDIMCI ──
 function Card({ children, dark, className = '' }: any) {
   return <div className={`rounded-xl border shadow-sm overflow-hidden ${dark ? 'border-[#252a33] bg-[#111317]' : 'border-gray-200 bg-white'} ${className}`}>{children}</div>
@@ -229,6 +284,31 @@ const AKT_TYPES = [
 
 function today() { return new Date().toISOString().split('T')[0] }
 function fmtM(n: number) { return '₺' + (Number(n) || 0).toLocaleString('tr-TR') }
+
+function getStoragePathFromValue(bucket: string, value?: string | null) {
+  if (!value) return null
+  if (!value.startsWith('http://') && !value.startsWith('https://')) return value
+
+  try {
+    const url = new URL(value)
+    const markers = [
+      `/object/public/${bucket}/`,
+      `/object/sign/${bucket}/`,
+      `/object/authenticated/${bucket}/`,
+    ]
+
+    for (const marker of markers) {
+      const index = url.pathname.indexOf(marker)
+      if (index >= 0) {
+        return decodeURIComponent(url.pathname.slice(index + marker.length))
+      }
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
 
 // ── DASHBOARD ──
 function Dashboard({ okul, ogrenciler, dark, setActivePage }: any) {
@@ -1101,29 +1181,56 @@ function Fotograflar({ siniflar, okul, dark }: any) {
 
   async function load() {
     const { data } = await supabase.from('fotograflar').select('*').eq('okul_id', okul.id).order('id', { ascending: false }).limit(50)
-    setFotos(data || [])
+    const rows = await Promise.all((data || []).map(async (row: any) => {
+      const storagePath =
+        row.storage_path ||
+        row.storagePath ||
+        row.path ||
+        getStoragePathFromValue('fotograflar', row.url)
+
+      if (!storagePath) {
+        return { ...row, signedUrl: row.url || null, storagePath: null }
+      }
+
+      const signed = await createSignedStorageUrl('fotograflar', storagePath)
+      return {
+        ...row,
+        storagePath,
+        signedUrl: signed.data || row.url || null,
+      }
+    }))
+    setFotos(rows)
   }
 
   async function upload() {
     if (!files.length) return
     setUploading(true)
     for (const f of files) {
-      const fn = Date.now() + '_' + Math.random().toString(36).slice(2) + '.jpg'
-      const { error } = await supabase.storage.from('fotograflar').upload(fn, f, {
+      const storagePath = `${okul.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`
+      const { error } = await supabase.storage.from('fotograflar').upload(storagePath, f, {
         contentType: f.type || 'image/jpeg',
         upsert: true,
       })
       if (!error) {
-        const { data } = supabase.storage.from('fotograflar').getPublicUrl(fn)
-        const url = data.publicUrl
-        await supabase.from('fotograflar').insert({ okul_id: okul.id, url, aciklama: form.aciklama, sinif: form.sinif, tarih: today() })
+        const insertWithPath = await supabase
+          .from('fotograflar')
+          .insert({ okul_id: okul.id, url: storagePath, storage_path: storagePath, aciklama: form.aciklama, sinif: form.sinif, tarih: today() })
+
+        if (insertWithPath.error) {
+          await supabase
+            .from('fotograflar')
+            .insert({ okul_id: okul.id, url: storagePath, aciklama: form.aciklama, sinif: form.sinif, tarih: today() })
+        }
       }
     }
     setUploading(false); setModal(false); load()
   }
 
-  async function deleteFoto(id: number) {
+  async function deleteFoto(id: number, storagePath?: string | null) {
     if (!confirm('Sil?')) return
+    if (storagePath) {
+      await supabase.storage.from('fotograflar').remove([storagePath])
+    }
     await supabase.from('fotograflar').delete().eq('id', id)
     load()
   }
@@ -1141,11 +1248,11 @@ function Fotograflar({ siniflar, okul, dark }: any) {
       <div className="flex justify-end mb-4">
         <button onClick={() => { setFiles([]); setForm({}); setModal(true) }} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">+ Fotoğraf Ekle</button>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {fotos.map(f => (
-          <div key={f.id} className="relative aspect-square rounded-xl overflow-hidden group cursor-pointer" onClick={() => setViewer(f.url)}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {fotos.map(f => (
+          <div key={f.id} className="relative aspect-square rounded-xl overflow-hidden group cursor-pointer" onClick={() => setViewer(f.signedUrl || f.url)}>
             <Image
-              src={f.url}
+              src={f.signedUrl || f.url}
               alt={f.aciklama || 'Okul fotografi'}
               fill
               sizes="(max-width: 1024px) 50vw, 25vw"
@@ -1155,7 +1262,7 @@ function Fotograflar({ siniflar, okul, dark }: any) {
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
               <p className="text-white text-xs">{f.aciklama || ''}</p>
             </div>
-            <button onClick={e => { e.stopPropagation(); deleteFoto(f.id) }}
+            <button onClick={e => { e.stopPropagation(); deleteFoto(f.id, f.storagePath) }}
               className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">×</button>
           </div>
         ))}

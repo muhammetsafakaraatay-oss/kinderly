@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { Instrument_Serif, DM_Sans } from 'next/font/google'
@@ -156,6 +156,10 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
   const [feeFilter, setFeeFilter] = useState<'hepsi' | 'bekleyen' | 'odendi'>('hepsi')
   const [authTimeout, setAuthTimeout] = useState(false)
   const dark = resolvedTheme === 'dark'
+  // Prevents re-fetching children list when auth fires TOKEN_REFRESHED for the same user/school
+  const childrenLoadedRef = useRef<string | null>(null)
+  // Tracks whether we have data for the selected child (prevents full loading on child switch)
+  const hasData = activities.length > 0 || announcements.length > 0 || fees.length > 0
 
   useEffect(() => {
     void params.then((value) => setSlug(value.slug))
@@ -199,6 +203,11 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
 
   useEffect(() => {
     if (!okul || !session) return
+
+    // Guard: skip children re-fetch for the same school+user
+    const loadKey = `${okul.id}-${session.user.id}`
+    if (childrenLoadedRef.current === loadKey) return
+    childrenLoadedRef.current = loadKey
 
     let alive = true
     const currentOkul = okul
@@ -249,9 +258,11 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
     let alive = true
     const currentOkul = okul
     const currentChildId = selectedChildId
+    // Only show full-page loading on first load; keep old data visible when switching children
+    const isFirstLoad = !hasData
 
     async function loadData() {
-      setPageLoading(true)
+      if (isFirstLoad) setPageLoading(true)
       try {
         const [activityQuery, attendanceQuery, announcementQuery, feeQuery, messageQuery] = await Promise.all([
           supabase
@@ -273,7 +284,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
           loadAnnouncementsCompat(currentOkul.id, 30),
           supabase
             .from('aidatlar')
-            .select('*')
+            .select('id,okul_id,ogrenci_id,donem,ay,tutar,odendi,son_odeme,odeme_tarihi')
             .eq('okul_id', currentOkul.id)
             .eq('ogrenci_id', currentChildId)
             .order('son_odeme', { ascending: true }),
@@ -291,7 +302,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
         if (!alive) return
         setMessageState(getSupabaseErrorMessage(error as { message?: string }, 'Çocuk verileri yüklenemedi.'))
       } finally {
-        if (alive) setPageLoading(false)
+        if (alive && isFirstLoad) setPageLoading(false)
       }
     }
 
@@ -391,7 +402,8 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
   }
 
   if (loading || pageLoading || !session || !okul) {
-    return <LoadingScreen message={authTimeout ? 'Oturum doğrulanamadı, giriş ekranına yönlendiriliyor...' : 'Panel hazırlanıyor...'} />
+    if (authTimeout) return <LoadingScreen message="Oturum doğrulanamadı, giriş ekranına yönlendiriliyor..." />
+    return <ParentPanelSkeleton dark={dark} />
   }
 
   const childAge = ageFromBirthDate(selectedChild?.dogum_tarihi)
@@ -781,6 +793,41 @@ function LoadingScreen({ message }: { message: string }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] text-[var(--muted-text)]">
       {message}
+    </div>
+  )
+}
+
+function ParentPanelSkeleton({ dark }: { dark: boolean }) {
+  const skBase = dark ? 'bg-[#1a1d23]' : 'bg-slate-200'
+  const cardBase = dark ? 'bg-[#111317] border-[#252a33]' : 'bg-white border-slate-200'
+  return (
+    <div className={`flex min-h-screen flex-col lg:flex-row ${dark ? 'bg-[#090b10]' : 'bg-slate-50'}`}>
+      <aside className={`w-full border-b lg:w-[260px] lg:border-b-0 lg:border-r ${dark ? 'bg-[#111317] border-[#252a33]' : 'bg-white border-slate-200'} px-5 py-6`}>
+        <div className="flex items-center gap-3">
+          <div className={`h-14 w-14 rounded-2xl animate-pulse ${skBase}`} />
+          <div className="flex-1 space-y-2">
+            <div className={`h-3 w-28 rounded animate-pulse ${skBase}`} />
+            <div className={`h-2 w-20 rounded animate-pulse ${skBase}`} />
+          </div>
+        </div>
+        <div className="mt-8 space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className={`h-11 rounded-2xl animate-pulse ${skBase}`} style={{ animationDelay: `${i * 40}ms` }} />
+          ))}
+        </div>
+      </aside>
+      <div className="flex-1 px-4 py-5 lg:px-8 lg:py-7 space-y-6">
+        <div className={`rounded-[24px] border p-5 animate-pulse ${cardBase}`}>
+          <div className={`h-3 w-24 rounded ${skBase}`} />
+          <div className={`mt-3 h-12 w-3/4 rounded-xl ${skBase}`} />
+          <div className={`mt-3 h-3 w-40 rounded ${skBase}`} />
+        </div>
+        <div className="grid gap-6 xl:grid-cols-2">
+          <div className={`rounded-[24px] border p-5 animate-pulse h-56 ${cardBase}`} />
+          <div className={`rounded-[24px] border p-5 animate-pulse h-56 ${cardBase}`} />
+        </div>
+        <div className={`rounded-[24px] border p-5 animate-pulse h-40 ${cardBase}`} />
+      </div>
     </div>
   )
 }
