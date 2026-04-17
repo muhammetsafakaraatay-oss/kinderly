@@ -139,7 +139,7 @@ function isSameDay(a: string, b?: string) {
 export default function VeliPage({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter()
   const { resolvedTheme } = useTheme()
-  const { session, role, okul: authOkul, loading, signOut } = useAuth()
+  const { session, role, okul: authOkul, loading, hasValidSession, signOut } = useAuth()
   const [slug, setSlug] = useState('')
   const [activeTab, setActiveTab] = useState<ParentTab>('bugun')
   const [children, setChildren] = useState<ChildDetails[]>([])
@@ -168,9 +168,10 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
   const okul = authOkul as Okul | null
 
   useEffect(() => {
-    if (loading || !slug) return
+    if ((loading && !hasValidSession) || !slug) return
 
     if (!session || !authOkul) {
+      if (hasValidSession) return
       // Reset loadedRef so the next login (same account) triggers a fresh data load.
       childrenLoadedRef.current = null
       router.replace(`/giris?redirect=${encodeURIComponent(`/${slug}/veli`)}`)
@@ -186,22 +187,33 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
     if (authOkul.slug !== slug) {
       router.replace(`/${authOkul.slug}/veli`)
     }
-  }, [authOkul, loading, role, router, session, slug])
+  }, [authOkul, hasValidSession, loading, role, router, session, slug])
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading || hasValidSession) {
       if (!authTimeout) return
       const resetTimeout = window.setTimeout(() => setAuthTimeout(false), 0)
       return () => window.clearTimeout(resetTimeout)
     }
     const timeout = window.setTimeout(() => setAuthTimeout(true), 10000)
     return () => window.clearTimeout(timeout)
-  }, [authTimeout, loading])
+  }, [authTimeout, hasValidSession, loading])
 
   useEffect(() => {
-    if (!authTimeout || session) return
+    if (!authTimeout || session || hasValidSession) return
     router.replace(`/giris?redirect=${encodeURIComponent(`/${slug}/veli`)}`)
-  }, [authTimeout, router, session, slug])
+  }, [authTimeout, hasValidSession, router, session, slug])
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && session && okul) {
+        setPageLoading(false)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [session, okul])
 
   useEffect(() => {
     if (!okul || !session) return
@@ -409,8 +421,8 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
     setMessageState('Mesaj öğretmene iletildi.')
   }
 
-  if (loading || pageLoading || !session || !okul) {
-    if (authTimeout) return <LoadingScreen message="Oturum doğrulanamadı, giriş ekranına yönlendiriliyor..." />
+  if ((loading && !hasValidSession) || pageLoading || !session || !okul) {
+    if (authTimeout && !hasValidSession) return <LoadingScreen message="Oturum doğrulanamadı, giriş ekranına yönlendiriliyor..." />
     return <ParentPanelSkeleton dark={dark} />
   }
 

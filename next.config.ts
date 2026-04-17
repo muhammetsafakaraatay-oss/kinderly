@@ -9,7 +9,7 @@ function lanDevHosts(): string[] {
   for (const list of Object.values(nets)) {
     for (const net of list ?? []) {
       const family = net.family;
-      const isV4 = family === "IPv4" || family === 4;
+      const isV4 = family === "IPv4";
       if (isV4 && !net.internal) hosts.push(net.address);
     }
   }

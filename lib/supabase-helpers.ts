@@ -436,3 +436,11 @@ export async function createSignedPhotoUrl(storagePath: string, expiresIn = 60 *
     error,
   }
 }
+
+export async function createSignedStorageUrl(bucket: string, storagePath: string, expiresIn = 60 * 60) {
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(storagePath, expiresIn)
+  return {
+    data: data?.signedUrl ?? null,
+    error,
+  }
+}

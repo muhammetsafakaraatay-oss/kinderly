@@ -1,7 +1,7 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import type { Session, User } from '@supabase/supabase-js'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
 import { hasSupabaseEnv, supabase } from '@/lib/supabase'
 
 export type Role = 'admin' | 'ogretmen' | 'veli' | null
@@ -39,11 +39,11 @@ type AuthContextValue = {
   okul: OkulInfo | null
   personel: PersonelInfo | null
   loading: boolean
+  hasValidSession: boolean
   signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
-const AUTH_QUERY_TIMEOUT_MS = 10000
 const AUTH_REMEMBER_KEY = 'kinderly.remember'
 const AUTH_CACHE_KEY = 'kinderly.auth.cache'
 const AUTH_SESSION_MARKER = 'kinderly.auth.browser'
@@ -73,15 +73,12 @@ function clearSessionCookie() {
 
 export function setAuthRememberPreference(remember: boolean) {
   if (typeof window === 'undefined') return
-  window.localStorage.setItem(AUTH_REMEMBER_KEY, remember ? '1' : '0')
-  if (!remember) {
-    window.sessionStorage.setItem(AUTH_SESSION_MARKER, '1')
-  }
+  window.localStorage.setItem(AUTH_REMEMBER_KEY, '0')
+  window.sessionStorage.removeItem(AUTH_SESSION_MARKER)
 }
 
 function getRememberPreference() {
-  if (typeof window === 'undefined') return true
-  return window.localStorage.getItem(AUTH_REMEMBER_KEY) !== '0'
+  return false
 }
 
 function clearCachedAuth() {
@@ -94,47 +91,11 @@ function clearCachedAuth() {
 }
 
 function persistSnapshot(snapshot: AuthSnapshot) {
-  if (typeof window === 'undefined') return
-
-  const remember = snapshot.remember
-  const storage = getStorageTarget(remember)
-  if (!storage) return
-
-  window.localStorage.removeItem(AUTH_CACHE_KEY)
-  window.sessionStorage.removeItem(AUTH_CACHE_KEY)
-  storage.setItem(AUTH_CACHE_KEY, JSON.stringify(snapshot))
-  setAuthRememberPreference(remember)
-  setSessionCookie(remember)
+  void snapshot
 }
 
 function readCachedSnapshot() {
-  if (typeof window === 'undefined') return null
-
-  const remember = getRememberPreference()
-  const storage = getStorageTarget(remember)
-  const raw = storage?.getItem(AUTH_CACHE_KEY) ?? null
-  if (!raw) return null
-
-  try {
-    const parsed = JSON.parse(raw) as AuthSnapshot
-    if (parsed.expiresAt && parsed.expiresAt < Date.now()) {
-      clearCachedAuth()
-      return null
-    }
-    return parsed
-  } catch {
-    clearCachedAuth()
-    return null
-  }
-}
-
-async function withTimeout<T>(promise: PromiseLike<T>, timeoutMs = AUTH_QUERY_TIMEOUT_MS): Promise<T> {
-  return await Promise.race([
-    promise,
-    new Promise<T>((_, reject) => {
-      setTimeout(() => reject(new Error('Auth query timeout')), timeoutMs)
-    }),
-  ])
+  return null
 }
 
 function normalizeRole(value: string | null | undefined): Role {
@@ -171,6 +132,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [okul, setOkul] = useState<OkulInfo | null>(null)
   const [personel, setPersonel] = useState<PersonelInfo | null>(null)
   const [loading, setLoading] = useState(hasSupabaseEnv)
+  const [hasValidSession, setHasValidSession] = useState(false)
+  const lastValidSnapshotRef = useRef<AuthSnapshot | null>(null)
 
   const commitSnapshot = useCallback((nextSnapshot: AuthSnapshot) => {
     if (!nextSnapshot.session?.user) {
@@ -181,6 +144,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setOkul(null)
       setPersonel(null)
       setLoading(false)
+      setHasValidSession(false)
+      lastValidSnapshotRef.current = null
       _memCache = null
       clearCachedAuth()
       return
@@ -202,6 +167,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setOkul((prev) => (prev?.id === nextSnapshot.okul?.id ? prev : nextSnapshot.okul))
     setPersonel((prev) => (prev?.id === nextSnapshot.personel?.id ? prev : nextSnapshot.personel))
     setLoading(false)
+    const isValid = !!(nextSnapshot.session && nextSnapshot.okul)
+    setHasValidSession(isValid)
+    if (isValid) {
+      lastValidSnapshotRef.current = { ...nextSnapshot }
+    }
 
     _memCache = { snapshot: { ...nextSnapshot }, userId: nextSnapshot.session.user.id, ts: Date.now() }
     persistSnapshot({
@@ -209,6 +179,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       expiresAt: nextSnapshot.remember ? Date.now() + (THIRTY_DAYS_IN_SECONDS * 1000) : null,
     })
   }, [])
+
+  const restoreExistingSnapshot = useCallback((user: User, remembered: boolean, nextSession: Session | null) => {
+    const cachedSnapshot =
+      (lastValidSnapshotRef.current?.session?.user?.id === user.id ? lastValidSnapshotRef.current : null) ??
+      (_memCache?.userId === user.id ? _memCache.snapshot : null) ??
+      readCachedSnapshot()
+
+    if (!cachedSnapshot?.session?.user || cachedSnapshot.session.user.id !== user.id || !cachedSnapshot.okul) {
+      return false
+    }
+    commitSnapshot({
+      ...cachedSnapshot,
+      session: nextSession ?? cachedSnapshot.session,
+      remember: remembered,
+    })
+    return true
+  }, [commitSnapshot])
+
+  const clearSnapshot = useCallback((remembered: boolean) => {
+    commitSnapshot({ session: null, role: null, okul: null, personel: null, remember: remembered })
+  }, [commitSnapshot])
+
+  const handleSignedOutLikeState = useCallback((event: AuthChangeEvent, rememberCurrent: boolean) => {
+    if (event === 'SIGNED_OUT') {
+      clearSnapshot(rememberCurrent)
+      return
+    }
+
+    // Ignore transient null-session auth events when we still have a previously
+    // validated school/session snapshot; token refresh recovery can briefly enter
+    // this branch and we do not want to force users back to /giris.
+    const preservedSnapshot = lastValidSnapshotRef.current ?? _memCache?.snapshot ?? readCachedSnapshot()
+    if (preservedSnapshot?.session?.user && preservedSnapshot.okul) {
+      commitSnapshot({
+        ...preservedSnapshot,
+        remember: rememberCurrent,
+      })
+      return
+    }
+
+    clearSnapshot(rememberCurrent)
+  }, [clearSnapshot, commitSnapshot])
 
   const fetchRole = useCallback(async (user: User, remembered = getRememberPreference(), nextSession: Session | null = null) => {
     // Use in-memory cache if same user and fresh enough — skips all Supabase queries.
@@ -227,13 +239,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const email = user.email?.trim().toLocaleLowerCase('tr-TR')
       let matchedPersonel: PersonelInfo | null = null
 
-      const { data: userRows } = (await withTimeout(
-        supabase
+      const { data: userRows } = await supabase
           .from('personel')
           .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
           .eq('user_id', user.id)
           .limit(5)
-      )) as { data: PersonelInfo[] | null }
+      
 
       const matchedByUser = (userRows || []).find((row) => row.user_id === user.id && row.aktif) ??
         (userRows || []).find((row) => row.user_id === user.id) ??
@@ -242,13 +253,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       matchedPersonel = matchedByUser
 
       if (!matchedPersonel && email) {
-        const { data: emailRows } = (await withTimeout(
-          supabase
+        const { data: emailRows } = await supabase
             .from('personel')
             .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
             .eq('email', email)
             .limit(5)
-        )) as { data: PersonelInfo[] | null }
+        
 
         matchedPersonel =
           (emailRows || []).find((row) => row.email?.trim().toLocaleLowerCase('tr-TR') === email && row.aktif) ??
@@ -260,17 +270,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const normalizedRole = normalizeRole(matchedPersonel.rol)
         if (!normalizedRole) {
           await supabase.auth.signOut()
-          commitSnapshot({ session: null, role: null, okul: null, personel: null, remember: remembered })
+          clearSnapshot(remembered)
           return
         }
 
-        const { data: okulData } = (await withTimeout(
-          supabase
+        const { data: okulData } = await supabase
             .from('okullar')
             .select('id, ad, slug, logo_url')
             .eq('id', matchedPersonel.okul_id)
             .maybeSingle()
-        )) as { data: OkulInfo | null }
+        
 
         commitSnapshot({
           session: nextSession,
@@ -282,23 +291,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      const { data: veli } = (await withTimeout(
-        supabase
+      const { data: veli } = await supabase
           .from('veliler')
           .select('okul_id')
           .eq('user_id', user.id)
           .eq('aktif', true)
           .maybeSingle()
-      )) as { data: { okul_id: number | string } | null }
+      
 
       if (veli) {
-        const { data: okulData } = (await withTimeout(
-          supabase
+        const { data: okulData } = await supabase
             .from('okullar')
             .select('id, ad, slug, logo_url')
             .eq('id', veli.okul_id)
             .maybeSingle()
-        )) as { data: OkulInfo | null }
+        
 
         commitSnapshot({
           session: nextSession,
@@ -310,12 +317,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      commitSnapshot({ session: null, role: null, okul: null, personel: null, remember: remembered })
+      if (restoreExistingSnapshot(user, remembered, nextSession)) {
+        return
+      }
+      clearSnapshot(remembered)
     } catch (error) {
       console.error('Auth fetchRole hatası', error)
-      commitSnapshot({ session: null, role: null, okul: null, personel: null, remember: remembered })
+      if (restoreExistingSnapshot(user, remembered, nextSession)) {
+        setLoading(false)
+        return
+      }
+      clearSnapshot(remembered)
     }
-  }, [commitSnapshot])
+  }, [clearSnapshot, commitSnapshot, restoreExistingSnapshot])
 
   useEffect(() => {
     let active = true
@@ -326,25 +340,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    const remember = getRememberPreference()
-    const browserSessionActive = typeof window !== 'undefined' && window.sessionStorage.getItem(AUTH_SESSION_MARKER) === '1'
-
-    if (!remember && !browserSessionActive) {
-      clearCachedAuth()
-      void supabase.auth.signOut()
-    } else {
-      const cachedSnapshot = readCachedSnapshot()
-      if (cachedSnapshot) {
-        restoreTimeout = window.setTimeout(() => {
-          if (!active) return
-          commitSnapshot(cachedSnapshot)
-        }, 0)
-      }
-    }
+    const remember = false
 
     async function hydrateSession() {
       try {
-        const { data } = await withTimeout(supabase.auth.getSession())
+        const { data } = await supabase.auth.getSession()
         if (!active) return
 
         const nextSession = data.session
@@ -353,12 +353,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (nextSession?.user) {
           await fetchRole(nextSession.user, remember, nextSession)
         } else {
-          commitSnapshot({ session: null, role: null, okul: null, personel: null, remember })
+          handleSignedOutLikeState('INITIAL_SESSION', remember)
         }
       } catch (error) {
         console.error('Auth hydrate hatası', error)
         if (!active) return
-        commitSnapshot({ session: null, role: null, okul: null, personel: null, remember })
+        const preservedSnapshot = lastValidSnapshotRef.current ?? _memCache?.snapshot ?? readCachedSnapshot()
+        if (preservedSnapshot?.session?.user && preservedSnapshot.okul) {
+          commitSnapshot({
+            ...preservedSnapshot,
+            remember,
+          })
+          return
+        }
+        setLoading(false)
       }
     }
 
@@ -366,7 +374,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
       if (!active) return
 
       const rememberCurrent = getRememberPreference()
@@ -380,7 +388,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         await fetchRole(nextSession.user, rememberCurrent, nextSession)
       } else {
-        commitSnapshot({ session: null, role: null, okul: null, personel: null, remember: rememberCurrent })
+        handleSignedOutLikeState(event, rememberCurrent)
       }
     })
 
@@ -391,7 +399,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       subscription.unsubscribe()
     }
-  }, [commitSnapshot, fetchRole])
+  }, [commitSnapshot, fetchRole, handleSignedOutLikeState])
 
   return (
     <AuthContext.Provider
@@ -401,6 +409,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         okul,
         personel,
         loading,
+        hasValidSession,
         signOut: async () => {
           if (!hasSupabaseEnv) return
           // Clear in-memory and persisted caches first so that any
@@ -408,7 +417,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // repopulate the cache with stale data.
           _memCache = null
           clearCachedAuth()
-          commitSnapshot({ session: null, role: null, okul: null, personel: null, remember: getRememberPreference() })
+          clearSnapshot(getRememberPreference())
           await supabase.auth.signOut()
         },
       }}

@@ -44,14 +44,14 @@ function GirisFallback() {
 function GirisContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { loading: authLoading, session, role, okul } = useAuth()
+  const { loading: authLoading, session, role, okul, hasValidSession } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [redirectIssue, setRedirectIssue] = useState('')
-  const [rememberMe, setRememberMe] = useState(true)
+  const [rememberMe] = useState(false)
   const [authDelayHint, setAuthDelayHint] = useState('')
   const [signinSlowHint, setSigninSlowHint] = useState(false)
   const [loadingStage, setLoadingStage] = useState(0)
@@ -59,21 +59,21 @@ function GirisContent() {
   const redirectTarget = searchParams.get('redirect') || ''
 
   const normalizedEmail = email.trim().toLowerCase()
-  const canSubmit = normalizedEmail.length > 0 && password.trim().length > 0 && !submitting && !authLoading
+  const canSubmit = normalizedEmail.length > 0 && password.trim().length > 0 && !submitting && !(authLoading && !hasValidSession)
   const redirectPath = rolePath(role)
   const roleResolutionError =
     redirectIssue ||
-    (!authLoading && session && !redirectPath
+    (( !authLoading || hasValidSession) && session && !redirectPath
       ? 'Giriş tamamlandı fakat bu hesap için panel rolü bulunamadı. Ana sayfaya yönlendiriliyorsunuz.'
       : '')
 
   const buttonLabel =
     submitting
       ? 'Giriş yapılıyor...'
-      : authLoading && session
+      : authLoading && session && !hasValidSession
         ? 'Panel hazirlaniyor...'
         : 'Panele giriş yap'
-  const isPreparingPanel = authLoading && !!session
+  const isPreparingPanel = authLoading && !!session && !hasValidSession
   const isBusy = submitting || (isPreparingPanel && !prepareOverlayTimedOut)
   const loadingMessages = [
     'Kimlik doğrulanıyor...',
@@ -82,15 +82,15 @@ function GirisContent() {
   ] as const
 
   useEffect(() => {
-    if (authLoading) return
+    if (authLoading && !hasValidSession) return
 
     if (session && okul?.slug && redirectPath) {
       router.replace(redirectTarget || `/${okul.slug}/${redirectPath}`)
     }
-  }, [authLoading, okul?.slug, redirectPath, redirectTarget, router, session])
+  }, [authLoading, hasValidSession, okul?.slug, redirectPath, redirectTarget, router, session])
 
   useEffect(() => {
-    if (!session || authLoading) return
+    if (!session || (authLoading && !hasValidSession)) return
 
     if (okul?.slug && redirectPath) {
       return
@@ -108,10 +108,10 @@ function GirisContent() {
     }, REDIRECT_RESOLUTION_TIMEOUT_MS)
 
     return () => window.clearTimeout(timeout)
-  }, [authLoading, okul?.slug, redirectPath, role, router, session])
+  }, [authLoading, hasValidSession, okul?.slug, redirectPath, role, router, session])
 
   useEffect(() => {
-    if (!session || !authLoading) {
+    if (!session || !authLoading || hasValidSession) {
       const resetTimer = window.setTimeout(() => {
         setAuthDelayHint('')
         setPrepareOverlayTimedOut(false)
@@ -125,7 +125,7 @@ function GirisContent() {
     }, AUTH_LOADING_HINT_TIMEOUT_MS)
 
     return () => window.clearTimeout(timeout)
-  }, [authLoading, session])
+  }, [authLoading, hasValidSession, session])
 
   useEffect(() => {
     if (!isPreparingPanel) {
@@ -176,7 +176,7 @@ function GirisContent() {
     setAuthDelayHint('')
     setSigninSlowHint(false)
     setPrepareOverlayTimedOut(false)
-    setAuthRememberPreference(rememberMe)
+    setAuthRememberPreference(false)
 
     // Show a "bağlantı yavaş" hint after SIGNIN_SLOW_HINT_MS without cancelling the request
     const slowHintTimer = window.setTimeout(() => setSigninSlowHint(true), SIGNIN_SLOW_HINT_MS)
@@ -372,16 +372,9 @@ function GirisContent() {
                 </div>
               </div>
 
-              <label className="mt-5 flex items-center gap-3 rounded-[18px] border border-[var(--border)] bg-white/[0.03] px-4 py-3 text-sm text-[var(--muted)]">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(event) => setRememberMe(event.target.checked)}
-                  className="h-4 w-4 accent-[var(--green)]"
-                />
-                Beni hatırla
-                <span className="ml-auto text-xs text-white/40">{rememberMe ? '30 gün' : 'Tarayıcı oturumu'}</span>
-              </label>
+              <div className="mt-5 rounded-[18px] border border-[var(--border)] bg-white/[0.03] px-4 py-3 text-sm text-[var(--muted)]">
+                Otomatik giriş kapalı. Tarayıcıyı kapatınca yeniden giriş yapmanız gerekir.
+              </div>
 
               <button
                 onClick={handleLogin}

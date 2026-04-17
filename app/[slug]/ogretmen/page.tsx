@@ -162,7 +162,7 @@ async function uploadPhotoFile(okulId: number | string, ogrenciId: number, file:
 export default function OgretmenPage({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter()
   const { resolvedTheme } = useTheme()
-  const { session, role, okul: authOkul, loading, signOut } = useAuth()
+  const { session, role, okul: authOkul, loading, hasValidSession, signOut } = useAuth()
   const [slug, setSlug] = useState('')
   const [activeTab, setActiveTab] = useState<TeacherTab>('dashboard')
   const [teacher, setTeacher] = useState<TeacherProfile | null>(null)
@@ -208,9 +208,10 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
   const okul = authOkul as Okul | null
 
   useEffect(() => {
-    if (loading || !slug) return
+    if ((loading && !hasValidSession) || !slug) return
 
     if (!session || !authOkul) {
+      if (hasValidSession) return
       // Reset loadedRef so the next login (same account) triggers a fresh data load.
       loadedRef.current = null
       router.replace(`/giris?redirect=${encodeURIComponent(`/${slug}/ogretmen`)}`)
@@ -226,22 +227,33 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
     if (authOkul.slug !== slug) {
       router.replace(`/${authOkul.slug}/ogretmen`)
     }
-  }, [authOkul, loading, role, router, session, slug])
+  }, [authOkul, hasValidSession, loading, role, router, session, slug])
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading || hasValidSession) {
       if (!authTimeout) return
       const resetTimeout = window.setTimeout(() => setAuthTimeout(false), 0)
       return () => window.clearTimeout(resetTimeout)
     }
     const timeout = window.setTimeout(() => setAuthTimeout(true), 10000)
     return () => window.clearTimeout(timeout)
-  }, [authTimeout, loading])
+  }, [authTimeout, hasValidSession, loading])
 
   useEffect(() => {
-    if (!authTimeout || session) return
+    if (!authTimeout || session || hasValidSession) return
     router.replace(`/giris?redirect=${encodeURIComponent(`/${slug}/ogretmen`)}`)
-  }, [authTimeout, router, session, slug])
+  }, [authTimeout, hasValidSession, router, session, slug])
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && session && okul) {
+        setPageLoading(false)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [session, okul])
 
   useEffect(() => {
     if (!okul || !session) return
@@ -660,8 +672,8 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
     }
   }
 
-  if (loading || pageLoading || !session || !okul) {
-    if (authTimeout) return <LoadingScreen message="Oturum doğrulanamadı, giriş ekranına yönlendiriliyor..." />
+  if ((loading && !hasValidSession) || pageLoading || !session || !okul) {
+    if (authTimeout && !hasValidSession) return <LoadingScreen message="Oturum doğrulanamadı, giriş ekranına yönlendiriliyor..." />
     return <TeacherPanelSkeleton dark={dark} />
   }
 

@@ -32,7 +32,7 @@ import { Ogrenci, Sinif, Okul } from '@/lib/types'
 
 export default function AdminPage({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter()
-  const { session, role, okul: authOkul, loading, signOut } = useAuth()
+  const { session, role, okul: authOkul, loading, hasValidSession, signOut } = useAuth()
   const { resolvedTheme } = useTheme()
   const [slug, setSlug] = useState('')
   const [okul, setOkul] = useState<Okul | null>(null)
@@ -41,9 +41,11 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   const [activePage, setActivePage] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [authTimeout, setAuthTimeout] = useState(false)
+  const [pageLoading, setPageLoading] = useState(true)
   const dark = resolvedTheme === 'dark'
   // Prevents re-loading when auth fires TOKEN_REFRESHED for the same user/school
   const loadedRef = useRef<string | null>(null)
+  const activeOkul = okul ?? (authOkul as Okul | null)
 
   async function loadAll(okulId: number) {
     const [{ data: ogr }, { data: sinif }] = await Promise.all([
@@ -63,23 +65,36 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   useEffect(() => { params.then(p => setSlug(p.slug)) }, [params])
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading || hasValidSession) {
       setAuthTimeout(false)
       return
     }
     const timeout = window.setTimeout(() => setAuthTimeout(true), 10000)
     return () => window.clearTimeout(timeout)
-  }, [loading])
+  }, [hasValidSession, loading])
 
   useEffect(() => {
-    if (!authTimeout || session) return
+    if (!authTimeout || session || hasValidSession) return
     router.replace(`/giris?redirect=${encodeURIComponent(`/${slug}/admin`)}`)
-  }, [authTimeout, router, session, slug])
+  }, [authTimeout, hasValidSession, router, session, slug])
 
   useEffect(() => {
-    if (loading || !slug) return
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && session && activeOkul) {
+        setPageLoading(false)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [activeOkul, session])
+
+  useEffect(() => {
+    if ((loading && !hasValidSession) || !slug) return
 
     if (!session || !authOkul) {
+      if (hasValidSession) return
+      setPageLoading(false)
       router.replace(`/giris?redirect=${encodeURIComponent(`/${slug}/admin`)}`)
       return
     }
@@ -101,14 +116,16 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
     if (loadedRef.current !== loadKey) {
       loadedRef.current = loadKey
       setOkul(authOkul as Okul)
-      void loadAll(Number(authOkul.id))
+      setPageLoading(true)
+      void loadAll(Number(authOkul.id)).finally(() => setPageLoading(false))
     } else {
       setOkul(authOkul as Okul)
+      setPageLoading(false)
     }
-  }, [authOkul, loading, role, router, session, slug])
+  }, [authOkul, hasValidSession, loading, role, router, session, slug])
 
-  if (loading || !session || !okul) {
-    if (authTimeout) {
+  if ((loading && !hasValidSession) || !session || !activeOkul) {
+    if (authTimeout && !hasValidSession) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-[#090b10] text-gray-400">
           Oturum doğrulanamadı, giriş ekranına yönlendiriliyor...
@@ -144,14 +161,14 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
       <aside className={`fixed top-0 left-0 h-full w-60 z-50 flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 border-r shadow-sm ${dark ? 'bg-[#090b10] border-[#252a33]' : 'bg-white border-gray-200'}`}>
         <div className={`p-4 border-b flex items-center gap-3 ${dark ? 'border-[#252a33]' : 'border-gray-200'}`}>
           {okul?.logo_url ? (
-            <img src={okul.logo_url} alt={okul.ad} className="h-9 w-9 rounded-lg object-cover" />
+            <img src={activeOkul.logo_url} alt={activeOkul.ad} className="h-9 w-9 rounded-lg object-cover" />
           ) : (
             <div className="w-9 h-9 bg-green-600 rounded-lg flex items-center justify-center text-sm font-bold text-white">
-              {(okul?.ad || 'Kinderly').split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase()}
+              {(activeOkul?.ad || 'Kinderly').split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase()}
             </div>
           )}
           <div>
-            <div className={`text-sm font-semibold ${dark ? 'text-white' : 'text-gray-900'}`}>{okul?.ad || 'Kinderly'}</div>
+            <div className={`text-sm font-semibold ${dark ? 'text-white' : 'text-gray-900'}`}>{activeOkul?.ad || 'Kinderly'}</div>
             <div className="text-xs text-gray-500">Yönetim Paneli</div>
           </div>
         </div>
@@ -193,22 +210,22 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
         </header>
 
         <main className="flex-1 p-4 lg:p-6">
-          {activePage === 'dashboard' && <Dashboard okul={okul} ogrenciler={ogrenciler} dark={dark} setActivePage={setActivePage} />}
-          {activePage === 'ogrenciler' && <Ogrenciler ogrenciler={ogrenciler} siniflar={siniflar} okul={okul} dark={dark} reload={() => loadAll(okul!.id)} />}
-          {activePage === 'siniflar' && <Siniflar siniflar={siniflar} ogrenciler={ogrenciler} okul={okul} dark={dark} reload={() => loadAll(okul!.id)} />}
-          {activePage === 'yoklama' && <Yoklama ogrenciler={ogrenciler} siniflar={siniflar} okul={okul} dark={dark} />}
-          {activePage === 'aktivite' && <AktivitePage ogrenciler={ogrenciler} okul={okul} dark={dark} />}
-          {activePage === 'gunluk' && <GunlukRaporPage ogrenciler={ogrenciler} siniflar={siniflar} okul={okul} dark={dark} />}
-          {activePage === 'gelisim' && <GelisimPage ogrenciler={ogrenciler} okul={okul} dark={dark} />}
-          {activePage === 'fotograflar' && <Fotograflar siniflar={siniflar} okul={okul} dark={dark} />}
-          {activePage === 'aidat' && <AidatPage ogrenciler={ogrenciler} okul={okul} dark={dark} />}
-          {activePage === 'yemek' && <YemekListesi okul={okul} dark={dark} />}
-          {activePage === 'personel' && <Personel siniflar={siniflar} okul={okul} dark={dark} />}
-          {activePage === 'servis' && <ServisPage ogrenciler={ogrenciler} siniflar={siniflar} okul={okul} dark={dark} />}
-          {activePage === 'mesajlar' && <MesajlarPage ogrenciler={ogrenciler} okul={okul} dark={dark} />}
-          {activePage === 'duyurular' && <Duyurular okul={okul} dark={dark} />}
-          {activePage === 'etkinlikler' && <Etkinlikler siniflar={siniflar} okul={okul} dark={dark} />}
-          {activePage === 'ayarlar' && <OkulAyarlari okul={okul} dark={dark} setOkul={setOkul} />}
+          {activePage === 'dashboard' && <Dashboard okul={activeOkul} ogrenciler={ogrenciler} dark={dark} setActivePage={setActivePage} />}
+          {activePage === 'ogrenciler' && <Ogrenciler ogrenciler={ogrenciler} siniflar={siniflar} okul={activeOkul} dark={dark} reload={() => loadAll(Number(activeOkul.id))} />}
+          {activePage === 'siniflar' && <Siniflar siniflar={siniflar} ogrenciler={ogrenciler} okul={activeOkul} dark={dark} reload={() => loadAll(Number(activeOkul.id))} />}
+          {activePage === 'yoklama' && <Yoklama ogrenciler={ogrenciler} siniflar={siniflar} okul={activeOkul} dark={dark} />}
+          {activePage === 'aktivite' && <AktivitePage ogrenciler={ogrenciler} okul={activeOkul} dark={dark} />}
+          {activePage === 'gunluk' && <GunlukRaporPage ogrenciler={ogrenciler} siniflar={siniflar} okul={activeOkul} dark={dark} />}
+          {activePage === 'gelisim' && <GelisimPage ogrenciler={ogrenciler} okul={activeOkul} dark={dark} />}
+          {activePage === 'fotograflar' && <Fotograflar siniflar={siniflar} okul={activeOkul} dark={dark} />}
+          {activePage === 'aidat' && <AidatPage ogrenciler={ogrenciler} okul={activeOkul} dark={dark} />}
+          {activePage === 'yemek' && <YemekListesi okul={activeOkul} dark={dark} />}
+          {activePage === 'personel' && <Personel siniflar={siniflar} okul={activeOkul} dark={dark} />}
+          {activePage === 'servis' && <ServisPage ogrenciler={ogrenciler} siniflar={siniflar} okul={activeOkul} dark={dark} />}
+          {activePage === 'mesajlar' && <MesajlarPage ogrenciler={ogrenciler} okul={activeOkul} dark={dark} />}
+          {activePage === 'duyurular' && <Duyurular okul={activeOkul} dark={dark} />}
+          {activePage === 'etkinlikler' && <Etkinlikler siniflar={siniflar} okul={activeOkul} dark={dark} />}
+          {activePage === 'ayarlar' && <OkulAyarlari okul={activeOkul} dark={dark} setOkul={setOkul} />}
         </main>
       </div>
     </div>
