@@ -211,6 +211,8 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
     if (loading || !slug) return
 
     if (!session || !authOkul) {
+      // Reset loadedRef so the next login (same account) triggers a fresh data load.
+      loadedRef.current = null
       router.replace(`/giris?redirect=${encodeURIComponent(`/${slug}/ogretmen`)}`)
       return
     }
@@ -741,7 +743,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
               <button
                 onClick={async () => {
                   await signOut()
-                  router.replace('/giris')
+                  window.location.href = '/giris'
                 }}
                 className="mt-4 w-full rounded-2xl bg-[#10b981] px-4 py-3 text-sm font-semibold text-white"
               >

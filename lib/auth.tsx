@@ -173,10 +173,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(hasSupabaseEnv)
 
   const commitSnapshot = useCallback((nextSnapshot: AuthSnapshot) => {
-    // Use functional setters with reference equality — if nothing meaningful changed,
-    // the same object reference is returned so React skips re-rendering that state.
-    // This prevents panel useEffects from re-firing when auth emits TOKEN_REFRESHED
-    // with the same user/token (which would trigger loadData → alive=false → stuck loading).
+    if (!nextSnapshot.session?.user) {
+      // Signed-out path: set everything to null directly so React
+      // always propagates the cleared state to consumers.
+      setSession(null)
+      setRole(null)
+      setOkul(null)
+      setPersonel(null)
+      setLoading(false)
+      _memCache = null
+      clearCachedAuth()
+      return
+    }
+
+    // Signed-in path: use functional setters with reference equality.
+    // If nothing meaningful changed, the same object reference is returned so
+    // React skips re-rendering that state. This prevents panel useEffects from
+    // re-firing when auth emits TOKEN_REFRESHED with the same user/token
+    // (which would cause alive=false → setPageLoading stuck on true).
     setSession((prev) => {
       if (
         prev?.user?.id === nextSnapshot.session?.user?.id &&
@@ -189,16 +203,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPersonel((prev) => (prev?.id === nextSnapshot.personel?.id ? prev : nextSnapshot.personel))
     setLoading(false)
 
-    if (nextSnapshot.session?.user) {
-      _memCache = { snapshot: { ...nextSnapshot }, userId: nextSnapshot.session.user.id, ts: Date.now() }
-      persistSnapshot({
-        ...nextSnapshot,
-        expiresAt: nextSnapshot.remember ? Date.now() + (THIRTY_DAYS_IN_SECONDS * 1000) : null,
-      })
-    } else {
-      _memCache = null
-      clearCachedAuth()
-    }
+    _memCache = { snapshot: { ...nextSnapshot }, userId: nextSnapshot.session.user.id, ts: Date.now() }
+    persistSnapshot({
+      ...nextSnapshot,
+      expiresAt: nextSnapshot.remember ? Date.now() + (THIRTY_DAYS_IN_SECONDS * 1000) : null,
+    })
   }, [])
 
   const fetchRole = useCallback(async (user: User, remembered = getRememberPreference(), nextSession: Session | null = null) => {
@@ -361,7 +370,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!active) return
 
       const rememberCurrent = getRememberPreference()
-      setSession(nextSession)
+      // Do NOT call setSession directly here — commitSnapshot (called below by fetchRole
+      // or the else branch) handles session state with reference equality checks,
+      // preventing spurious TOKEN_REFRESHED re-renders in panel pages.
 
       if (nextSession?.user) {
         if (!rememberCurrent && typeof window !== 'undefined') {
@@ -392,8 +403,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         signOut: async () => {
           if (!hasSupabaseEnv) return
-          await supabase.auth.signOut()
+          // Clear in-memory and persisted caches first so that any
+          // onAuthStateChange event that fires during signOut cannot
+          // repopulate the cache with stale data.
+          _memCache = null
+          clearCachedAuth()
           commitSnapshot({ session: null, role: null, okul: null, personel: null, remember: getRememberPreference() })
+          await supabase.auth.signOut()
         },
       }}
     >

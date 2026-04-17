@@ -171,6 +171,8 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
     if (loading || !slug) return
 
     if (!session || !authOkul) {
+      // Reset loadedRef so the next login (same account) triggers a fresh data load.
+      childrenLoadedRef.current = null
       router.replace(`/giris?redirect=${encodeURIComponent(`/${slug}/veli`)}`)
       return
     }
@@ -519,7 +521,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
                 <button
                   onClick={async () => {
                     await signOut()
-                    router.replace('/giris')
+                    window.location.href = '/giris'
                   }}
                   className="flex-1 rounded-2xl bg-[#f59e0b] px-4 py-3 text-sm font-semibold text-white"
                 >

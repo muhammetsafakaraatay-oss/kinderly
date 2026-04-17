@@ -173,7 +173,7 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
           ))}
         </nav>
         <div className={`p-3 border-t ${dark ? 'border-[#252a33]' : 'border-gray-200'}`}>
-          <button onClick={async () => { await signOut(); router.replace('/giris') }}
+          <button onClick={async () => { await signOut(); window.location.href = '/giris' }}
             className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg ${dark ? 'text-gray-400 hover:bg-[#111317]' : 'text-gray-500 hover:bg-gray-50'}`}>
             Çıkış Yap
           </button>
