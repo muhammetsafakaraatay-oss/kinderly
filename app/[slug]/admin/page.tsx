@@ -50,7 +50,7 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
     const [{ data: ogr }, { data: sinif }] = await Promise.all([
       supabase
         .from('ogrenciler')
-        .select('id,ad_soyad,sinif,okul_id,aktif,dogum_tarihi,alerjiler,notlar')
+        .select('id,ad_soyad,sinif,okul_id,aktif,dogum_tarihi,alerjiler,veli_ad,veli_telefon,veli2_ad,veli2_telefon,aidat_tutari,kan_grubu,ilac,adres,aciklama,kayit_tarihi')
         .eq('okul_id', okulId)
         .eq('aktif', true)
         .order('ad_soyad')
@@ -505,7 +505,23 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
     setSaving(true)
     setSaveError(null)
     try {
-      const data = { ...form, okul_id: okul.id, aktif: true }
+      const data = {
+        ad_soyad: form.ad_soyad?.trim(),
+        dogum_tarihi: form.dogum_tarihi || null,
+        sinif: form.sinif || null,
+        veli_ad: form.veli_ad?.trim() || null,
+        veli_telefon: form.veli_telefon?.trim() || null,
+        veli2_ad: form.veli2_ad?.trim() || null,
+        veli2_telefon: form.veli2_telefon?.trim() || null,
+        alerjiler: form.alerjiler?.trim() || null,
+        ilac: form.ilac?.trim() || null,
+        adres: form.adres?.trim() || null,
+        aciklama: form.aciklama?.trim() || null,
+        aidat_tutari: form.aidat_tutari ? Number(form.aidat_tutari) : null,
+        kan_grubu: form.kan_grubu || null,
+        okul_id: okul.id,
+        aktif: true,
+      }
       if (editing) {
         const { error } = await supabase.from('ogrenciler').update(data).eq('id', editing.id)
         if (error) throw error
