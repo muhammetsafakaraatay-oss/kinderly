@@ -1401,15 +1401,43 @@ function Personel({ siniflar, okul, dark }: any) {
   const [data, setData] = useState<any[]>([])
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState<any>({ rol: 'ogretmen' })
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [geciciSifre, setGeciciSifre] = useState<string | null>(null)
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (okul) load() }, [okul])
   async function load() { const { data: d } = await supabase.from('personel').select('*').eq('okul_id', okul.id).eq('aktif', true).order('ad_soyad'); setData(d || []) }
 
   async function save() {
-    if (!form.ad_soyad) { alert('Ad zorunlu!'); return }
-    await supabase.from('personel').insert({ okul_id: okul.id, ...form, aktif: true })
-    setModal(false); setForm({ rol: 'ogretmen' }); load()
+    if (!form.ad_soyad?.trim()) { setSaveError('Ad soyad zorunludur.'); return }
+    if (!form.email?.trim()) { setSaveError('E-posta zorunludur.'); return }
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const res = await fetch('/api/personel-ekle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          okul_id: okul.id,
+          ad_soyad: form.ad_soyad,
+          email: form.email,
+          telefon: form.telefon || '',
+          rol: form.rol || 'ogretmen',
+          sinif: form.sinif || '',
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setSaveError(json.error || 'Personel eklenemedi.'); return }
+      setModal(false)
+      setForm({ rol: 'ogretmen' })
+      setGeciciSifre(json.geciciSifre)
+      load()
+    } catch {
+      setSaveError('Bağlantı hatası. Tekrar deneyin.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function del(id: number) {
@@ -1422,8 +1450,30 @@ function Personel({ siniflar, okul, dark }: any) {
   return (
     <div>
       <div className="flex justify-end mb-4">
-        <button onClick={() => { setForm({ rol: 'ogretmen' }); setModal(true) }} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">+ Personel Ekle</button>
+        <button onClick={() => { setForm({ rol: 'ogretmen' }); setSaveError(null); setModal(true) }} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">+ Personel Ekle</button>
       </div>
+
+      {geciciSifre && (
+        <div className="mb-4 rounded-xl border border-[rgba(74,222,128,0.3)] bg-[rgba(74,222,128,0.06)] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-[#4ade80] mb-1">✅ Personel başarıyla eklendi!</p>
+              <p className="text-xs text-[rgba(255,255,255,0.7)] mb-2">Öğretmene iletmek için geçici şifresini kopyalayın:</p>
+              <div className="flex items-center gap-2">
+                <code className="bg-[#060a06] border border-[rgba(74,222,128,0.2)] rounded px-3 py-1.5 text-sm font-mono text-[#4ade80] tracking-widest">{geciciSifre}</code>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(geciciSifre); }}
+                  className="text-xs border border-[rgba(74,222,128,0.3)] px-2 py-1.5 rounded text-[rgba(255,255,255,0.7)] hover:border-[#4ade80] hover:text-[#4ade80] transition-colors"
+                >
+                  Kopyala
+                </button>
+              </div>
+            </div>
+            <button onClick={() => setGeciciSifre(null)} className="text-[rgba(255,255,255,0.35)] hover:text-white text-lg leading-none">×</button>
+          </div>
+        </div>
+      )}
+
       <Card dark={dark}>
         <div className="divide-y divide-[rgba(74,222,128,0.08)]">
           {data.map(p => (
@@ -1442,19 +1492,23 @@ function Personel({ siniflar, okul, dark }: any) {
         </div>
       </Card>
 
-      <Modal open={modal} onClose={() => setModal(false)} title="Personel Ekle" dark={dark}>
+      <Modal open={modal} onClose={() => { setModal(false); setSaveError(null) }} title="Personel Ekle" dark={dark}>
         <div className="p-5 space-y-3">
-          {[['Ad Soyad *','ad_soyad'],['Telefon','telefon'],['E-posta','email']].map(([l,k]) => (
+          {[['Ad Soyad *','ad_soyad'],['E-posta *','email'],['Telefon','telefon']].map(([l,k]) => (
             <div key={k}>
               <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">{l}</label>
-              <input value={form[k] || ''} onChange={e => setForm({ ...form, [k]: e.target.value })}
-                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
+              <input
+                type={k === 'email' ? 'email' : 'text'}
+                value={form[k] || ''}
+                onChange={e => { setForm({ ...form, [k]: e.target.value }); setSaveError(null) }}
+                className="w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]"
+              />
             </div>
           ))}
           <div>
             <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Rol</label>
             <select value={form.rol} onChange={e => setForm({ ...form, rol: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]`}>
+              className="w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]">
               <option value="ogretmen">Öğretmen</option>
               <option value="mudur">Müdür</option>
               <option value="yardimci">Yardımcı</option>
@@ -1463,15 +1517,23 @@ function Personel({ siniflar, okul, dark }: any) {
           <div>
             <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Sınıf</label>
             <select value={form.sinif || ''} onChange={e => setForm({ ...form, sinif: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]`}>
+              className="w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]">
               <option value="">—</option>
               {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
             </select>
           </div>
+          <p className="text-xs text-[rgba(255,255,255,0.35)]">Personel eklendikten sonra geçici giriş şifresi gösterilecektir.</p>
         </div>
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 border-[rgba(74,222,128,0.14)]`}>
-          <button onClick={() => setModal(false)} className="border border-[rgba(74,222,128,0.2)] px-4 py-2 rounded-lg text-sm text-[rgba(255,255,255,0.6)] hover:border-[rgba(74,222,128,0.4)] transition-colors">İptal</button>
-          <button onClick={save} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
+        {saveError && (
+          <div className="px-5 pb-3">
+            <p className="text-sm text-red-400 bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.25)] rounded-lg px-3 py-2">{saveError}</p>
+          </div>
+        )}
+        <div className="px-5 py-4 border-t border-[rgba(74,222,128,0.14)] flex justify-end gap-2">
+          <button onClick={() => { setModal(false); setSaveError(null) }} disabled={saving} className="border border-[rgba(74,222,128,0.2)] px-4 py-2 rounded-lg text-sm text-[rgba(255,255,255,0.6)] hover:border-[rgba(74,222,128,0.4)] transition-colors disabled:opacity-50">İptal</button>
+          <button onClick={save} disabled={saving} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60 min-w-[80px]">
+            {saving ? 'Ekleniyor...' : 'Ekle'}
+          </button>
         </div>
       </Modal>
     </div>

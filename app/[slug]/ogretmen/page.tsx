@@ -29,7 +29,7 @@ import type { Ogrenci, Okul } from '@/lib/types'
 const serif = Instrument_Serif({ subsets: ['latin'], weight: '400', variable: '--font-serif' })
 const sans = DM_Sans({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700'], variable: '--font-sans' })
 
-type TeacherTab = 'dashboard' | 'yoklama' | 'aktiviteler' | 'mesajlar' | 'duyurular' | 'fotograflar' | 'gunluk'
+type TeacherTab = 'dashboard' | 'yoklama' | 'aktiviteler' | 'mesajlar' | 'duyurular' | 'fotograflar' | 'gunluk' | 'ayarlar'
 type AttendanceStatus = 'geldi' | 'gelmedi' | 'izinli' | ''
 type ActivityType = 'food' | 'nap' | 'potty' | 'photo' | 'kudos' | 'meds' | 'incident' | 'health' | 'note'
 
@@ -67,6 +67,7 @@ const tabs: Array<{ id: TeacherTab; label: string; icon: string }> = [
   { id: 'duyurular', label: 'Duyurular', icon: '📢' },
   { id: 'fotograflar', label: 'Fotoğraflar', icon: '📷' },
   { id: 'gunluk', label: 'Günlük Rapor', icon: '📋' },
+  { id: 'ayarlar', label: 'Ayarlar', icon: '⚙️' },
 ]
 
 const activityTypeConfig: Array<{ id: ActivityType; label: string; emoji: string; color: string; bg: string }> = [
@@ -198,6 +199,10 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
   const [savingAnnouncement, setSavingAnnouncement] = useState(false)
   const [uploadingGallery, setUploadingGallery] = useState(false)
   const [authTimeout, setAuthTimeout] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({ yeni: '', tekrar: '' })
+  const [savingPassword, setSavingPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordSuccess, setPasswordSuccess] = useState(false)
   const dark = resolvedTheme === 'dark'
   // Prevents re-fetching when auth fires TOKEN_REFRESHED for the same user/school
   const loadedRef = useRef<string | null>(null)
@@ -669,6 +674,28 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
       setUploadingGallery(false)
       setStatusMessage(getSupabaseErrorMessage(error as { message?: string }, 'Fotoğraf yüklenemedi.'))
     }
+  }
+
+  async function handlePasswordChange() {
+    if (!passwordForm.yeni.trim() || passwordForm.yeni.length < 6) {
+      setPasswordError('Şifre en az 6 karakter olmalıdır.')
+      return
+    }
+    if (passwordForm.yeni !== passwordForm.tekrar) {
+      setPasswordError('Şifreler eşleşmiyor.')
+      return
+    }
+    setSavingPassword(true)
+    setPasswordError(null)
+    setPasswordSuccess(false)
+    const { error } = await supabase.auth.updateUser({ password: passwordForm.yeni })
+    setSavingPassword(false)
+    if (error) {
+      setPasswordError(error.message)
+      return
+    }
+    setPasswordSuccess(true)
+    setPasswordForm({ yeni: '', tekrar: '' })
   }
 
   if ((loading && !hasValidSession) || pageLoading || !session || !okul) {
@@ -1278,6 +1305,57 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
                     )
                   })}
                 </div>
+              </PanelCard>
+            </section>
+          )}
+          {activeTab === 'ayarlar' && (
+            <section className="mt-6 max-w-lg">
+              <PanelCard>
+                <h2 className="text-lg font-semibold text-slate-900">Şifre değiştir</h2>
+                <p className="mt-1 text-sm text-slate-500">Yeni şifreniz en az 6 karakter olmalıdır.</p>
+
+                <div className="mt-5 space-y-4">
+                  <Field label="Yeni şifre">
+                    <input
+                      type="password"
+                      className="panel-input"
+                      value={passwordForm.yeni}
+                      onChange={(event) => { setPasswordForm((current) => ({ ...current, yeni: event.target.value })); setPasswordError(null); setPasswordSuccess(false) }}
+                      placeholder="••••••••"
+                      autoComplete="new-password"
+                    />
+                  </Field>
+                  <Field label="Yeni şifre (tekrar)">
+                    <input
+                      type="password"
+                      className="panel-input"
+                      value={passwordForm.tekrar}
+                      onChange={(event) => { setPasswordForm((current) => ({ ...current, tekrar: event.target.value })); setPasswordError(null); setPasswordSuccess(false) }}
+                      placeholder="••••••••"
+                      autoComplete="new-password"
+                    />
+                  </Field>
+                </div>
+
+                {passwordError && (
+                  <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {passwordError}
+                  </div>
+                )}
+
+                {passwordSuccess && (
+                  <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    Şifreniz başarıyla güncellendi.
+                  </div>
+                )}
+
+                <button
+                  onClick={handlePasswordChange}
+                  disabled={savingPassword}
+                  className="mt-5 rounded-2xl bg-[#10b981] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {savingPassword ? 'Kaydediliyor...' : 'Şifreyi güncelle'}
+                </button>
               </PanelCard>
             </section>
           )}
