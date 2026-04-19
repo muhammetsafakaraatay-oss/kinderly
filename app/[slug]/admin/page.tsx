@@ -1425,6 +1425,7 @@ function Personel({ siniflar, okul, dark }: any) {
           telefon: form.telefon || '',
           rol: form.rol || 'ogretmen',
           sinif: form.sinif || '',
+          sifre: form.sifre || '',
         }),
       })
       const json = await res.json()
@@ -1494,14 +1495,15 @@ function Personel({ siniflar, okul, dark }: any) {
 
       <Modal open={modal} onClose={() => { setModal(false); setSaveError(null) }} title="Personel Ekle" dark={dark}>
         <div className="p-5 space-y-3">
-          {[['Ad Soyad *','ad_soyad'],['E-posta *','email'],['Telefon','telefon']].map(([l,k]) => (
+          {[['Ad Soyad *','ad_soyad','text'],['E-posta *','email','email'],['Telefon','telefon','text'],['Şifre (boş bırakılırsa otomatik)','sifre','password']].map(([l,k,t]) => (
             <div key={k}>
               <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">{l}</label>
               <input
-                type={k === 'email' ? 'email' : 'text'}
+                type={t}
                 value={form[k] || ''}
                 onChange={e => { setForm({ ...form, [k]: e.target.value }); setSaveError(null) }}
                 className="w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]"
+                autoComplete={k === 'sifre' ? 'new-password' : undefined}
               />
             </div>
           ))}
@@ -1522,7 +1524,7 @@ function Personel({ siniflar, okul, dark }: any) {
               {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
             </select>
           </div>
-          <p className="text-xs text-[rgba(255,255,255,0.35)]">Personel eklendikten sonra geçici giriş şifresi gösterilecektir.</p>
+          <p className="text-xs text-[rgba(255,255,255,0.35)]">Şifre girilmezse otomatik oluşturulur ve ekleme sonrası gösterilir.</p>
         </div>
         {saveError && (
           <div className="px-5 pb-3">

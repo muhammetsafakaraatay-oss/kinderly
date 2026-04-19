@@ -8,6 +8,7 @@ type PersonelBody = {
   telefon?: string
   rol?: string
   sinif?: string
+  sifre?: string
 }
 
 const EMAIL_REGEX = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$/
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as PersonelBody
-    const { okul_id, ad_soyad, email, telefon, rol, sinif } = body
+    const { okul_id, ad_soyad, email, telefon, rol, sinif, sifre } = body
 
     if (!okul_id || !ad_soyad?.trim() || !email?.trim()) {
       return NextResponse.json({ error: 'Okul ID, ad soyad ve e-posta zorunludur.' }, { status: 400 })
@@ -52,7 +53,11 @@ export async function POST(request: Request) {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
-    const geciciSifre = generatePassword()
+    const geciciSifre = sifre?.trim() || generatePassword()
+
+    if (sifre?.trim() && sifre.trim().length < 6) {
+      return NextResponse.json({ error: 'Şifre en az 6 karakter olmalıdır.' }, { status: 400 })
+    }
 
     const { data: userData, error: authError } = await admin.auth.admin.createUser({
       email: normalizedEmail,
