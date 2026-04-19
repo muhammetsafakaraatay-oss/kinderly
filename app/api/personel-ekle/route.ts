@@ -9,18 +9,25 @@ type PersonelBody = {
   telefon?: string
   rol?: string
   sinif?: string
-  sifre?: string
 }
 
 const EMAIL_REGEX = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$/
 
 function generatePassword(): string {
-  const chars = 'abcdefghjkmnpqrstuvwxyz23456789'
-  let result = ''
-  for (let i = 0; i < 8; i++) {
-    result += chars[Math.floor(Math.random() * chars.length)]
-  }
-  return result
+  const lower = 'abcdefghjkmnpqrstuvwxyz'
+  const upper = 'ABCDEFGHJKMNPQRSTUVWXYZ'
+  const digits = '23456789'
+  const special = '!@#$%&*'
+  const all = lower + upper + digits + special
+  // En az birer tane zorunlu karakter + 8 rastgele
+  const required = [
+    lower[Math.floor(Math.random() * lower.length)],
+    upper[Math.floor(Math.random() * upper.length)],
+    digits[Math.floor(Math.random() * digits.length)],
+    special[Math.floor(Math.random() * special.length)],
+  ]
+  const rest = Array.from({ length: 8 }, () => all[Math.floor(Math.random() * all.length)])
+  return [...required, ...rest].sort(() => Math.random() - 0.5).join('')
 }
 
 export async function POST(request: Request) {
@@ -38,7 +45,7 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as PersonelBody
-    const { okul_id, ad_soyad, email, telefon, rol, sinif, sifre } = body
+    const { okul_id, ad_soyad, email, telefon, rol, sinif } = body
 
     if (!okul_id || !ad_soyad?.trim() || !email?.trim()) {
       return NextResponse.json({ error: 'Okul ID, ad soyad ve e-posta zorunludur.' }, { status: 400 })
@@ -48,10 +55,6 @@ export async function POST(request: Request) {
 
     if (!EMAIL_REGEX.test(normalizedEmail)) {
       return NextResponse.json({ error: 'Geçerli bir e-posta adresi girin.' }, { status: 400 })
-    }
-
-    if (sifre?.trim() && sifre.trim().length < 6) {
-      return NextResponse.json({ error: 'Şifre en az 6 karakter olmalıdır.' }, { status: 400 })
     }
 
     const admin = createClient(supabaseUrl, serviceRoleKey, {
@@ -64,7 +67,7 @@ export async function POST(request: Request) {
       .eq('id', okul_id)
       .single()
 
-    const geciciSifre = sifre?.trim() || generatePassword()
+    const geciciSifre = generatePassword()
 
     const { data: userData, error: authError } = await admin.auth.admin.createUser({
       email: normalizedEmail,
@@ -99,18 +102,19 @@ export async function POST(request: Request) {
     }
 
     if (okulData) {
-      sendPersonelWelcomeEmail({
+      await sendPersonelWelcomeEmail({
         email: normalizedEmail,
         ad_soyad: ad_soyad.trim(),
         okul_ad: okulData.ad,
         slug: okulData.slug,
         sifre: geciciSifre,
-      }).catch((err: unknown) => {
-        console.error('[personel-ekle] E-posta gönderilemedi, kayıt başarılı:', err)
       })
     }
 
-    return NextResponse.json({ geciciSifre })
+    return NextResponse.json({
+      success: true,
+      message: `${ad_soyad.trim()} başarıyla eklendi. Davet e-postası gönderildi.`,
+    })
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'İstek işlenemedi.' },

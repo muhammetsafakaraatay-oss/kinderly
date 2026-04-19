@@ -1419,7 +1419,7 @@ function Personel({ siniflar, okul, dark }: any) {
   const [form, setForm] = useState<any>({ rol: 'ogretmen' })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [geciciSifre, setGeciciSifre] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (okul) load() }, [okul])
@@ -1441,14 +1441,13 @@ function Personel({ siniflar, okul, dark }: any) {
           telefon: form.telefon || '',
           rol: form.rol || 'ogretmen',
           sinif: form.sinif || '',
-          sifre: form.sifre || '',
         }),
       })
       const json = await res.json()
       if (!res.ok) { setSaveError(json.error || 'Personel eklenemedi.'); return }
       setModal(false)
       setForm({ rol: 'ogretmen' })
-      setGeciciSifre(json.geciciSifre)
+      setSuccessMsg(json.message || `${form.ad_soyad} başarıyla eklendi. Davet e-postası gönderildi.`)
       load()
     } catch {
       setSaveError('Bağlantı hatası. Tekrar deneyin.')
@@ -1470,24 +1469,10 @@ function Personel({ siniflar, okul, dark }: any) {
         <button onClick={() => { setForm({ rol: 'ogretmen' }); setSaveError(null); setModal(true) }} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">+ Personel Ekle</button>
       </div>
 
-      {geciciSifre && (
-        <div className="mb-4 rounded-xl border border-[rgba(74,222,128,0.3)] bg-[rgba(74,222,128,0.06)] p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-[#4ade80] mb-1">✅ Personel başarıyla eklendi!</p>
-              <p className="text-xs text-[rgba(255,255,255,0.7)] mb-2">Öğretmene iletmek için geçici şifresini kopyalayın:</p>
-              <div className="flex items-center gap-2">
-                <code className="bg-[#060a06] border border-[rgba(74,222,128,0.2)] rounded px-3 py-1.5 text-sm font-mono text-[#4ade80] tracking-widest">{geciciSifre}</code>
-                <button
-                  onClick={() => { navigator.clipboard.writeText(geciciSifre); }}
-                  className="text-xs border border-[rgba(74,222,128,0.3)] px-2 py-1.5 rounded text-[rgba(255,255,255,0.7)] hover:border-[#4ade80] hover:text-[#4ade80] transition-colors"
-                >
-                  Kopyala
-                </button>
-              </div>
-            </div>
-            <button onClick={() => setGeciciSifre(null)} className="text-[rgba(255,255,255,0.35)] hover:text-white text-lg leading-none">×</button>
-          </div>
+      {successMsg && (
+        <div className="mb-4 rounded-xl border border-[rgba(74,222,128,0.3)] bg-[rgba(74,222,128,0.06)] p-4 flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-[#4ade80]">✅ {successMsg}</p>
+          <button onClick={() => setSuccessMsg(null)} className="text-[rgba(255,255,255,0.35)] hover:text-white text-lg leading-none">×</button>
         </div>
       )}
 
@@ -1511,7 +1496,7 @@ function Personel({ siniflar, okul, dark }: any) {
 
       <Modal open={modal} onClose={() => { setModal(false); setSaveError(null) }} title="Personel Ekle" dark={dark}>
         <div className="p-5 space-y-3">
-          {[['Ad Soyad *','ad_soyad','text'],['E-posta *','email','email'],['Telefon','telefon','text'],['Şifre (boş bırakılırsa otomatik)','sifre','password']].map(([l,k,t]) => (
+          {[['Ad Soyad *','ad_soyad','text'],['E-posta *','email','email'],['Telefon','telefon','text']].map(([l,k,t]) => (
             <div key={k}>
               <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">{l}</label>
               <input
@@ -1519,7 +1504,6 @@ function Personel({ siniflar, okul, dark }: any) {
                 value={form[k] || ''}
                 onChange={e => { setForm({ ...form, [k]: e.target.value }); setSaveError(null) }}
                 className="w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]"
-                autoComplete={k === 'sifre' ? 'new-password' : undefined}
               />
             </div>
           ))}
@@ -1540,7 +1524,7 @@ function Personel({ siniflar, okul, dark }: any) {
               {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
             </select>
           </div>
-          <p className="text-xs text-[rgba(255,255,255,0.35)]">Şifre girilmezse otomatik oluşturulur ve ekleme sonrası gösterilir.</p>
+          <p className="text-xs text-[rgba(255,255,255,0.35)]">Güçlü geçici şifre otomatik oluşturulur ve personele e-posta ile gönderilir.</p>
         </div>
         {saveError && (
           <div className="px-5 pb-3">
