@@ -11,14 +11,15 @@ import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
 import {
   createSignedPhotoUrl,
+  getUserFacingErrorMessage,
   getSupabaseErrorMessage,
   insertActivityCompat,
   insertAnnouncementCompat,
-  insertMessageCompat,
   loadAnnouncementsCompat,
   loadSchoolMessagesCompat,
   markMessagesReadCompat,
   resolveTeacherMessageParties,
+  sendMessageToRecipientsCompat,
   upsertAttendanceCompat,
   type AnnouncementItem,
   type NormalizedMessage,
@@ -499,7 +500,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
     setSavingAttendance(false)
 
     if (error) {
-      setStatusMessage(getSupabaseErrorMessage(error, 'Yoklama kaydedilemedi.'))
+      setStatusMessage(getUserFacingErrorMessage(error, 'Yoklama kaydedilemedi.'))
       return
     }
 
@@ -533,7 +534,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
       setSavingActivity(false)
 
       if (error) {
-        setStatusMessage(getSupabaseErrorMessage(error, 'Aktivite kaydedilemedi.'))
+        setStatusMessage(getUserFacingErrorMessage(error, 'Aktivite kaydedilemedi.'))
         return
       }
 
@@ -543,7 +544,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
       setStatusMessage('Aktivite kaydı oluşturuldu.')
     } catch (error) {
       setSavingActivity(false)
-      setStatusMessage(getSupabaseErrorMessage(error as { message?: string }, 'Fotoğraf yüklenemedi.'))
+      setStatusMessage(getUserFacingErrorMessage(error as { message?: string }, 'Fotoğraf yüklenemedi.'))
     }
   }
 
@@ -554,26 +555,25 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
     const { data: parties, error: partyError } = await resolveTeacherMessageParties(session.user.id, okul.id, selectedMessageStudent.id)
     if (partyError || !parties) {
       setSendingThread(false)
-      setStatusMessage(getSupabaseErrorMessage(partyError, 'Veli eşleşmesi bulunamadı.'))
+      setStatusMessage(getUserFacingErrorMessage(partyError, 'Veli eşleşmesi bulunamadı.'))
       return
     }
 
-    const { error } = await insertMessageCompat({
+    const { error } = await sendMessageToRecipientsCompat({
       okul_id: okul.id,
       ogrenci_id: selectedMessageStudent.id,
       gonderen_id: parties.senderId,
       gonderen_rol: 'ogretmen',
       gonderen_ad: teacher?.ad_soyad || 'Öğretmen',
-      alici_id: parties.receiverId,
       alici_tip: 'veli',
       okundu: false,
       created_at: new Date().toISOString(),
-    }, threadDraft.trim())
+    }, parties.receiverIds, threadDraft.trim())
 
     setSendingThread(false)
 
     if (error) {
-      setStatusMessage(getSupabaseErrorMessage(error, 'Mesaj gönderilemedi.'))
+      setStatusMessage(getUserFacingErrorMessage(error, 'Mesaj gönderilemedi.'))
       return
     }
 
@@ -587,18 +587,17 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
 
     for (const student of filteredStudents) {
       const { data: parties } = await resolveTeacherMessageParties(session.user.id, okul.id, student.id)
-      if (!parties?.receiverId) continue
-      await insertMessageCompat({
+      if (!parties?.receiverIds?.length) continue
+      await sendMessageToRecipientsCompat({
         okul_id: okul.id,
         ogrenci_id: student.id,
         gonderen_id: parties.senderId,
         gonderen_rol: 'ogretmen',
         gonderen_ad: teacher?.ad_soyad || 'Öğretmen',
-        alici_id: parties.receiverId,
         alici_tip: 'veli',
         okundu: false,
         created_at: new Date().toISOString(),
-      }, bulkDraft.trim())
+      }, parties.receiverIds, bulkDraft.trim())
     }
 
     setSendingBulk(false)

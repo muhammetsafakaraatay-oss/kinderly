@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
 import { hasSupabaseEnv, supabase } from '@/lib/supabase'
+import { normalizeRole } from '@/lib/role-utils'
 
 export type Role = 'admin' | 'ogretmen' | 'veli' | null
 
@@ -126,34 +127,6 @@ function readCachedSnapshot() {
     clearCachedAuth()
     return null
   }
-}
-
-function normalizeRole(value: string | null | undefined): Role {
-  if (!value) return null
-
-  const normalized = value
-    .trim()
-    .toLocaleLowerCase('tr-TR')
-    .replace(/ö/g, 'o')
-    .replace(/ğ/g, 'g')
-    .replace(/ı/g, 'i')
-    .replace(/ü/g, 'u')
-    .replace(/ş/g, 's')
-    .replace(/ç/g, 'c')
-
-  if (
-    normalized === 'admin' ||
-    normalized.includes('admin') ||
-    normalized.includes('yonet') ||
-    normalized.includes('mudur') ||
-    normalized.includes('owner') ||
-    normalized.includes('kurucu')
-  ) return 'admin'
-
-  if (normalized.includes('ogretmen') || normalized.includes('teacher')) return 'ogretmen'
-  if (normalized.includes('veli') || normalized.includes('parent')) return 'veli'
-
-  return null
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -286,7 +259,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: emailRows } = await supabase
             .from('personel')
             .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
-            .eq('email', email)
+            .ilike('email', email)
             .limit(5)
         
 

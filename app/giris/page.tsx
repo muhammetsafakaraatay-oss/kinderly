@@ -5,6 +5,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Instrument_Serif, DM_Sans } from 'next/font/google'
 import { hasSupabaseEnv, supabase } from '@/lib/supabase'
+import { getUserFacingErrorMessage } from '@/lib/supabase-helpers'
 import { setAuthRememberPreference, useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
 
@@ -204,7 +205,7 @@ function GirisContent() {
       setError(
         signInError.message === 'Invalid login credentials'
           ? 'Email veya şifre hatalı.'
-          : signInError.message
+          : getUserFacingErrorMessage(signInError, 'Giriş şu anda tamamlanamadı. Lütfen tekrar deneyin.')
       )
     }
 

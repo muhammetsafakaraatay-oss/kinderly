@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { isTeacherRole } from '@/lib/role-utils'
 
 type SupabaseErrorLike = {
   message?: string
@@ -16,6 +17,7 @@ export type ChildRecord = {
 type MessagePartyResult = {
   senderId: number
   receiverId: number | null
+  receiverIds: number[]
 }
 
 export type AnnouncementItem = {
@@ -48,6 +50,10 @@ function isInvalidIntegerError(error: SupabaseErrorLike) {
   return errorText(error).includes('invalid input syntax for type integer')
 }
 
+function isProduction() {
+  return process.env.NODE_ENV === 'production'
+}
+
 export function isMissingColumnError(error: SupabaseErrorLike, columns: string[]) {
   const text = errorText(error)
   return columns.some((column) => text.includes(column.toLowerCase())) &&
@@ -62,6 +68,13 @@ export function isMissingColumnError(error: SupabaseErrorLike, columns: string[]
 
 export function getSupabaseErrorMessage(error: SupabaseErrorLike, fallback = 'Bir hata oluştu.') {
   return error?.message || fallback
+}
+
+export function getUserFacingErrorMessage(error: SupabaseErrorLike, fallback = 'İşlem şu anda tamamlanamadı. Lütfen tekrar deneyin.') {
+  if (!isProduction()) {
+    return getSupabaseErrorMessage(error, fallback)
+  }
+  return fallback
 }
 
 export async function loadParentChildren(userId: string, okulId: string | number) {
@@ -146,7 +159,7 @@ export async function resolveParentMessageParties(userId: string, okulId: string
     return { data: null as MessagePartyResult | null, error: personelError }
   }
 
-  const ogretmenler = (activeTeachers || []).filter((item: { rol?: string | null }) => item.rol === 'ogretmen')
+  const ogretmenler = (activeTeachers || []).filter((item: { rol?: string | null }) => isTeacherRole(item.rol))
   const sameClass = ogrenci?.sinif
     ? ogretmenler.filter((item: { sinif?: string | null }) => item.sinif === ogrenci.sinif)
     : []
@@ -167,6 +180,7 @@ export async function resolveParentMessageParties(userId: string, okulId: string
     data: {
       senderId: Number(veli.id),
       receiverId: Number(resolvedTeacher.id),
+      receiverIds: [Number(resolvedTeacher.id)],
     },
     error: null as SupabaseErrorLike,
   }
@@ -190,14 +204,54 @@ export async function resolveTeacherMessageParties(userId: string, okulId: strin
     .eq('okul_id', okulId)
     .eq('ogrenci_id', ogrenciId)
     .eq('aktif', true)
-    .limit(1)
+    .limit(10)
+
+  const receiverIds = Array.from(
+    new Set((veli || []).map((item) => Number(item.id)).filter((id) => Number.isFinite(id)))
+  )
+
+  if (!receiverIds.length) {
+    return {
+      data: null as MessagePartyResult | null,
+      error: veliError ?? { message: 'Bu öğrenci için aktif veli kaydı bulunamadı.' },
+    }
+  }
 
   return {
     data: {
       senderId: Number(personel.id),
-      receiverId: veli?.[0]?.id ? Number(veli[0].id) : null,
+      receiverId: receiverIds[0] ?? null,
+      receiverIds,
     },
     error: veliError,
+  }
+}
+
+export async function sendMessageToRecipientsCompat(base: Record<string, unknown>, receiverIds: number[], content: string) {
+  const uniqueReceiverIds = Array.from(new Set(receiverIds)).filter((id) => Number.isFinite(id))
+
+  if (!uniqueReceiverIds.length) {
+    return {
+      sentCount: 0,
+      error: { message: 'Mesaj gönderilecek alıcı bulunamadı.' } as SupabaseErrorLike,
+    }
+  }
+
+  let lastError: SupabaseErrorLike = null
+  let sentCount = 0
+
+  for (const receiverId of uniqueReceiverIds) {
+    const { error } = await insertMessageCompat({ ...base, alici_id: receiverId }, content)
+    if (error) {
+      lastError = error
+      continue
+    }
+    sentCount += 1
+  }
+
+  return {
+    sentCount,
+    error: sentCount > 0 ? null as SupabaseErrorLike : lastError,
   }
 }
 

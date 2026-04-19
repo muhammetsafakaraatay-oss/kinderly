@@ -23,6 +23,7 @@ import {
   CalendarDays,
   Settings,
 } from 'lucide-react'
+import { SiniflarPanel } from '@/components/admin/siniflar-panel'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { supabase } from '@/lib/supabase'
 import { createSignedStorageUrl } from '@/lib/supabase-helpers'
@@ -212,7 +213,7 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
         <main className="flex-1 p-4 lg:p-6">
           {activePage === 'dashboard' && <Dashboard okul={activeOkul} ogrenciler={ogrenciler} dark={dark} setActivePage={setActivePage} />}
           {activePage === 'ogrenciler' && <Ogrenciler ogrenciler={ogrenciler} siniflar={siniflar} okul={activeOkul} dark={dark} reload={() => loadAll(Number(activeOkul.id))} />}
-          {activePage === 'siniflar' && <Siniflar siniflar={siniflar} ogrenciler={ogrenciler} okul={activeOkul} dark={dark} reload={() => loadAll(Number(activeOkul.id))} />}
+          {activePage === 'siniflar' && <SiniflarPanel siniflar={siniflar} ogrenciler={ogrenciler} okul={activeOkul} dark={dark} reload={() => loadAll(Number(activeOkul.id))} />}
           {activePage === 'yoklama' && <Yoklama ogrenciler={ogrenciler} siniflar={siniflar} okul={activeOkul} dark={dark} />}
           {activePage === 'aktivite' && <AktivitePage ogrenciler={ogrenciler} okul={activeOkul} dark={dark} />}
           {activePage === 'gunluk' && <GunlukRaporPage ogrenciler={ogrenciler} siniflar={siniflar} okul={activeOkul} dark={dark} />}
@@ -643,118 +644,6 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
             <select value={form.kan_grubu || ''} onChange={e => setForm({ ...form, kan_grubu: e.target.value })}
               className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300 bg-white'}`}>
               {['—', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', '0+', '0-'].map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-          </div>
-        </div>
-        {saveError && (
-          <div className="px-5 pb-3">
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{saveError}</p>
-          </div>
-        )}
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#252a33]' : 'border-gray-200'}`}>
-          <button onClick={() => setModal(false)} disabled={saving} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600 disabled:opacity-50">İptal</button>
-          <button onClick={save} disabled={saving} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60 min-w-[80px]">
-            {saving ? 'Kaydediliyor...' : 'Kaydet'}
-          </button>
-        </div>
-      </Modal>
-    </div>
-  )
-}
-
-// ── SINIFLAR ──
-function Siniflar({ siniflar, ogrenciler, okul, dark, reload }: any) {
-  const [modal, setModal] = useState(false)
-  const [editing, setEditing] = useState<Sinif | null>(null)
-  const [form, setForm] = useState<any>({ renk: '#5c6bc0', kapasite: 20 })
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-
-  async function save() {
-    if (!form.ad) { setSaveError('Sınıf adı zorunlu!'); return }
-    setSaving(true)
-    setSaveError(null)
-    try {
-      const payload = { ...form, okul_id: okul.id }
-      const { error } = editing
-        ? await supabase.from('siniflar').update(payload).eq('id', editing.id)
-        : await supabase.from('siniflar').insert(payload)
-      if (error) throw error
-      setModal(false)
-      reload()
-    } catch (err: any) {
-      const detail = err?.code === '42501'
-        ? 'Yetki hatası (RLS): Bu işlem için yetkiniz bulunmuyor.'
-        : err?.code === '23505'
-          ? 'Bu sınıf adı zaten mevcut.'
-          : `Kayıt hatası: ${err?.message || 'Bilinmeyen hata'}`
-      setSaveError(detail)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function del(id: number) {
-    if (!confirm('Silmek istediğinizden emin misiniz?')) return
-    const { error } = await supabase.from('siniflar').delete().eq('id', id)
-    if (error) { alert(`Silme hatası: ${error.message}`); return }
-    reload()
-  }
-
-  return (
-    <div>
-      <div className="flex justify-end mb-4">
-        <button onClick={() => { setEditing(null); setForm({ renk: '#5c6bc0', kapasite: 20 }); setSaveError(null); setModal(true) }} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">+ Sınıf Ekle</button>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {siniflar.map((s: Sinif) => {
-          const cnt = ogrenciler.filter((o: Ogrenci) => o.sinif === s.ad).length
-          const pct = Math.min(Math.round(cnt / (s.kapasite || 20) * 100), 100)
-          return (
-            <div key={s.id} className={`rounded-lg border overflow-hidden ${dark ? 'border-[#252a33]' : 'border-gray-200'}`}>
-              <div className="p-4 text-white" style={{ background: s.renk || '#5c6bc0' }}>
-                <div className="font-bold text-lg">{s.ad}</div>
-                <div className="text-sm opacity-80">{s.yas_grubu || ''} {s.ogretmen ? '· ' + s.ogretmen : ''}</div>
-              </div>
-              <div className={`p-4 ${dark ? 'bg-[#111317]' : 'bg-white'}`}>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-500">Doluluk</span>
-                  <span className={`font-semibold ${dark ? 'text-white' : ''}`}>{cnt}/{s.kapasite || 20}</span>
-                </div>
-                <div className="bg-gray-200 rounded-full h-1.5 mb-3">
-                  <div className="h-1.5 rounded-full" style={{ width: pct + '%', background: s.renk || '#5c6bc0' }} />
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => { setEditing(s); setForm({ ...s }); setModal(true) }} className="flex-1 border border-gray-300 rounded-lg py-1.5 text-xs font-semibold hover:border-green-600 hover:text-green-700">✏️ Düzenle</button>
-                  <button onClick={() => del(s.id)} className="border border-red-200 text-red-500 bg-red-50 rounded-lg px-3 py-1.5 text-xs">🗑</button>
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Sınıf Düzenle' : 'Sınıf Ekle'} dark={dark}>
-        <div className="p-5 grid grid-cols-2 gap-3">
-          {[
-            { label: 'Sınıf Adı *', key: 'ad', full: true },
-            { label: 'Yaş Grubu', key: 'yas_grubu' },
-            { label: 'Kapasite', key: 'kapasite', type: 'number' },
-            { label: 'Öğretmen', key: 'ogretmen', full: true },
-          ].map(f => (
-            <div key={f.key} className={f.full ? 'col-span-2' : ''}>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">{f.label}</label>
-              <input type={f.type || 'text'} value={form[f.key] || ''} onChange={e => setForm({ ...form, [f.key]: e.target.value })}
-                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
-            </div>
-          ))}
-          <div className="col-span-2">
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Renk</label>
-            <select value={form.renk} onChange={e => setForm({ ...form, renk: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300 bg-white'}`}>
-              {[['#5c6bc0','🔵 Mor'],['#26a69a','🟢 Yeşil'],['#ffa726','🟡 Sarı'],['#ef5350','🔴 Kırmızı'],['#42a5f5','🔵 Mavi'],['#ec407a','🩷 Pembe']].map(([v,l]) => (
-                <option key={v} value={v}>{l}</option>
-              ))}
             </select>
           </div>
         </div>

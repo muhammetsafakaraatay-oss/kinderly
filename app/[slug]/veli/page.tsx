@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
 import {
   getSupabaseErrorMessage,
+  getUserFacingErrorMessage,
   insertMessageCompat,
   loadAnnouncementsCompat,
   loadParentChildren,
@@ -319,7 +320,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
         setMessages(messageQuery.data || [])
       } catch (error) {
         if (!alive) return
-        setMessageState(getSupabaseErrorMessage(error as { message?: string }, 'Çocuk verileri yüklenemedi.'))
+      setMessageState(getUserFacingErrorMessage(error as { message?: string }, 'Çocuk verileri yüklenemedi.'))
       } finally {
         // Always clear loading when this was a first-load — even if effect re-ran (alive=false).
         if (isFirstLoad) setPageLoading(false)
@@ -394,7 +395,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
 
     if (partyError || !parties) {
       setSending(false)
-      setMessageState(getSupabaseErrorMessage(partyError, 'Öğretmen eşleşmesi bulunamadı.'))
+      setMessageState(getUserFacingErrorMessage(partyError, 'Öğretmen eşleşmesi bulunamadı.'))
       return
     }
 
@@ -413,7 +414,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
     setSending(false)
 
     if (error) {
-      setMessageState(getSupabaseErrorMessage(error, 'Mesaj gönderilemedi.'))
+      setMessageState(getUserFacingErrorMessage(error, 'Mesaj gönderilemedi.'))
       return
     }
 
