@@ -3,7 +3,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { useTheme } from 'next-themes'
 import Image from 'next/image'
 import {
   LayoutDashboard,
@@ -34,7 +33,6 @@ import { Ogrenci, Sinif, Okul } from '@/lib/types'
 export default function AdminPage({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter()
   const { session, role, okul: authOkul, loading, hasValidSession, signOut } = useAuth()
-  const { resolvedTheme } = useTheme()
   const [slug, setSlug] = useState('')
   const [okul, setOkul] = useState<Okul | null>(null)
   const [ogrenciler, setOgrenciler] = useState<Ogrenci[]>([])
@@ -43,7 +41,7 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [authTimeout, setAuthTimeout] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
-  const dark = resolvedTheme === 'dark'
+  const dark = true
   // Prevents re-loading when auth fires TOKEN_REFRESHED for the same user/school
   const loadedRef = useRef<string | null>(null)
   const activeOkul = okul ?? (authOkul as Okul | null)
@@ -128,7 +126,7 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   if ((loading && !hasValidSession) || !session || !activeOkul) {
     if (authTimeout && !hasValidSession) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-[#090b10] text-gray-400">
+        <div className="min-h-screen flex items-center justify-center bg-[#060a06] text-gray-400">
           Oturum doğrulanamadı, giriş ekranına yönlendiriliyor...
         </div>
       )
@@ -156,57 +154,53 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   ]
 
   return (
-    <div className={`flex min-h-screen ${dark ? 'bg-[#090b10] text-gray-100' : 'bg-[#fafafa] text-gray-900'}`}>
-      {sidebarOpen && <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+    <div className="flex min-h-screen bg-[#060a06] text-white">
+      {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
-      <aside className={`fixed top-0 left-0 h-full w-60 z-50 flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 border-r shadow-sm ${dark ? 'bg-[#090b10] border-[#252a33]' : 'bg-white border-gray-200'}`}>
-        <div className={`p-4 border-b flex items-center gap-3 ${dark ? 'border-[#252a33]' : 'border-gray-200'}`}>
+      <aside className={`fixed top-0 left-0 h-full w-60 z-50 flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 border-r border-[rgba(74,222,128,0.14)] bg-[#060a06]`}>
+        <div className="p-4 border-b border-[rgba(74,222,128,0.14)] flex items-center gap-3">
           {okul?.logo_url ? (
             <img src={activeOkul.logo_url} alt={activeOkul.ad} className="h-9 w-9 rounded-lg object-cover" />
           ) : (
-            <div className="w-9 h-9 bg-green-600 rounded-lg flex items-center justify-center text-sm font-bold text-white">
+            <div className="w-9 h-9 bg-[#4ade80] rounded-lg flex items-center justify-center text-sm font-bold text-black">
               {(activeOkul?.ad || 'Kinderly').split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase()}
             </div>
           )}
           <div>
-            <div className={`text-sm font-semibold ${dark ? 'text-white' : 'text-gray-900'}`}>{activeOkul?.ad || 'Kinderly'}</div>
-            <div className="text-xs text-gray-500">Yönetim Paneli</div>
+            <div className="text-sm font-semibold text-white">{activeOkul?.ad || 'Kinderly'}</div>
+            <div className="text-xs text-[rgba(255,255,255,0.54)]">Yönetim Paneli</div>
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto py-2">
           {navItems.map(item => (
             <button key={item.id} onClick={() => { setActivePage(item.id); setSidebarOpen(false) }}
               className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-all border-l-2 ${activePage === item.id
-                ? dark
-                  ? 'bg-[#1a1d23] text-white border-l-green-500'
-                  : 'bg-green-50 text-green-700 border-l-green-600'
-                : dark
-                  ? 'border-l-transparent text-gray-200 hover:bg-[#111317]'
-                  : 'border-l-transparent text-gray-600 hover:bg-gray-50'}`}>
-              <span className={`inline-flex h-6 min-w-6 items-center justify-center rounded-md ${dark ? 'bg-[#111317] text-gray-200' : 'bg-gray-100 text-gray-500'}`}>
+                ? 'bg-[rgba(74,222,128,0.08)] text-[#4ade80] border-l-[#4ade80]'
+                : 'border-l-transparent text-[rgba(255,255,255,0.7)] hover:bg-[#0b120b] hover:text-white'}`}>
+              <span className={`inline-flex h-6 min-w-6 items-center justify-center rounded-md ${activePage === item.id ? 'bg-[rgba(74,222,128,0.12)] text-[#4ade80]' : 'bg-[#0b120b] text-[rgba(255,255,255,0.54)]'}`}>
                 <item.icon size={14} strokeWidth={2} />
               </span>
               {item.label}
             </button>
           ))}
         </nav>
-        <div className={`p-3 border-t ${dark ? 'border-[#252a33]' : 'border-gray-200'}`}>
+        <div className="p-3 border-t border-[rgba(74,222,128,0.14)]">
           <button onClick={async () => { await signOut(); window.location.href = '/giris' }}
-            className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg ${dark ? 'text-gray-400 hover:bg-[#111317]' : 'text-gray-500 hover:bg-gray-50'}`}>
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-[rgba(255,255,255,0.54)] hover:bg-[#0b120b] hover:text-white transition-colors">
             Çıkış Yap
           </button>
         </div>
       </aside>
 
       <div className="flex-1 lg:ml-60 flex flex-col min-h-screen">
-        <header className={`px-4 h-14 flex items-center justify-between sticky top-0 z-30 border-b shadow-sm ${dark ? 'bg-[#090b10] border-[#252a33]' : 'bg-white border-gray-200'}`}>
+        <header className="px-4 h-14 flex items-center justify-between sticky top-0 z-30 border-b border-[rgba(74,222,128,0.14)] bg-[#060a06]">
           <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-gray-500 text-xl">☰</button>
-            <h1 className={`text-base font-semibold ${dark ? 'text-white' : 'text-gray-900'}`}>{navItems.find(n => n.id === activePage)?.label}</h1>
+            <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-[rgba(255,255,255,0.54)] text-xl">☰</button>
+            <h1 className="text-base font-semibold text-white">{navItems.find(n => n.id === activePage)?.label}</h1>
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <button onClick={() => setActivePage('yoklama')} className="bg-green-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">Yoklama Al</button>
+            <button onClick={() => setActivePage('yoklama')} className="bg-[#4ade80] text-black text-xs font-semibold px-3 py-1.5 rounded-lg">Yoklama Al</button>
           </div>
         </header>
 
@@ -235,33 +229,33 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
 
 function AdminSkeleton() {
   return (
-    <div className="flex min-h-screen bg-[#090b10]">
-      <aside className="hidden lg:flex w-60 flex-col border-r border-[#252a33] bg-[#090b10]">
-        <div className="p-4 border-b border-[#252a33] flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-[#1a1d23] animate-pulse" />
+    <div className="flex min-h-screen bg-[#060a06]">
+      <aside className="hidden lg:flex w-60 flex-col border-r border-[rgba(74,222,128,0.14)] bg-[#060a06]">
+        <div className="p-4 border-b border-[rgba(74,222,128,0.14)] flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-[#0b120b] animate-pulse" />
           <div className="flex-1 space-y-1.5">
-            <div className="h-3 rounded bg-[#1a1d23] animate-pulse w-24" />
-            <div className="h-2 rounded bg-[#1a1d23] animate-pulse w-16" />
+            <div className="h-3 rounded bg-[#0b120b] animate-pulse w-24" />
+            <div className="h-2 rounded bg-[#0b120b] animate-pulse w-16" />
           </div>
         </div>
         <div className="flex-1 py-2 space-y-1 px-2">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-9 rounded-lg bg-[#111317] animate-pulse" style={{ animationDelay: `${i * 40}ms` }} />
+            <div key={i} className="h-9 rounded-lg bg-[#0b120b] animate-pulse" style={{ animationDelay: `${i * 40}ms` }} />
           ))}
         </div>
       </aside>
       <div className="flex-1 flex flex-col">
-        <header className="h-14 border-b border-[#252a33] bg-[#090b10] flex items-center px-4 gap-3">
-          <div className="h-4 w-32 rounded bg-[#1a1d23] animate-pulse" />
+        <header className="h-14 border-b border-[rgba(74,222,128,0.14)] bg-[#060a06] flex items-center px-4 gap-3">
+          <div className="h-4 w-32 rounded bg-[#0b120b] animate-pulse" />
         </header>
         <main className="flex-1 p-6 space-y-4">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-24 rounded-xl bg-[#111317] animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
+              <div key={i} className="h-24 rounded-xl bg-[#0b120b] animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
             ))}
           </div>
-          <div className="h-64 rounded-xl bg-[#111317] animate-pulse" />
-          <div className="h-48 rounded-xl bg-[#111317] animate-pulse" />
+          <div className="h-64 rounded-xl bg-[#0b120b] animate-pulse" />
+          <div className="h-48 rounded-xl bg-[#0b120b] animate-pulse" />
         </main>
       </div>
     </div>
@@ -269,18 +263,18 @@ function AdminSkeleton() {
 }
 
 // ── YARDIMCI ──
-function Card({ children, dark, className = '' }: any) {
-  return <div className={`rounded-xl border shadow-sm overflow-hidden ${dark ? 'border-[#252a33] bg-[#111317]' : 'border-gray-200 bg-white'} ${className}`}>{children}</div>
+function Card({ children, dark: _dark, className = '' }: any) {
+  return <div className={`rounded-xl border shadow-sm overflow-hidden border-[rgba(74,222,128,0.14)] bg-[#0b120b] ${className}`}>{children}</div>
 }
 
-function Modal({ open, onClose, title, children, dark }: any) {
+function Modal({ open, onClose, title, children, dark: _dark }: any) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-      <div className={`rounded-xl w-full max-w-lg max-h-screen overflow-y-auto border shadow-sm ${dark ? 'bg-[#111317] border-[#252a33]' : 'bg-white border-gray-200'}`}>
-        <div className={`px-5 py-4 border-b flex items-center justify-between ${dark ? 'border-[#252a33]' : 'border-gray-200'}`}>
-          <h3 className={`font-semibold ${dark ? 'text-white' : 'text-gray-900'}`}>{title}</h3>
-          <button onClick={onClose} className="text-gray-400 text-xl">×</button>
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+      <div className="rounded-xl w-full max-w-lg max-h-screen overflow-y-auto border shadow-2xl bg-[#0b120b] border-[rgba(74,222,128,0.14)]">
+        <div className="px-5 py-4 border-b border-[rgba(74,222,128,0.14)] flex items-center justify-between">
+          <h3 className="font-semibold text-white">{title}</h3>
+          <button onClick={onClose} className="text-[rgba(255,255,255,0.54)] text-xl hover:text-white transition-colors">×</button>
         </div>
         {children}
       </div>
@@ -364,93 +358,93 @@ function Dashboard({ okul, ogrenciler, dark, setActivePage }: any) {
     <div>
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Hoş Geldiniz</h2>
-          <p className="text-sm text-gray-500">{new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+          <h2 className="text-xl font-bold text-white">Hoş Geldiniz</h2>
+          <p className="text-sm text-[rgba(255,255,255,0.54)]">{new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
         </div>
       </div>
 
       {alerjili.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-center gap-3">
+        <div className="bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.25)] rounded-lg p-3 mb-4 flex items-center gap-3">
           <span className="text-xl">⚠️</span>
           <div>
-            <p className="font-semibold text-sm text-red-600">Alerjisi Olan Öğrenciler ({alerjili.length})</p>
-            <p className="text-xs text-gray-500">{alerjili.map((o: Ogrenci) => o.ad_soyad.split(' ')[0] + ': ' + o.alerjiler).join(' · ')}</p>
+            <p className="font-semibold text-sm text-red-400">Alerjisi Olan Öğrenciler ({alerjili.length})</p>
+            <p className="text-xs text-[rgba(255,255,255,0.54)]">{alerjili.map((o: Ogrenci) => o.ad_soyad.split(' ')[0] + ': ' + o.alerjiler).join(' · ')}</p>
           </div>
         </div>
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         {[
-          { icon: 'Ö', label: 'Toplam Öğrenci', value: ogrenciler.length, color: 'text-green-700', page: 'ogrenciler' },
-          { icon: 'Y', label: 'Bugün Geldi', value: stats.geldi, color: 'text-green-700', page: 'yoklama' },
-          { icon: 'A', label: 'Geciken Aidat', value: stats.aidatKisi + ' kişi', color: 'text-green-700', page: 'aidat' },
-          { icon: 'E', label: 'Yaklaşan Etkinlik', value: stats.etkinlik, color: 'text-green-700', page: 'etkinlikler' },
+          { icon: 'Ö', label: 'Toplam Öğrenci', value: ogrenciler.length, page: 'ogrenciler' },
+          { icon: 'Y', label: 'Bugün Geldi', value: stats.geldi, page: 'yoklama' },
+          { icon: 'A', label: 'Geciken Aidat', value: stats.aidatKisi + ' kişi', page: 'aidat' },
+          { icon: 'E', label: 'Yaklaşan Etkinlik', value: stats.etkinlik, page: 'etkinlikler' },
         ].map(w => (
           <div key={w.label} onClick={() => setActivePage(w.page)}
-            className="rounded-xl p-4 border border-gray-200 bg-white cursor-pointer hover:shadow-sm transition-shadow">
-            <div className="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-green-50 px-2 text-xs font-semibold text-green-700 mb-2">{w.icon}</div>
-            <div className="text-xs text-gray-500 font-medium mb-1">{w.label}</div>
-            <div className={`text-2xl font-bold ${w.color}`}>{w.value}</div>
+            className="rounded-xl p-4 border border-[rgba(74,222,128,0.14)] bg-[#0b120b] cursor-pointer hover:border-[rgba(74,222,128,0.3)] hover:bg-[#0d160d] transition-all">
+            <div className="inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-[rgba(74,222,128,0.12)] px-2 text-xs font-semibold text-[#4ade80] mb-2">{w.icon}</div>
+            <div className="text-xs text-[rgba(255,255,255,0.54)] font-medium mb-1">{w.label}</div>
+            <div className="text-2xl font-bold text-[#4ade80]">{w.value}</div>
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card dark={dark}>
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="font-semibold text-sm text-gray-900">Yaklaşan Etkinlikler</h3>
-            <button onClick={() => setActivePage('etkinlikler')} className="text-xs text-green-700 font-medium">Tümü</button>
+          <div className="px-4 py-3 border-b border-[rgba(74,222,128,0.14)] flex items-center justify-between">
+            <h3 className="font-semibold text-sm text-white">Yaklaşan Etkinlikler</h3>
+            <button onClick={() => setActivePage('etkinlikler')} className="text-xs text-[#4ade80] font-medium">Tümü</button>
           </div>
           <div className="p-4">
             {events.length ? events.map(e => {
               const d = new Date(e.tarih)
-              return <div key={e.id} className="flex items-center gap-3 py-2 border-b last:border-0 border-gray-50">
-                <div className="bg-green-600 text-white rounded-lg px-2 py-1 text-center min-w-10 flex-shrink-0">
+              return <div key={e.id} className="flex items-center gap-3 py-2 border-b last:border-0 border-[rgba(74,222,128,0.08)]">
+                <div className="bg-[#4ade80] text-black rounded-lg px-2 py-1 text-center min-w-10 flex-shrink-0">
                   <div className="text-base font-bold leading-none">{d.getDate()}</div>
-                  <div className="text-xs opacity-80">{d.toLocaleDateString('tr-TR', { month: 'short' })}</div>
+                  <div className="text-xs opacity-70">{d.toLocaleDateString('tr-TR', { month: 'short' })}</div>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">{e.baslik}</p>
-                  <p className="text-xs text-gray-500">{e.hedef_kitle || ''}</p>
+                  <p className="text-sm font-semibold text-white">{e.baslik}</p>
+                  <p className="text-xs text-[rgba(255,255,255,0.54)]">{e.hedef_kitle || ''}</p>
                 </div>
               </div>
-            }) : <p className="text-sm text-gray-400">Yaklaşan etkinlik yok</p>}
+            }) : <p className="text-sm text-[rgba(255,255,255,0.54)]">Yaklaşan etkinlik yok</p>}
           </div>
         </Card>
 
         <Card dark={dark}>
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="font-semibold text-sm text-gray-900">Geciken Aidatlar</h3>
-            <button onClick={() => setActivePage('aidat')} className="text-xs text-green-700 font-medium">Tümü</button>
+          <div className="px-4 py-3 border-b border-[rgba(74,222,128,0.14)] flex items-center justify-between">
+            <h3 className="font-semibold text-sm text-white">Geciken Aidatlar</h3>
+            <button onClick={() => setActivePage('aidat')} className="text-xs text-[#4ade80] font-medium">Tümü</button>
           </div>
           <div className="p-4">
             {debts.length ? debts.map((a, i) => (
-              <div key={i} className="flex items-center justify-between py-2 border-b last:border-0 text-sm border-gray-50">
-                <span className="font-medium text-gray-900">{(a.ogrenciler as any)?.ad_soyad || '—'}</span>
-                <span className="text-red-500 font-semibold">{fmtM(a.tutar)}</span>
+              <div key={i} className="flex items-center justify-between py-2 border-b last:border-0 text-sm border-[rgba(74,222,128,0.08)]">
+                <span className="font-medium text-white">{(a.ogrenciler as any)?.ad_soyad || '—'}</span>
+                <span className="text-red-400 font-semibold">{fmtM(a.tutar)}</span>
               </div>
-            )) : <p className="text-sm text-green-700 font-semibold">✅ Tüm aidatlar ödendi!</p>}
+            )) : <p className="text-sm text-[#4ade80] font-semibold">✅ Tüm aidatlar ödendi!</p>}
           </div>
         </Card>
 
         <Card dark={dark}>
-          <div className={`px-4 py-3 border-b ${dark ? 'border-[#252a33]' : 'border-gray-100'}`}>
-            <h3 className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>⚡ Son Aktiviteler</h3>
+          <div className="px-4 py-3 border-b border-[rgba(74,222,128,0.14)]">
+            <h3 className="font-semibold text-sm text-white">⚡ Son Aktiviteler</h3>
           </div>
           <div className="p-4">
             {activities.length ? activities.map((a, i) => (
-              <div key={i} className={`flex items-center gap-3 py-2 border-b last:border-0 text-sm ${dark ? 'border-[#252a33]' : 'border-gray-50'}`}>
+              <div key={i} className="flex items-center gap-3 py-2 border-b last:border-0 text-sm border-[rgba(74,222,128,0.08)]">
                 <span>{AKT_E[a.tur] || '📋'}</span>
-                <span className={`flex-1 font-medium ${dark ? 'text-white' : ''}`}>{(a.ogrenciler as any)?.ad_soyad || '—'}</span>
-                <span className="text-gray-400 text-xs">{a.tarih}</span>
+                <span className="flex-1 font-medium text-white">{(a.ogrenciler as any)?.ad_soyad || '—'}</span>
+                <span className="text-[rgba(255,255,255,0.54)] text-xs">{a.tarih}</span>
               </div>
-            )) : <p className="text-sm text-gray-400">Aktivite yok</p>}
+            )) : <p className="text-sm text-[rgba(255,255,255,0.54)]">Aktivite yok</p>}
           </div>
         </Card>
 
         <Card dark={dark}>
-          <div className={`px-4 py-3 border-b ${dark ? 'border-[#252a33]' : 'border-gray-100'}`}>
-            <h3 className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>🎂 Bu Hafta Doğum Günleri</h3>
+          <div className="px-4 py-3 border-b border-[rgba(74,222,128,0.14)]">
+            <h3 className="font-semibold text-sm text-white">🎂 Bu Hafta Doğum Günleri</h3>
           </div>
           <div className="p-4">
             {ogrenciler.filter((o: Ogrenci) => {
@@ -466,10 +460,10 @@ function Dashboard({ okul, ogrenciler, dark, setActivePage }: any) {
               const thisYear = new Date(now.getFullYear(), bd.getMonth(), bd.getDate())
               const diff = Math.round((thisYear.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
               return (
-                <div key={o.id} className={`flex items-center gap-3 py-2 border-b last:border-0 ${dark ? 'border-[#252a33]' : 'border-gray-50'}`}>
+                <div key={o.id} className="flex items-center gap-3 py-2 border-b last:border-0 border-[rgba(74,222,128,0.08)]">
                   <span className="text-xl">🎂</span>
-                  <span className={`flex-1 text-sm font-medium ${dark ? 'text-white' : ''}`}>{o.ad_soyad}</span>
-                  <span className="text-xs text-orange-500 font-semibold">{diff === 0 ? '🎉 Bugün!' : diff + ' gün'}</span>
+                  <span className="flex-1 text-sm font-medium text-white">{o.ad_soyad}</span>
+                  <span className="text-xs text-orange-400 font-semibold">{diff === 0 ? '🎉 Bugün!' : diff + ' gün'}</span>
                 </div>
               )
             })}
@@ -480,7 +474,7 @@ function Dashboard({ okul, ogrenciler, dark, setActivePage }: any) {
               const thisYear = new Date(now.getFullYear(), bd.getMonth(), bd.getDate())
               const diff = Math.round((thisYear.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
               return diff >= 0 && diff <= 7
-            }) && <p className="text-sm text-gray-400">Bu hafta doğum günü yok</p>}
+            }) && <p className="text-sm text-[rgba(255,255,255,0.54)]">Bu hafta doğum günü yok</p>}
           </div>
         </Card>
       </div>
@@ -565,46 +559,46 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
     <div>
       <div className="flex gap-2 mb-4 flex-wrap">
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Öğrenci ara..."
-          className={`flex-1 min-w-48 border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+          className="flex-1 min-w-48 border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80] transition-colors" />
         <select value={sinifFilter} onChange={e => setSinifFilter(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300 bg-white'}`}>
+          className="border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80] transition-colors">
           <option value="">Tüm Sınıflar</option>
           {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
         </select>
-        <button onClick={exportCSV} className={`border px-4 py-2 rounded-lg text-sm font-semibold ${dark ? 'border-gray-600 text-gray-200' : 'border-gray-300 text-gray-600'}`}>📥 CSV</button>
-        <button onClick={openAdd} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">+ Ekle</button>
+        <button onClick={exportCSV} className="border border-[rgba(74,222,128,0.3)] px-4 py-2 rounded-lg text-sm font-semibold text-[rgba(255,255,255,0.7)] hover:text-white hover:border-[#4ade80] transition-colors">📥 CSV</button>
+        <button onClick={openAdd} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">+ Ekle</button>
       </div>
 
       <Card dark={dark}>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className={dark ? 'bg-[#1a1d23]' : 'bg-gray-50'}>
+              <tr className="bg-[#0d160d]">
                 {['Öğrenci', 'Sınıf', 'Veli', 'Telefon', 'Alerji', 'İşlem'].map(h => (
-                  <th key={h} className={`text-left px-4 py-3 text-xs font-semibold uppercase ${dark ? 'text-gray-400' : 'text-gray-500'}`}>{h}</th>
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase text-[rgba(255,255,255,0.54)]">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtered.map((o: Ogrenci) => (
-                <tr key={o.id} className={`border-t ${dark ? 'border-[#252a33] hover:bg-[#1a1d23]' : 'border-gray-100 hover:bg-gray-50'}`}>
+                <tr key={o.id} className="border-t border-[rgba(74,222,128,0.08)] hover:bg-[#0d160d] transition-colors">
                   <td className="px-4 py-3">
-                    <div className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>{o.ad_soyad}</div>
-                    {o.alerjiler && <div className="text-xs text-red-500 font-semibold">🚨 {o.alerjiler}</div>}
+                    <div className="font-semibold text-sm text-white">{o.ad_soyad}</div>
+                    {o.alerjiler && <div className="text-xs text-red-400 font-semibold">🚨 {o.alerjiler}</div>}
                   </td>
-                  <td className="px-4 py-3"><span className="bg-green-50 text-green-700 text-xs font-semibold px-2 py-1 rounded-full">{o.sinif || '—'}</span></td>
-                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-200' : 'text-gray-600'}`}>{o.veli_ad || '—'}</td>
-                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-200' : 'text-gray-600'}`}>{o.veli_telefon || '—'}</td>
-                  <td className="px-4 py-3">{o.alerjiler ? <span className="bg-red-100 text-red-600 text-xs font-semibold px-2 py-1 rounded-full">⚠️ Var</span> : <span className="text-gray-400 text-xs">Yok</span>}</td>
+                  <td className="px-4 py-3"><span className="bg-[rgba(74,222,128,0.12)] text-[#4ade80] text-xs font-semibold px-2 py-1 rounded-full">{o.sinif || '—'}</span></td>
+                  <td className="px-4 py-3 text-sm text-[rgba(255,255,255,0.7)]">{o.veli_ad || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-[rgba(255,255,255,0.7)]">{o.veli_telefon || '—'}</td>
+                  <td className="px-4 py-3">{o.alerjiler ? <span className="bg-[rgba(239,68,68,0.12)] text-red-400 text-xs font-semibold px-2 py-1 rounded-full">⚠️ Var</span> : <span className="text-[rgba(255,255,255,0.35)] text-xs">Yok</span>}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
-                      <button onClick={() => openEdit(o)} className="text-xs border border-gray-300 px-2 py-1 rounded hover:border-green-600 hover:text-green-700">✏️</button>
-                      <button onClick={() => deleteOgr(o.id)} className="text-xs bg-red-50 text-red-500 border border-red-200 px-2 py-1 rounded">🗑</button>
+                      <button onClick={() => openEdit(o)} className="text-xs border border-[rgba(74,222,128,0.2)] px-2 py-1 rounded text-[rgba(255,255,255,0.7)] hover:border-[#4ade80] hover:text-[#4ade80] transition-colors">✏️</button>
+                      <button onClick={() => deleteOgr(o.id)} className="text-xs bg-[rgba(239,68,68,0.1)] text-red-400 border border-[rgba(239,68,68,0.2)] px-2 py-1 rounded">🗑</button>
                     </div>
                   </td>
                 </tr>
               ))}
-              {!filtered.length && <tr><td colSpan={6} className="text-center py-8 text-gray-400 text-sm">Öğrenci bulunamadı</td></tr>}
+              {!filtered.length && <tr><td colSpan={6} className="text-center py-8 text-[rgba(255,255,255,0.35)] text-sm">Öğrenci bulunamadı</td></tr>}
             </tbody>
           </table>
         </div>
@@ -626,35 +620,35 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
             { label: 'Notlar', key: 'aciklama', full: true },
           ].map(f => (
             <div key={f.key} className={f.full ? 'col-span-2' : ''}>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">{f.label}</label>
+              <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">{f.label}</label>
               <input type={f.type || 'text'} value={form[f.key] || ''} onChange={e => setForm({ ...form, [f.key]: e.target.value })}
-                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
             </div>
           ))}
           <div className="col-span-2">
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Sınıf</label>
+            <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Sınıf</label>
             <select value={form.sinif || ''} onChange={e => setForm({ ...form, sinif: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300 bg-white'}`}>
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]`}>
               <option value="">— Seçin —</option>
               {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
             </select>
           </div>
           <div className="col-span-2">
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Kan Grubu</label>
+            <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Kan Grubu</label>
             <select value={form.kan_grubu || ''} onChange={e => setForm({ ...form, kan_grubu: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300 bg-white'}`}>
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]`}>
               {['—', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', '0+', '0-'].map(v => <option key={v} value={v}>{v}</option>)}
             </select>
           </div>
         </div>
         {saveError && (
           <div className="px-5 pb-3">
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{saveError}</p>
+            <p className="text-sm text-red-400 bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.25)] rounded-lg px-3 py-2">{saveError}</p>
           </div>
         )}
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#252a33]' : 'border-gray-200'}`}>
-          <button onClick={() => setModal(false)} disabled={saving} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600 disabled:opacity-50">İptal</button>
-          <button onClick={save} disabled={saving} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60 min-w-[80px]">
+        <div className={`px-5 py-4 border-t flex justify-end gap-2 border-[rgba(74,222,128,0.14)]`}>
+          <button onClick={() => setModal(false)} disabled={saving} className="border border-[rgba(74,222,128,0.2)] px-4 py-2 rounded-lg text-sm text-[rgba(255,255,255,0.6)] hover:border-[rgba(74,222,128,0.4)] transition-colors disabled:opacity-50">İptal</button>
+          <button onClick={save} disabled={saving} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60 min-w-[80px]">
             {saving ? 'Kaydediliyor...' : 'Kaydet'}
           </button>
         </div>
@@ -700,17 +694,17 @@ function Yoklama({ ogrenciler, siniflar, okul, dark }: any) {
     <div>
       <div className="flex gap-2 mb-4 flex-wrap items-center">
         <input type="date" value={tarih} onChange={e => setTarih(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+          className={`border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
         <select value={sinifFilter} onChange={e => setSinifFilter(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300 bg-white'}`}>
+          className={`border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]`}>
           <option value="">Tüm Sınıflar</option>
           {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
         </select>
-        <button onClick={sendWA} className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-semibold">📱 WhatsApp</button>
-        <button onClick={save} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">💾 Kaydet</button>
+        <button onClick={sendWA} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">📱 WhatsApp</button>
+        <button onClick={save} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">💾 Kaydet</button>
         <div className="ml-auto flex gap-4 text-sm font-semibold">
-          <span className="text-green-700">✅ {counts.geldi}</span>
-          <span className="text-red-500">❌ {counts.gelmedi}</span>
+          <span className="text-[#4ade80]">✅ {counts.geldi}</span>
+          <span className="text-red-400">❌ {counts.gelmedi}</span>
           <span className="text-orange-500">🏖️ {counts.izinli}</span>
         </div>
       </div>
@@ -718,13 +712,13 @@ function Yoklama({ ogrenciler, siniflar, okul, dark }: any) {
         {filtered.map((o: Ogrenci) => {
           const d = state[o.id] || ''
           return (
-            <div key={o.id} className={`border-2 rounded-xl p-3 text-center transition-all ${d === 'geldi' ? 'border-green-300 bg-green-50' : d === 'gelmedi' ? 'border-red-400 bg-red-50' : d === 'izinli' ? 'border-orange-400 bg-orange-50' : dark ? 'border-gray-600 bg-[#111317]' : 'border-gray-200 bg-white'}`}>
+            <div key={o.id} className={`border-2 rounded-xl p-3 text-center transition-all ${d === 'geldi' ? 'border-[rgba(74,222,128,0.5)] bg-[rgba(74,222,128,0.08)]' : d === 'gelmedi' ? 'border-[rgba(239,68,68,0.5)] bg-[rgba(239,68,68,0.08)]' : d === 'izinli' ? 'border-orange-400/50 bg-orange-400/10' : 'border-[rgba(74,222,128,0.14)] bg-[#0b120b]'}`}>
               <div className="text-2xl mb-1">🌸</div>
-              <div className={`text-xs font-semibold mb-2 ${dark ? 'text-white' : ''}`}>{o.ad_soyad.split(' ')[0]}</div>
+              <div className="text-xs font-semibold mb-2 text-white">{o.ad_soyad.split(' ')[0]}</div>
               <div className="flex gap-1 justify-center">
-                {[['geldi','✓','bg-green-600'],['gelmedi','✗','bg-red-500'],['izinli','İ','bg-orange-400']].map(([val,label,color]) => (
+                {[['geldi','✓','bg-[#4ade80] text-black'],['gelmedi','✗','bg-red-500 text-white'],['izinli','İ','bg-orange-400 text-white']].map(([val,label,color]) => (
                   <button key={val} onClick={() => setState(s => ({ ...s, [o.id]: val }))}
-                    className={`text-xs px-2 py-1 rounded font-bold transition-all ${d === val ? color + ' text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    className={`text-xs px-2 py-1 rounded font-bold transition-all ${d === val ? color : 'bg-[#0d160d] text-[rgba(255,255,255,0.54)]'}`}>
                     {label}
                   </button>
                 ))}
@@ -768,18 +762,18 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <Card dark={dark}>
-        <div className={`px-4 py-3 border-b font-semibold text-sm ${dark ? 'border-[#252a33] text-white' : 'border-gray-100'}`}>👦 Öğrenci Seç</div>
+        <div className={`px-4 py-3 border-b font-semibold text-sm border-[rgba(74,222,128,0.14)] text-white`}>👦 Öğrenci Seç</div>
         <div className="p-2">
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Ara..."
-            className={`w-full border rounded-lg px-3 py-2 text-sm outline-none mb-2 ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+            className={`w-full border rounded-lg px-3 py-2 text-sm outline-none mb-2 bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
           <div className="max-h-80 overflow-y-auto">
             {filtered.map((o: Ogrenci) => (
               <div key={o.id} onClick={() => setSelected(o)}
-                className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer ${selected?.id === o.id ? 'bg-green-50' : dark ? 'hover:bg-[#1a1d23]' : 'hover:bg-gray-50'}`}>
+                className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer ${selected?.id === o.id ? 'bg-[rgba(74,222,128,0.1)]' : 'hover:bg-[#0d160d]'}`}>
                 <span className="text-lg">🌸</span>
                 <div>
-                  <div className={`text-sm font-medium ${dark ? 'text-white' : ''}`}>{o.ad_soyad}</div>
-                  <div className="text-xs text-gray-400">{o.sinif || ''}</div>
+                  <div className={`text-sm font-medium text-white`}>{o.ad_soyad}</div>
+                  <div className="text-xs text-[rgba(255,255,255,0.54)]">{o.sinif || ''}</div>
                 </div>
               </div>
             ))}
@@ -789,7 +783,7 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
 
       <div className="lg:col-span-2 space-y-4">
         <Card dark={dark}>
-          <div className={`px-4 py-3 border-b font-semibold text-sm ${dark ? 'border-[#252a33] text-white' : 'border-gray-100'}`}>
+          <div className={`px-4 py-3 border-b font-semibold text-sm border-[rgba(74,222,128,0.14)] text-white`}>
             {selected ? selected.ad_soyad : 'Öğrenci seçin'}
           </div>
           <div className="p-4 grid grid-cols-3 sm:grid-cols-5 gap-2">
@@ -805,22 +799,22 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
         </Card>
 
         <Card dark={dark}>
-          <div className={`px-4 py-3 border-b flex items-center justify-between ${dark ? 'border-[#252a33]' : 'border-gray-100'}`}>
-            <span className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>📋 Aktivite Geçmişi</span>
+          <div className={`px-4 py-3 border-b flex items-center justify-between border-[rgba(74,222,128,0.14)]`}>
+            <span className={`font-semibold text-sm text-white`}>📋 Aktivite Geçmişi</span>
             <input type="date" value={tarih} onChange={e => setTarih(e.target.value)}
-              className={`border rounded-lg px-2 py-1 text-xs outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+              className={`border rounded-lg px-2 py-1 text-xs outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
           </div>
           <div>
             {feed.length ? feed.map(a => {
               const tp = AKT_TYPES.find(x => x.id === a.tur)
-              return <div key={a.id} className={`flex items-center gap-3 px-4 py-3 border-b last:border-0 ${dark ? 'border-[#252a33]' : 'border-gray-50'}`}>
+              return <div key={a.id} className={`flex items-center gap-3 px-4 py-3 border-b last:border-0 ${dark ? 'border-[rgba(74,222,128,0.14)]' : 'border-gray-50'}`}>
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base flex-shrink-0" style={{ background: tp?.color || '#9e9e9e' }}>{tp?.emoji || '📋'}</div>
                 <div>
-                  <div className={`text-sm font-medium ${dark ? 'text-white' : ''}`}>{tp?.label || a.tur}{a.detay?.not ? ' · ' + a.detay.not : ''}</div>
-                  <div className="text-xs text-gray-400">{a.kaydeden}</div>
+                  <div className={`text-sm font-medium text-white`}>{tp?.label || a.tur}{a.detay?.not ? ' · ' + a.detay.not : ''}</div>
+                  <div className="text-xs text-[rgba(255,255,255,0.54)]">{a.kaydeden}</div>
                 </div>
               </div>
-            }) : <div className="text-center py-8 text-gray-400 text-sm">Aktivite yok</div>}
+            }) : <div className="text-center py-8 text-[rgba(255,255,255,0.35)] text-sm">Aktivite yok</div>}
           </div>
         </Card>
       </div>
@@ -829,50 +823,50 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
         <div className="p-5 space-y-3">
           {aktType === 'food' && <>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-2">ÖĞÜN</label>
+              <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-2">ÖĞÜN</label>
               <div className="flex gap-2 flex-wrap">
                 {['Kahvaltı','Kuşluk','Öğle','İkindi'].map(v => (
                   <button key={v} onClick={() => setForm({...form, ogun: v})}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${form.ogun === v ? 'bg-green-600 text-white border-green-600' : 'border-gray-300 text-gray-600'}`}>{v}</button>
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${form.ogun === v ? 'bg-[#4ade80] text-black border-[#4ade80]' : 'border-[rgba(74,222,128,0.2)] text-[rgba(255,255,255,0.7)]'}`}>{v}</button>
                 ))}
               </div>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-2">NE KADAR YEDİ?</label>
+              <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-2">NE KADAR YEDİ?</label>
               <div className="flex gap-2 flex-wrap">
                 {['Hepsini','Çoğunu','Birazını','Hiç'].map(v => (
                   <button key={v} onClick={() => setForm({...form, yeme: v})}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${form.yeme === v ? 'bg-green-600 text-white border-green-600' : 'border-gray-300 text-gray-600'}`}>{v}</button>
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${form.yeme === v ? 'bg-[#4ade80] text-black border-[#4ade80]' : 'border-[rgba(74,222,128,0.2)] text-[rgba(255,255,255,0.7)]'}`}>{v}</button>
                 ))}
               </div>
             </div>
           </>}
           {aktType === 'health' && <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Ateş (°C)</label>
+            <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Ateş (°C)</label>
             <input type="number" step="0.1" value={form.ates || ''} onChange={e => setForm({...form, ates: e.target.value})}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
           </div>}
           {aktType === 'meds' && <>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">İlaç Adı *</label>
+              <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">İlaç Adı *</label>
               <input value={form.ilac || ''} onChange={e => setForm({...form, ilac: e.target.value})}
-                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Doz</label>
+              <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Doz</label>
               <input value={form.doz || ''} onChange={e => setForm({...form, doz: e.target.value})}
-                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
             </div>
           </>}
           <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Not</label>
+            <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Not</label>
             <textarea value={form.not || ''} onChange={e => setForm({...form, not: e.target.value}) }
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none resize-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} rows={3} />
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none resize-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} rows={3} />
           </div>
         </div>
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#252a33]' : 'border-gray-200'}`}>
-          <button onClick={() => setModal(false)} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600">İptal</button>
-          <button onClick={saveAkt} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
+        <div className={`px-5 py-4 border-t flex justify-end gap-2 border-[rgba(74,222,128,0.14)]`}>
+          <button onClick={() => setModal(false)} className="border border-[rgba(74,222,128,0.2)] px-4 py-2 rounded-lg text-sm text-[rgba(255,255,255,0.6)] hover:border-[rgba(74,222,128,0.4)] transition-colors">İptal</button>
+          <button onClick={saveAkt} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
         </div>
       </Modal>
     </div>
@@ -911,9 +905,9 @@ function GunlukRaporPage({ ogrenciler, siniflar, okul, dark }: any) {
     <div>
       <div className="flex gap-2 mb-4 flex-wrap items-center">
         <input type="date" value={tarih} onChange={e => setTarih(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+          className={`border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
         <select value={sinifFilter} onChange={e => setSinifFilter(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300 bg-white'}`}>
+          className={`border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]`}>
           <option value="">Tüm Sınıflar</option>
           {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
         </select>
@@ -923,10 +917,10 @@ function GunlukRaporPage({ ogrenciler, siniflar, okul, dark }: any) {
           const r = raporlar[o.id] || {}
           return (
             <Card key={o.id} dark={dark}>
-              <div className={`px-4 py-3 border-b flex items-center gap-3 ${dark ? 'border-[#252a33]' : 'border-gray-100'}`}>
+              <div className={`px-4 py-3 border-b flex items-center gap-3 border-[rgba(74,222,128,0.14)]`}>
                 <span className="text-xl">🌸</span>
-                <span className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>{o.ad_soyad}</span>
-                <span className="text-xs text-gray-400">{o.sinif}</span>
+                <span className={`font-semibold text-sm text-white`}>{o.ad_soyad}</span>
+                <span className="text-xs text-[rgba(255,255,255,0.54)]">{o.sinif}</span>
               </div>
               <div className="p-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
@@ -936,22 +930,22 @@ function GunlukRaporPage({ ogrenciler, siniflar, okul, dark }: any) {
                   { label: '😊 Ruh Hali', key: 'ruh_hali', placeholder: 'Nasıldı?' },
                 ].map(f => (
                   <div key={f.key}>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1">{f.label}</label>
+                    <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">{f.label}</label>
                     <input
                       defaultValue={r[f.key] || ''}
                       placeholder={f.placeholder}
                       onBlur={e => saveRapor(o.id, { ...r, [f.key]: e.target.value })}
-                      className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`}
+                      className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`}
                     />
                   </div>
                 ))}
                 <div className="col-span-2 lg:col-span-4">
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">📝 Açıklama</label>
+                  <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">📝 Açıklama</label>
                   <input
                     defaultValue={r.aciklama || ''}
                     placeholder="Günle ilgili not..."
                     onBlur={e => saveRapor(o.id, { ...r, aciklama: e.target.value })}
-                    className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`}
+                    className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`}
                   />
                 </div>
               </div>
@@ -1004,50 +998,50 @@ function GelisimPage({ ogrenciler, okul, dark }: any) {
     <div>
       <div className="flex gap-2 mb-4 flex-wrap items-center">
         <select value={selectedOgr} onChange={e => setSelectedOgr(Number(e.target.value))}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300 bg-white'}`}>
+          className={`border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]`}>
           <option value="">— Öğrenci Seç —</option>
           {ogrenciler.map((o: Ogrenci) => <option key={o.id} value={o.id}>{o.ad_soyad}</option>)}
         </select>
         <select value={donem} onChange={e => setDonem(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300 bg-white'}`}>
+          className={`border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]`}>
           <option>2025-2026 1. Dönem</option>
           <option>2025-2026 2. Dönem</option>
         </select>
-        {selectedOgr && <button onClick={() => { setPuanlar({}); setGenelNot(''); setModal(true) }} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">+ Rapor Ekle</button>}
+        {selectedOgr && <button onClick={() => { setPuanlar({}); setGenelNot(''); setModal(true) }} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">+ Rapor Ekle</button>}
       </div>
 
       {data.length > 0 && (
         <Card dark={dark}>
-          <div className={`px-4 py-3 border-b ${dark ? 'border-[#252a33]' : 'border-gray-100'}`}>
-            <h3 className={`font-semibold ${dark ? 'text-white' : ''}`}>{donem}</h3>
+          <div className={`px-4 py-3 border-b border-[rgba(74,222,128,0.14)]`}>
+            <h3 className={`font-semibold text-white`}>{donem}</h3>
           </div>
           <div className="p-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
             {GEL_CATS.map(k => {
               const d = data.find(x => x.kategori === k.id)
               return (
-                <div key={k.id} className={`rounded-lg p-3 ${dark ? 'bg-[#1a1d23]' : 'bg-gray-50'}`}>
-                  <div className="text-xs font-semibold text-gray-500 mb-1">{k.ad}</div>
+                <div key={k.id} className="rounded-lg p-3 bg-[#0d160d]">
+                  <div className="text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">{k.ad}</div>
                   <div className="text-lg">{'⭐'.repeat(d?.puan || 0)}{'☆'.repeat(5 - (d?.puan || 0))}</div>
                 </div>
               )
             })}
           </div>
           {data.find(x => x.kategori === 'genel')?.not_text && (
-            <div className={`mx-4 mb-4 p-3 rounded-lg border-l-4 border-green-600 ${dark ? 'bg-[#1a1d23]' : 'bg-green-50'}`}>
-              <p className={`text-sm ${dark ? 'text-white' : ''}`}>📝 {data.find(x => x.kategori === 'genel')?.not_text}</p>
+            <div className="mx-4 mb-4 p-3 rounded-lg border-l-4 border-[#4ade80] bg-[#0d160d]">
+              <p className={`text-sm text-white`}>📝 {data.find(x => x.kategori === 'genel')?.not_text}</p>
             </div>
           )}
         </Card>
       )}
 
-      {!selectedOgr && <div className="text-center py-16 text-gray-400">📈 Öğrenci seçin</div>}
-      {selectedOgr && !data.length && <div className="text-center py-16 text-gray-400">📈 Bu dönem için rapor yok</div>}
+      {!selectedOgr && <div className="text-center py-16 text-[rgba(255,255,255,0.35)]">📈 Öğrenci seçin</div>}
+      {selectedOgr && !data.length && <div className="text-center py-16 text-[rgba(255,255,255,0.35)]">📈 Bu dönem için rapor yok</div>}
 
       <Modal open={modal} onClose={() => setModal(false)} title="Gelişim Raporu Ekle" dark={dark}>
         <div className="p-5 space-y-3">
           {GEL_CATS.map(k => (
             <div key={k.id} className="flex items-center gap-3">
-              <span className={`flex-1 text-sm font-medium ${dark ? 'text-white' : ''}`}>{k.ad}</span>
+              <span className={`flex-1 text-sm font-medium text-white`}>{k.ad}</span>
               <div className="flex gap-1">
                 {[1,2,3,4,5].map(i => (
                   <button key={i} onClick={() => setPuanlar(p => ({ ...p, [k.id]: i }))}
@@ -1059,14 +1053,14 @@ function GelisimPage({ ogrenciler, okul, dark }: any) {
             </div>
           ))}
           <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Genel Değerlendirme</label>
+            <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Genel Değerlendirme</label>
             <textarea value={genelNot} onChange={e => setGenelNot(e.target.value)}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none resize-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} rows={3} />
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none resize-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} rows={3} />
           </div>
         </div>
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#252a33]' : 'border-gray-200'}`}>
-          <button onClick={() => setModal(false)} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600">İptal</button>
-          <button onClick={save} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
+        <div className={`px-5 py-4 border-t flex justify-end gap-2 border-[rgba(74,222,128,0.14)]`}>
+          <button onClick={() => setModal(false)} className="border border-[rgba(74,222,128,0.2)] px-4 py-2 rounded-lg text-sm text-[rgba(255,255,255,0.6)] hover:border-[rgba(74,222,128,0.4)] transition-colors">İptal</button>
+          <button onClick={save} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
         </div>
       </Modal>
     </div>
@@ -1152,7 +1146,7 @@ function Fotograflar({ siniflar, okul, dark }: any) {
         </div>
       )}
       <div className="flex justify-end mb-4">
-        <button onClick={() => { setFiles([]); setForm({}); setModal(true) }} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">+ Fotoğraf Ekle</button>
+        <button onClick={() => { setFiles([]); setForm({}); setModal(true) }} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">+ Fotoğraf Ekle</button>
       </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {fotos.map(f => (
@@ -1172,34 +1166,34 @@ function Fotograflar({ siniflar, okul, dark }: any) {
               className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">×</button>
           </div>
         ))}
-        {!fotos.length && <div className="col-span-4 text-center py-16 text-gray-400">📷 Fotoğraf yok</div>}
+        {!fotos.length && <div className="col-span-4 text-center py-16 text-[rgba(255,255,255,0.35)]">📷 Fotoğraf yok</div>}
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)} title="Fotoğraf Ekle" dark={dark}>
         <div className="p-5 space-y-3">
           <div onClick={() => document.getElementById('foto-input')?.click()}
-            className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-green-500">
+            className="border-2 border-dashed border-[rgba(74,222,128,0.3)] rounded-xl p-6 text-center cursor-pointer hover:border-[#4ade80] transition-colors">
             <div className="text-3xl mb-2">📷</div>
             <p className="text-sm font-medium">{files.length ? files.length + ' dosya seçildi' : 'Fotoğraf Seç'}</p>
             <input id="foto-input" type="file" accept="image/*" multiple className="hidden" onChange={e => setFiles(Array.from(e.target.files || []))} />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Açıklama</label>
+            <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Açıklama</label>
             <input value={form.aciklama || ''} onChange={e => setForm({ ...form, aciklama: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Sınıf</label>
+            <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Sınıf</label>
             <select value={form.sinif || ''} onChange={e => setForm({ ...form, sinif: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300 bg-white'}`}>
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]`}>
               <option value="">Tüm okul</option>
               {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
             </select>
           </div>
         </div>
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#252a33]' : 'border-gray-200'}`}>
-          <button onClick={() => setModal(false)} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600">İptal</button>
-          <button onClick={upload} disabled={uploading} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60">
+        <div className={`px-5 py-4 border-t flex justify-end gap-2 border-[rgba(74,222,128,0.14)]`}>
+          <button onClick={() => setModal(false)} className="border border-[rgba(74,222,128,0.2)] px-4 py-2 rounded-lg text-sm text-[rgba(255,255,255,0.6)] hover:border-[rgba(74,222,128,0.4)] transition-colors">İptal</button>
+          <button onClick={upload} disabled={uploading} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60">
             {uploading ? '⏳ Yükleniyor...' : '💾 Yükle'}
           </button>
         </div>
@@ -1251,14 +1245,14 @@ function AidatPage({ ogrenciler, okul, dark }: any) {
     <div>
       <div className="flex gap-2 mb-4 flex-wrap items-center">
         <input type="month" value={ay} onChange={e => setAy(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
-        <button onClick={generate} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">📋 Ay Oluştur</button>
-        <button onClick={sendWA} className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-semibold">📱 WA Hatırlatma</button>
+          className={`border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
+        <button onClick={generate} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">📋 Ay Oluştur</button>
+        <button onClick={sendWA} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">📱 WA Hatırlatma</button>
       </div>
       <div className="grid grid-cols-3 gap-3 mb-4">
-        {[['TOPLAM', toplam, 'text-green-700'], ['ÖDENEN', odenen, 'text-green-700'], ['BEKLEYEN', toplam - odenen, 'text-red-500']].map(([l, v, c]) => (
+        {[['TOPLAM', toplam, 'text-[#4ade80]'], ['ÖDENEN', odenen, 'text-[#4ade80]'], ['BEKLEYEN', toplam - odenen, 'text-red-400']].map(([l, v, c]) => (
           <Card key={l as string} dark={dark} className="p-4 text-center">
-            <div className="text-xs text-gray-500 font-semibold mb-1">{l}</div>
+            <div className="text-xs text-[rgba(255,255,255,0.54)] font-semibold mb-1">{l}</div>
             <div className={`text-xl font-bold ${c}`}>{fmtM(Number(v))}</div>
           </Card>
         ))}
@@ -1267,29 +1261,29 @@ function AidatPage({ ogrenciler, okul, dark }: any) {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className={dark ? 'bg-[#1a1d23]' : 'bg-gray-50'}>
+              <tr className="bg-[#0d160d]">
                 {['Öğrenci', 'Veli', 'Tutar', 'Durum', 'Tarih', 'İşlem'].map(h => (
-                  <th key={h} className={`text-left px-4 py-3 text-xs font-semibold uppercase ${dark ? 'text-gray-400' : 'text-gray-500'}`}>{h}</th>
+                  <th key={h} className={`text-left px-4 py-3 text-xs font-semibold uppercase text-[rgba(255,255,255,0.54)]`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {data.map(a => (
-                <tr key={a.id} className={`border-t ${dark ? 'border-[#252a33]' : 'border-gray-100'}`}>
-                  <td className={`px-4 py-3 text-sm font-semibold ${dark ? 'text-white' : ''}`}>{(a.ogrenciler as any)?.ad_soyad || '—'}</td>
-                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-200' : 'text-gray-600'}`}>{(a.ogrenciler as any)?.veli_ad || '—'}</td>
-                  <td className={`px-4 py-3 text-sm font-semibold ${dark ? 'text-white' : ''}`}>{fmtM(a.tutar)}</td>
-                  <td className="px-4 py-3">{a.odendi ? <span className="bg-green-50 text-green-700 text-xs font-semibold px-2 py-1 rounded-full">✅ Ödendi</span> : <span className="bg-red-100 text-red-600 text-xs font-semibold px-2 py-1 rounded-full">⏳ Bekliyor</span>}</td>
-                  <td className={`px-4 py-3 text-xs ${dark ? 'text-gray-400' : 'text-gray-500'}`}>{a.odeme_tarihi || '—'}</td>
+                <tr key={a.id} className={`border-t border-[rgba(74,222,128,0.14)]`}>
+                  <td className={`px-4 py-3 text-sm font-semibold text-white`}>{(a.ogrenciler as any)?.ad_soyad || '—'}</td>
+                  <td className={`px-4 py-3 text-sm text-[rgba(255,255,255,0.7)]`}>{(a.ogrenciler as any)?.veli_ad || '—'}</td>
+                  <td className={`px-4 py-3 text-sm font-semibold text-white`}>{fmtM(a.tutar)}</td>
+                  <td className="px-4 py-3">{a.odendi ? <span className="bg-[rgba(74,222,128,0.12)] text-[#4ade80] text-xs font-semibold px-2 py-1 rounded-full">✅ Ödendi</span> : <span className="bg-[rgba(239,68,68,0.12)] text-red-400 text-xs font-semibold px-2 py-1 rounded-full">⏳ Bekliyor</span>}</td>
+                  <td className={`px-4 py-3 text-xs text-[rgba(255,255,255,0.54)]`}>{a.odeme_tarihi || '—'}</td>
                   <td className="px-4 py-3">
                     {!a.odendi
-                      ? <button onClick={() => markOdendi(a.id, a.tutar)} className="bg-green-600 text-white text-xs px-3 py-1.5 rounded-lg font-semibold">✓ Ödendi</button>
-                      : <button onClick={async () => { await supabase.from('aidatlar').update({ odendi: false, odeme_tarihi: null }).eq('id', a.id); load() }} className="bg-red-50 text-red-500 border border-red-200 text-xs px-3 py-1.5 rounded-lg">✗ İptal</button>
+                      ? <button onClick={() => markOdendi(a.id, a.tutar)} className="bg-[#4ade80] text-black text-xs px-3 py-1.5 rounded-lg font-semibold">✓ Ödendi</button>
+                      : <button onClick={async () => { await supabase.from('aidatlar').update({ odendi: false, odeme_tarihi: null }).eq('id', a.id); load() }} className="bg-[rgba(239,68,68,0.1)] text-red-400 border border-[rgba(239,68,68,0.2)] text-xs px-3 py-1.5 rounded-lg">✗ İptal</button>
                     }
                   </td>
                 </tr>
               ))}
-              {!data.length && <tr><td colSpan={6} className="text-center py-8 text-gray-400 text-sm">Bu ay için aidat oluşturulmamış</td></tr>}
+              {!data.length && <tr><td colSpan={6} className="text-center py-8 text-[rgba(255,255,255,0.35)] text-sm">Bu ay için aidat oluşturulmamış</td></tr>}
             </tbody>
           </table>
         </div>
@@ -1346,35 +1340,35 @@ function YemekListesi({ okul, dark }: any) {
     <div>
       <div className="flex gap-2 mb-4 items-center flex-wrap">
         <button onClick={() => { const d = new Date(hafta); d.setDate(d.getDate() - 7); setHafta(d.toISOString().split('T')[0]) }}
-          className={`border px-3 py-2 rounded-lg text-sm ${dark ? 'border-gray-600 text-gray-200' : 'border-gray-300'}`}>‹</button>
-        <span className={`text-sm font-medium flex-1 text-center ${dark ? 'text-white' : ''}`}>{new Date(hafta).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} haftası</span>
+          className={`border px-3 py-2 rounded-lg text-sm border-[rgba(74,222,128,0.2)] text-[rgba(255,255,255,0.7)]`}>‹</button>
+        <span className={`text-sm font-medium flex-1 text-center text-white`}>{new Date(hafta).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} haftası</span>
         <button onClick={() => { const d = new Date(hafta); d.setDate(d.getDate() + 7); setHafta(d.toISOString().split('T')[0]) }}
-          className={`border px-3 py-2 rounded-lg text-sm ${dark ? 'border-gray-600 text-gray-200' : 'border-gray-300'}`}>›</button>
-        <button onClick={sendWA} className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-semibold">📱 WA</button>
+          className={`border px-3 py-2 rounded-lg text-sm border-[rgba(74,222,128,0.2)] text-[rgba(255,255,255,0.7)]`}>›</button>
+        <button onClick={sendWA} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">📱 WA</button>
       </div>
       <Card dark={dark}>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className={dark ? 'bg-[#1a1d23]' : 'bg-gray-50'}>
+              <tr className="bg-[#0d160d]">
                 {['Gün', 'Kahvaltı', 'Öğle', 'İkindi', ''].map(h => (
-                  <th key={h} className={`text-left px-4 py-3 text-xs font-semibold ${dark ? 'text-gray-400' : 'text-gray-500'}`}>{h}</th>
+                  <th key={h} className={`text-left px-4 py-3 text-xs font-semibold text-[rgba(255,255,255,0.54)]`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {rows.map(r => (
-                <tr key={r.tarih} className={`border-t ${dark ? 'border-[#252a33]' : 'border-gray-100'}`}>
+                <tr key={r.tarih} className={`border-t border-[rgba(74,222,128,0.14)]`}>
                   <td className="px-4 py-3">
-                    <div className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>{r.gun}</div>
-                    <div className="text-xs text-gray-400">{r.tarih}</div>
+                    <div className={`font-semibold text-sm text-white`}>{r.gun}</div>
+                    <div className="text-xs text-[rgba(255,255,255,0.54)]">{r.tarih}</div>
                   </td>
-                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-200' : 'text-gray-600'}`}>{r.yemek.kahvalti || <span className="text-gray-200">—</span>}</td>
-                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-200' : 'text-gray-600'}`}>{r.yemek.ogle || <span className="text-gray-200">—</span>}</td>
-                  <td className={`px-4 py-3 text-sm ${dark ? 'text-gray-200' : 'text-gray-600'}`}>{r.yemek.ikindi || <span className="text-gray-200">—</span>}</td>
+                  <td className={`px-4 py-3 text-sm text-[rgba(255,255,255,0.7)]`}>{r.yemek.kahvalti || <span className="text-[rgba(255,255,255,0.35)]">—</span>}</td>
+                  <td className={`px-4 py-3 text-sm text-[rgba(255,255,255,0.7)]`}>{r.yemek.ogle || <span className="text-[rgba(255,255,255,0.35)]">—</span>}</td>
+                  <td className={`px-4 py-3 text-sm text-[rgba(255,255,255,0.7)]`}>{r.yemek.ikindi || <span className="text-[rgba(255,255,255,0.35)]">—</span>}</td>
                   <td className="px-4 py-3">
                     <button onClick={() => { setForm({ tarih: r.tarih, kahvalti: r.yemek.kahvalti || '', ogle: r.yemek.ogle || '', ikindi: r.yemek.ikindi || '' }); setModal(true) }}
-                      className={`text-xs border px-2 py-1 rounded hover:border-green-600 hover:text-green-700 ${dark ? 'border-gray-600 text-gray-200' : 'border-gray-300'}`}>✏️</button>
+                      className="text-xs border border-[rgba(74,222,128,0.2)] px-2 py-1 rounded text-[rgba(255,255,255,0.7)] hover:border-[#4ade80] hover:text-[#4ade80] transition-colors">✏️</button>
                   </td>
                 </tr>
               ))}
@@ -1387,15 +1381,15 @@ function YemekListesi({ okul, dark }: any) {
         <div className="p-5 space-y-3">
           {[['kahvalti','🍳 Kahvaltı'],['ogle','🍽️ Öğle'],['ikindi','🍪 İkindi']].map(([k,l]) => (
             <div key={k}>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">{l}</label>
+              <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">{l}</label>
               <input value={form[k] || ''} onChange={e => setForm({ ...form, [k]: e.target.value })}
-                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
             </div>
           ))}
         </div>
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#252a33]' : 'border-gray-200'}`}>
-          <button onClick={() => setModal(false)} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600">İptal</button>
-          <button onClick={save} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
+        <div className={`px-5 py-4 border-t flex justify-end gap-2 border-[rgba(74,222,128,0.14)]`}>
+          <button onClick={() => setModal(false)} className="border border-[rgba(74,222,128,0.2)] px-4 py-2 rounded-lg text-sm text-[rgba(255,255,255,0.6)] hover:border-[rgba(74,222,128,0.4)] transition-colors">İptal</button>
+          <button onClick={save} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
         </div>
       </Modal>
     </div>
@@ -1428,23 +1422,23 @@ function Personel({ siniflar, okul, dark }: any) {
   return (
     <div>
       <div className="flex justify-end mb-4">
-        <button onClick={() => { setForm({ rol: 'ogretmen' }); setModal(true) }} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">+ Personel Ekle</button>
+        <button onClick={() => { setForm({ rol: 'ogretmen' }); setModal(true) }} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">+ Personel Ekle</button>
       </div>
       <Card dark={dark}>
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-[rgba(74,222,128,0.08)]">
           {data.map(p => (
-            <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${dark ? 'border-[#252a33]' : ''}`}>
-              <div className="w-10 h-10 rounded-full bg-green-50 text-green-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
+            <div key={p.id} className="flex items-center gap-3 px-4 py-3">
+              <div className="w-10 h-10 rounded-full bg-[rgba(74,222,128,0.12)] text-[#4ade80] flex items-center justify-center font-bold text-sm flex-shrink-0">
                 {p.ad_soyad.split(' ').map((w: string) => w[0]).join('').slice(0, 2)}
               </div>
               <div className="flex-1">
-                <div className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>{p.ad_soyad}</div>
-                <div className="text-xs text-gray-500">{ROL[p.rol] || p.rol}{p.sinif ? ' · ' + p.sinif : ''} {p.telefon ? '· ' + p.telefon : ''}</div>
+                <div className="font-semibold text-sm text-white">{p.ad_soyad}</div>
+                <div className="text-xs text-[rgba(255,255,255,0.54)]">{ROL[p.rol] || p.rol}{p.sinif ? ' · ' + p.sinif : ''} {p.telefon ? '· ' + p.telefon : ''}</div>
               </div>
-              <button onClick={() => del(p.id)} className="text-xs text-red-500 bg-red-50 border border-red-200 px-2 py-1 rounded">🗑</button>
+              <button onClick={() => del(p.id)} className="text-xs text-red-400 bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.2)] px-2 py-1 rounded">🗑</button>
             </div>
           ))}
-          {!data.length && <div className="text-center py-16 text-gray-400">👨‍🏫 Personel yok</div>}
+          {!data.length && <div className="text-center py-16 text-[rgba(255,255,255,0.35)]">👨‍🏫 Personel yok</div>}
         </div>
       </Card>
 
@@ -1452,32 +1446,32 @@ function Personel({ siniflar, okul, dark }: any) {
         <div className="p-5 space-y-3">
           {[['Ad Soyad *','ad_soyad'],['Telefon','telefon'],['E-posta','email']].map(([l,k]) => (
             <div key={k}>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">{l}</label>
+              <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">{l}</label>
               <input value={form[k] || ''} onChange={e => setForm({ ...form, [k]: e.target.value })}
-                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
             </div>
           ))}
           <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Rol</label>
+            <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Rol</label>
             <select value={form.rol} onChange={e => setForm({ ...form, rol: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300 bg-white'}`}>
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]`}>
               <option value="ogretmen">Öğretmen</option>
               <option value="mudur">Müdür</option>
               <option value="yardimci">Yardımcı</option>
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Sınıf</label>
+            <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Sınıf</label>
             <select value={form.sinif || ''} onChange={e => setForm({ ...form, sinif: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300 bg-white'}`}>
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]`}>
               <option value="">—</option>
               {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
             </select>
           </div>
         </div>
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#252a33]' : 'border-gray-200'}`}>
-          <button onClick={() => setModal(false)} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600">İptal</button>
-          <button onClick={save} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
+        <div className={`px-5 py-4 border-t flex justify-end gap-2 border-[rgba(74,222,128,0.14)]`}>
+          <button onClick={() => setModal(false)} className="border border-[rgba(74,222,128,0.2)] px-4 py-2 rounded-lg text-sm text-[rgba(255,255,255,0.6)] hover:border-[rgba(74,222,128,0.4)] transition-colors">İptal</button>
+          <button onClick={save} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
         </div>
       </Modal>
     </div>
@@ -1521,16 +1515,16 @@ function ServisPage({ ogrenciler, siniflar, okul, dark }: any) {
     <div>
       <div className="flex gap-2 mb-4 flex-wrap items-center">
         <input type="date" value={tarih} onChange={e => setTarih(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+          className={`border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
         <select value={sinifFilter} onChange={e => setSinifFilter(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300 bg-white'}`}>
+          className={`border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]`}>
           <option value="">Tüm Sınıflar</option>
           {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
         </select>
-        <button onClick={sendWA} className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-semibold">📱 WA</button>
-        <button onClick={save} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">💾 Kaydet</button>
+        <button onClick={sendWA} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">📱 WA</button>
+        <button onClick={save} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">💾 Kaydet</button>
         <div className="ml-auto flex gap-4 text-sm font-semibold">
-          <span className="text-green-700">🚌 {counts.bindi} Bindi</span>
+          <span className="text-[#4ade80]">🚌 {counts.bindi} Bindi</span>
           <span className="text-orange-500">🏠 {counts.indi} İndi</span>
         </div>
       </div>
@@ -1538,13 +1532,13 @@ function ServisPage({ ogrenciler, siniflar, okul, dark }: any) {
         {filtered.map((o: Ogrenci) => {
           const d = state[o.id] || ''
           return (
-            <div key={o.id} className={`border-2 rounded-xl p-3 text-center transition-all ${d === 'bindi' ? 'border-green-300 bg-green-50' : d === 'indi' ? 'border-orange-400 bg-orange-50' : dark ? 'border-gray-600 bg-[#111317]' : 'border-gray-200 bg-white'}`}>
+            <div key={o.id} className={`border-2 rounded-xl p-3 text-center transition-all ${d === 'bindi' ? 'border-[rgba(74,222,128,0.5)] bg-[rgba(74,222,128,0.08)]' : d === 'indi' ? 'border-orange-400/50 bg-orange-400/10' : 'border-[rgba(74,222,128,0.14)] bg-[#0b120b]'}`}>
               <div className="text-2xl mb-1">🌸</div>
-              <div className={`text-xs font-semibold mb-2 ${dark ? 'text-white' : ''}`}>{o.ad_soyad.split(' ')[0]}</div>
+              <div className="text-xs font-semibold mb-2 text-white">{o.ad_soyad.split(' ')[0]}</div>
               <div className="flex gap-1 justify-center">
-                {[['bindi','🚌 Bindi','bg-green-600'],['indi','🏠 İndi','bg-orange-400']].map(([val,label,color]) => (
+                {[['bindi','🚌 Bindi','bg-[#4ade80] text-black'],['indi','🏠 İndi','bg-orange-400 text-white']].map(([val,label,color]) => (
                   <button key={val} onClick={() => setState(s => ({ ...s, [o.id]: val }))}
-                    className={`text-xs px-2 py-1 rounded font-bold transition-all ${d === val ? color + ' text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    className={`text-xs px-2 py-1 rounded font-bold transition-all ${d === val ? color : 'bg-[#0d160d] text-[rgba(255,255,255,0.54)]'}`}>
                     {label}
                   </button>
                 ))}
@@ -1592,22 +1586,22 @@ function MesajlarPage({ ogrenciler, okul, dark }: any) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[600px]">
       <Card dark={dark} className="flex flex-col overflow-hidden">
-        <div className={`px-4 py-3 border-b font-semibold text-sm flex items-center justify-between ${dark ? 'border-[#252a33] text-white' : 'border-gray-100'}`}>
+        <div className={`px-4 py-3 border-b font-semibold text-sm flex items-center justify-between border-[rgba(74,222,128,0.14)] text-white`}>
           💬 Mesajlar
-          {unread > 0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{unread}</span>}
+          {unread > 0 && <span className="bg-[rgba(239,68,68,0.12)] text-red-400 text-xs px-2 py-0.5 rounded-full border border-[rgba(239,68,68,0.2)]">{unread}</span>}
         </div>
         <div className="flex-1 overflow-y-auto">
           {ogrenciler.map((o: Ogrenci) => {
             const unreadCount = mesajlar.filter(m => m.gonderen_id === o.id && !m.okundu).length
             return (
               <div key={o.id} onClick={() => setSelected(o)}
-                className={`flex items-center gap-3 px-4 py-3 cursor-pointer border-b ${dark ? 'border-[#252a33]' : 'border-gray-50'} ${selected?.id === o.id ? 'bg-green-50' : dark ? 'hover:bg-[#1a1d23]' : 'hover:bg-gray-50'}`}>
-                <div className="w-9 h-9 rounded-full bg-green-50 flex items-center justify-center text-lg flex-shrink-0">🌸</div>
+                className={`flex items-center gap-3 px-4 py-3 cursor-pointer border-b border-[rgba(74,222,128,0.08)] ${selected?.id === o.id ? 'bg-[rgba(74,222,128,0.08)]' : 'hover:bg-[#0d160d]'} transition-colors`}>
+                <div className="w-9 h-9 rounded-full bg-[rgba(74,222,128,0.12)] flex items-center justify-center text-lg flex-shrink-0">🌸</div>
                 <div className="flex-1">
-                  <div className={`text-sm font-medium ${dark ? 'text-white' : ''}`}>{o.ad_soyad.split(' ')[0]}</div>
-                  <div className="text-xs text-gray-400">{o.veli_ad || ''}</div>
+                  <div className="text-sm font-medium text-white">{o.ad_soyad.split(' ')[0]}</div>
+                  <div className="text-xs text-[rgba(255,255,255,0.54)]">{o.veli_ad || ''}</div>
                 </div>
-                {unreadCount > 0 && <span className="bg-green-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">{unreadCount}</span>}
+                {unreadCount > 0 && <span className="bg-[#4ade80] text-black text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">{unreadCount}</span>}
               </div>
             )
           })}
@@ -1616,32 +1610,32 @@ function MesajlarPage({ ogrenciler, okul, dark }: any) {
 
       <Card dark={dark} className="lg:col-span-2 flex flex-col overflow-hidden">
         {selected ? <>
-          <div className={`px-4 py-3 border-b flex items-center gap-3 ${dark ? 'border-[#252a33]' : 'border-gray-100'}`}>
-            <div className="w-9 h-9 rounded-full bg-green-50 flex items-center justify-center text-lg">🌸</div>
+          <div className={`px-4 py-3 border-b flex items-center gap-3 border-[rgba(74,222,128,0.14)]`}>
+            <div className="w-9 h-9 rounded-full bg-[rgba(74,222,128,0.12)] flex items-center justify-center text-lg">🌸</div>
             <div>
-              <div className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>{selected.ad_soyad}</div>
-              <div className="text-xs text-gray-400">{selected.veli_ad}</div>
+              <div className={`font-semibold text-sm text-white`}>{selected.ad_soyad}</div>
+              <div className="text-xs text-[rgba(255,255,255,0.54)]">{selected.veli_ad}</div>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {thread.map(m => (
               <div key={m.id} className={`flex ${m.gonderen_tip === 'okul' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${m.gonderen_tip === 'okul' ? 'bg-green-600 text-white rounded-br-sm' : dark ? 'bg-[#1a1d23] text-white rounded-bl-sm' : 'bg-gray-100 rounded-bl-sm'}`}>
+                <div className={`max-w-xs px-4 py-2 rounded-2xl text-sm ${m.gonderen_tip === 'okul' ? 'bg-[#4ade80] text-black rounded-br-sm' : 'bg-[#0d160d] text-white rounded-bl-sm border border-[rgba(74,222,128,0.14)]'}`}>
                   {m.icerik}
-                  <div className={`text-xs mt-1 ${m.gonderen_tip === 'okul' ? 'text-green-100' : 'text-gray-400'}`}>{new Date(m.olusturuldu).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</div>
+                  <div className={`text-xs mt-1 ${m.gonderen_tip === 'okul' ? 'text-black/60' : 'text-[rgba(255,255,255,0.54)]'}`}>{new Date(m.olusturuldu).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</div>
                 </div>
               </div>
             ))}
-            {!thread.length && <div className="text-center py-8 text-gray-400 text-sm">Henüz mesaj yok</div>}
+            {!thread.length && <div className="text-center py-8 text-[rgba(255,255,255,0.35)] text-sm">Henüz mesaj yok</div>}
           </div>
-          <div className={`p-3 border-t flex gap-2 ${dark ? 'border-[#252a33]' : 'border-gray-100'}`}>
+          <div className={`p-3 border-t flex gap-2 border-[rgba(74,222,128,0.14)]`}>
             <input value={icerik} onChange={e => setIcerik(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()}
               placeholder="Mesaj yaz..."
-              className={`flex-1 border rounded-xl px-4 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
-            <button onClick={send} className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-semibold">➤</button>
+              className={`flex-1 border rounded-xl px-4 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
+            <button onClick={send} className="bg-[#4ade80] text-black px-4 py-2 rounded-xl text-sm font-semibold">➤</button>
           </div>
         </> : (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
+          <div className="flex-1 flex items-center justify-center text-[rgba(255,255,255,0.35)]">
             <div className="text-center">
               <div className="text-4xl mb-3">💬</div>
               <p className="text-sm">Bir öğrenci seçin</p>
@@ -1674,45 +1668,45 @@ function Duyurular({ okul, dark }: any) {
   return (
     <div>
       <div className="flex justify-end mb-4">
-        <button onClick={() => { setForm({}); setModal(true) }} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">+ Duyuru Ekle</button>
+        <button onClick={() => { setForm({}); setModal(true) }} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">+ Duyuru Ekle</button>
       </div>
       <div className="space-y-3">
         {data.map(d => (
-          <div key={d.id} className={`rounded-lg border p-4 ${d.onemli ? 'border-l-4 border-l-red-500 border-red-200' : dark ? 'border-[#252a33] bg-[#111317]' : 'border-gray-200 bg-white'}`}>
+          <div key={d.id} className={`rounded-lg border p-4 ${d.onemli ? 'border-l-4 border-l-red-400 border-[rgba(239,68,68,0.2)] bg-[rgba(239,68,68,0.05)]' : 'border-[rgba(74,222,128,0.14)] bg-[#0b120b]'}`}>
             <div className="flex items-center justify-between mb-1">
-              <h3 className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>{d.onemli ? '⚠️ ' : ''}{d.baslik}</h3>
+              <h3 className="font-semibold text-sm text-white">{d.onemli ? '⚠️ ' : ''}{d.baslik}</h3>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-400">{d.tarih}</span>
-                <button onClick={() => del(d.id)} className="text-xs text-red-500 bg-red-50 border border-red-200 px-2 py-1 rounded">🗑</button>
+                <span className="text-xs text-[rgba(255,255,255,0.54)]">{d.tarih}</span>
+                <button onClick={() => del(d.id)} className="text-xs text-red-400 bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.2)] px-2 py-1 rounded">🗑</button>
               </div>
             </div>
-            <p className="text-sm text-gray-500">{d.icerik}</p>
+            <p className="text-sm text-[rgba(255,255,255,0.54)]">{d.icerik}</p>
           </div>
         ))}
-        {!data.length && <div className="text-center py-16 text-gray-400">📢 Duyuru yok</div>}
+        {!data.length && <div className="text-center py-16 text-[rgba(255,255,255,0.35)]">📢 Duyuru yok</div>}
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)} title="Duyuru Ekle" dark={dark}>
         <div className="p-5 space-y-3">
           {[['Başlık *','baslik'],['İçerik *','icerik'],['Tarih','tarih']].map(([l,k]) => (
             <div key={k}>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">{l}</label>
+              <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">{l}</label>
               {k === 'icerik'
                 ? <textarea value={form[k] || ''} onChange={e => setForm({ ...form, [k]: e.target.value })}
-                    className={`w-full border rounded-lg px-3 py-2 text-sm outline-none resize-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} rows={4} />
+                    className={`w-full border rounded-lg px-3 py-2 text-sm outline-none resize-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} rows={4} />
                 : <input type={k === 'tarih' ? 'date' : 'text'} value={form[k] || ''} onChange={e => setForm({ ...form, [k]: e.target.value })}
-                    className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+                    className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
               }
             </div>
           ))}
           <div className="flex items-center gap-2">
             <input type="checkbox" id="onemli" checked={form.onemli || false} onChange={e => setForm({ ...form, onemli: e.target.checked })} />
-            <label htmlFor="onemli" className={`text-sm font-medium ${dark ? 'text-white' : ''}`}>⚠️ Önemli</label>
+            <label htmlFor="onemli" className={`text-sm font-medium text-white`}>⚠️ Önemli</label>
           </div>
         </div>
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#252a33]' : 'border-gray-200'}`}>
-          <button onClick={() => setModal(false)} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600">İptal</button>
-          <button onClick={save} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Yayınla</button>
+        <div className={`px-5 py-4 border-t flex justify-end gap-2 border-[rgba(74,222,128,0.14)]`}>
+          <button onClick={() => setModal(false)} className="border border-[rgba(74,222,128,0.2)] px-4 py-2 rounded-lg text-sm text-[rgba(255,255,255,0.6)] hover:border-[rgba(74,222,128,0.4)] transition-colors">İptal</button>
+          <button onClick={save} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">Yayınla</button>
         </div>
       </Modal>
     </div>
@@ -1740,50 +1734,50 @@ function Etkinlikler({ siniflar, okul, dark }: any) {
   return (
     <div>
       <div className="flex justify-end mb-4">
-        <button onClick={() => { setForm({}); setModal(true) }} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">+ Etkinlik Ekle</button>
+        <button onClick={() => { setForm({}); setModal(true) }} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">+ Etkinlik Ekle</button>
       </div>
       <div className="space-y-3">
         {data.map(e => {
           const d = new Date(e.tarih); const gecti = d < new Date()
           return (
-            <div key={e.id} className={`rounded-lg border p-4 flex items-center gap-4 ${gecti ? 'opacity-60' : ''} ${dark ? 'bg-[#111317] border-[#252a33]' : 'bg-white border-gray-200'}`}>
-              <div className={`${gecti ? 'bg-gray-400' : 'bg-green-600'} text-white rounded-xl p-3 text-center min-w-12 flex-shrink-0`}>
+            <div key={e.id} className={`rounded-lg border border-[rgba(74,222,128,0.14)] bg-[#0b120b] p-4 flex items-center gap-4 ${gecti ? 'opacity-50' : ''}`}>
+              <div className={`${gecti ? 'bg-[rgba(255,255,255,0.1)]' : 'bg-[#4ade80]'} ${gecti ? 'text-white' : 'text-black'} rounded-xl p-3 text-center min-w-12 flex-shrink-0`}>
                 <div className="text-xl font-bold leading-none">{d.getDate()}</div>
-                <div className="text-xs opacity-80">{d.toLocaleDateString('tr-TR', { month: 'short' })}</div>
+                <div className="text-xs opacity-70">{d.toLocaleDateString('tr-TR', { month: 'short' })}</div>
               </div>
               <div className="flex-1">
-                <h3 className={`font-semibold text-sm ${dark ? 'text-white' : ''}`}>{e.baslik}</h3>
-                <p className="text-xs text-gray-500">{e.aciklama || ''} {e.hedef_kitle ? '· ' + e.hedef_kitle : ''}</p>
+                <h3 className="font-semibold text-sm text-white">{e.baslik}</h3>
+                <p className="text-xs text-[rgba(255,255,255,0.54)]">{e.aciklama || ''} {e.hedef_kitle ? '· ' + e.hedef_kitle : ''}</p>
               </div>
-              <button onClick={() => del(e.id)} className="text-xs text-red-500 bg-red-50 border border-red-200 px-2 py-1.5 rounded">🗑</button>
+              <button onClick={() => del(e.id)} className="text-xs text-red-400 bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.2)] px-2 py-1.5 rounded">🗑</button>
             </div>
           )
         })}
-        {!data.length && <div className="text-center py-16 text-gray-400">📅 Etkinlik yok</div>}
+        {!data.length && <div className="text-center py-16 text-[rgba(255,255,255,0.35)]">📅 Etkinlik yok</div>}
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)} title="Etkinlik Ekle" dark={dark}>
         <div className="p-5 space-y-3">
           {[['Etkinlik Adı *','baslik'],['Tarih *','tarih'],['Açıklama','aciklama']].map(([l,k]) => (
             <div key={k}>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">{l}</label>
+              <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">{l}</label>
               <input type={k === 'tarih' ? 'date' : 'text'} value={form[k] || ''} onChange={e => setForm({ ...form, [k]: e.target.value })}
-                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
             </div>
           ))}
           <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Hedef Kitle</label>
+            <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Hedef Kitle</label>
             <select value={form.hedef_kitle || ''} onChange={e => setForm({ ...form, hedef_kitle: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300 bg-white'}`}>
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]`}>
               <option value="Tüm öğrenciler">Tüm öğrenciler</option>
               <option value="Veliler">Veliler</option>
               {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
             </select>
           </div>
         </div>
-        <div className={`px-5 py-4 border-t flex justify-end gap-2 ${dark ? 'border-[#252a33]' : 'border-gray-200'}`}>
-          <button onClick={() => setModal(false)} className="border border-gray-300 px-4 py-2 rounded-lg text-sm text-gray-600">İptal</button>
-          <button onClick={save} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
+        <div className={`px-5 py-4 border-t flex justify-end gap-2 border-[rgba(74,222,128,0.14)]`}>
+          <button onClick={() => setModal(false)} className="border border-[rgba(74,222,128,0.2)] px-4 py-2 rounded-lg text-sm text-[rgba(255,255,255,0.6)] hover:border-[rgba(74,222,128,0.4)] transition-colors">İptal</button>
+          <button onClick={save} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
         </div>
       </Modal>
     </div>
@@ -1824,35 +1818,35 @@ function OkulAyarlari({ okul, dark, setOkul }: any) {
   return (
     <div className="max-w-lg">
       <Card dark={dark} className="p-6 space-y-4">
-        <h3 className={`font-semibold text-base mb-4 ${dark ? 'text-white' : ''}`}>⚙️ Okul Bilgileri</h3>
+        <h3 className={`font-semibold text-base mb-4 text-white`}>⚙️ Okul Bilgileri</h3>
         <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-2">Okul Logosu</label>
+          <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-2">Okul Logosu</label>
           <div className="flex items-center gap-3">
             {form.logo_url ? (
-              <img src={form.logo_url} alt={form.ad || 'Logo'} className="h-16 w-16 rounded-2xl object-cover border border-gray-200" />
+              <img src={form.logo_url} alt={form.ad || 'Logo'} className="h-16 w-16 rounded-2xl object-cover border border-[rgba(74,222,128,0.14)]" />
             ) : (
-              <div className="h-16 w-16 rounded-2xl bg-green-50 flex items-center justify-center text-green-700 font-bold">
+              <div className="h-16 w-16 rounded-2xl bg-[rgba(74,222,128,0.12)] flex items-center justify-center text-[#4ade80] font-bold">
                 {(form.ad || 'Kinderly').split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase()}
               </div>
             )}
             <input type="file" accept="image/*" onChange={e => handleLogoUpload(e.target.files?.[0] ?? null)}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+              className="w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80] file:bg-[rgba(74,222,128,0.1)] file:text-[#4ade80] file:border-0 file:rounded file:px-2 file:py-1 file:text-xs" />
           </div>
-          <p className="mt-2 text-xs text-gray-500">{uploadingLogo ? 'Logo yükleniyor...' : 'Bucket: logos'}</p>
+          <p className="mt-2 text-xs text-[rgba(255,255,255,0.54)]">{uploadingLogo ? 'Logo yükleniyor...' : 'Bucket: logos'}</p>
         </div>
         {[['Okul Adı','ad'],['Telefon','telefon'],['Adres','adres']].map(([l,k]) => (
           <div key={k}>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">{l}</label>
+            <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">{l}</label>
             <input value={form[k] || ''} onChange={e => setForm({ ...form, [k]: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
           </div>
         ))}
         <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1">Yönetici Şifresi</label>
+          <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Yönetici Şifresi</label>
           <input type="password" value={form.sifre || ''} onChange={e => setForm({ ...form, sifre: e.target.value })}
-            className={`w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-green-600 ${dark ? 'bg-[#1a1d23] border-[#343a45] text-gray-100' : 'border-gray-300'}`} />
+            className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
         </div>
-        <button onClick={save} className="w-full bg-green-600 text-white py-3 rounded-lg text-sm font-semibold">
+        <button onClick={save} className="w-full bg-[#4ade80] text-black py-3 rounded-lg text-sm font-semibold">
           {saved ? '✅ Kaydedildi!' : 'Kaydet'}
         </button>
       </Card>
