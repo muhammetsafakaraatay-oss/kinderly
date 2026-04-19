@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { sendPersonelWelcomeEmail } from '@/lib/email'
 
 type PersonelBody = {
   okul_id?: number
@@ -49,15 +50,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Geçerli bir e-posta adresi girin.' }, { status: 400 })
     }
 
+    if (sifre?.trim() && sifre.trim().length < 6) {
+      return NextResponse.json({ error: 'Şifre en az 6 karakter olmalıdır.' }, { status: 400 })
+    }
+
     const admin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
-    const geciciSifre = sifre?.trim() || generatePassword()
+    const { data: okulData } = await admin
+      .from('okullar')
+      .select('ad, slug')
+      .eq('id', okul_id)
+      .single()
 
-    if (sifre?.trim() && sifre.trim().length < 6) {
-      return NextResponse.json({ error: 'Şifre en az 6 karakter olmalıdır.' }, { status: 400 })
-    }
+    const geciciSifre = sifre?.trim() || generatePassword()
 
     const { data: userData, error: authError } = await admin.auth.admin.createUser({
       email: normalizedEmail,
@@ -89,6 +96,18 @@ export async function POST(request: Request) {
     if (personelError) {
       await admin.auth.admin.deleteUser(userId)
       return NextResponse.json({ error: personelError.message }, { status: 500 })
+    }
+
+    if (okulData) {
+      sendPersonelWelcomeEmail({
+        email: normalizedEmail,
+        ad_soyad: ad_soyad.trim(),
+        okul_ad: okulData.ad,
+        slug: okulData.slug,
+        sifre: geciciSifre,
+      }).catch((err: unknown) => {
+        console.error('[personel-ekle] E-posta gönderilemedi, kayıt başarılı:', err)
+      })
     }
 
     return NextResponse.json({ geciciSifre })
