@@ -47,7 +47,7 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   const activeOkul = okul ?? (authOkul as Okul | null)
 
   async function loadAll(okulId: number) {
-    const [{ data: ogr }, { data: sinif }] = await Promise.all([
+    const [{ data: ogr }, { data: sinif }, { data: okulData }] = await Promise.all([
       supabase
         .from('ogrenciler')
         .select('id,ad_soyad,sinif,okul_id,aktif,dogum_tarihi,alerjiler,veli_ad,veli_telefon,veli2_ad,veli2_telefon,aidat_tutari,kan_grubu,ilac,adres,aciklama,kayit_tarihi')
@@ -56,9 +56,11 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
         .order('ad_soyad')
         .limit(500),
       supabase.from('siniflar').select('id,ad,okul_id').eq('okul_id', okulId).order('ad'),
+      supabase.from('okullar').select('id,ad,slug,logo_url,telefon,adres,sifre').eq('id', okulId).maybeSingle(),
     ])
     if (ogr) setOgrenciler(ogr)
     if (sinif) setSiniflar(sinif)
+    if (okulData) setOkul(okulData as Okul)
   }
 
   useEffect(() => { params.then(p => setSlug(p.slug)) }, [params])
@@ -118,7 +120,7 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
       setPageLoading(true)
       void loadAll(Number(authOkul.id)).finally(() => setPageLoading(false))
     } else {
-      setOkul(authOkul as Okul)
+      setOkul(prev => prev ?? (authOkul as Okul))
       setPageLoading(false)
     }
   }, [authOkul, hasValidSession, loading, role, router, session, slug])
@@ -1865,18 +1867,28 @@ function OkulAyarlari({ okul, dark, setOkul }: any) {
   async function handleLogoUpload(file?: File | null) {
     if (!file) return
     setUploadingLogo(true)
-    const storagePath = `${okul.id}/${Date.now()}-${file.name.replace(/\s+/g, '-')}`
-    const { error } = await supabase.storage.from('logos').upload(storagePath, file, {
-      contentType: file.type || 'image/png',
-      upsert: true,
-    })
+    try {
+      const storagePath = `${okul.id}/${Date.now()}-${file.name.replace(/\s+/g, '-')}`
+      const { error } = await supabase.storage.from('logos').upload(storagePath, file, {
+        contentType: file.type || 'image/png',
+        upsert: true,
+      })
 
-    if (!error) {
-      const { data } = supabase.storage.from('logos').getPublicUrl(storagePath)
-      setForm((prev: any) => ({ ...prev, logo_url: data.publicUrl }))
+      if (error) {
+        console.error('Logo yükleme hatası:', error.message)
+        alert(`Logo yüklenemedi: ${error.message}`)
+      } else {
+        const { data } = supabase.storage.from('logos').getPublicUrl(storagePath)
+        const newLogoUrl = data.publicUrl
+        console.log('[logo] getPublicUrl:', newLogoUrl)
+        setForm((prev: any) => ({ ...prev, logo_url: newLogoUrl }))
+        setOkul({ ...okul, logo_url: newLogoUrl })
+        const { error: dbError } = await supabase.from('okullar').update({ logo_url: newLogoUrl }).eq('id', okul.id)
+        console.log('[logo] db update error:', dbError)
+      }
+    } finally {
+      setUploadingLogo(false)
     }
-
-    setUploadingLogo(false)
   }
 
   return (

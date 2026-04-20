@@ -831,7 +831,7 @@ export default function Home() {
             </div>
           </div>
           <div className="flex flex-wrap gap-6 text-sm text-[var(--muted)]">
-            <a href="#ozellikler" className="transition-colors hover:text-white">Özellikler</a>
+           <a href="#ozellikler" className="transition-colors hover:text-white">Özellikler</a>
             <a href="#roller" className="transition-colors hover:text-white">Roller</a>
             <a href="#fiyatlar" className="transition-colors hover:text-white">Fiyatlar</a>
             <a href="mailto:info@kinderx.app" className="transition-colors hover:text-white">İletişim</a>

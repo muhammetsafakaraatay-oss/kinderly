@@ -360,10 +360,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    let listenerHandledInitial = false
+
     async function hydrateSession() {
       try {
         const { data } = await supabase.auth.getSession()
-        if (!active) return
+        if (!active || listenerHandledInitial) return
 
         const nextSession = data.session
         setSession(nextSession)
@@ -395,6 +397,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
       if (!active) return
 
+      listenerHandledInitial = true
       const rememberCurrent = getRememberPreference()
       // Do NOT call setSession directly here — commitSnapshot (called below by fetchRole
       // or the else branch) handles session state with reference equality checks,
