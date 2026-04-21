@@ -10,7 +10,6 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
 import {
-  createSignedPhotoUrl,
   getUserFacingErrorMessage,
   getSupabaseErrorMessage,
   insertActivityCompat,
@@ -21,6 +20,7 @@ import {
   resolveTeacherMessageParties,
   sendMessageToRecipientsCompat,
   upsertAttendanceCompat,
+  withSignedPhotoUrls,
   type AnnouncementItem,
   type NormalizedMessage,
 } from '@/lib/supabase-helpers'
@@ -145,9 +145,8 @@ function activitySummary(activity: ActivityRow) {
   return values[0] ? String(values[0]) : 'Detay eklenmedi'
 }
 
-function getStoragePath(detay?: Record<string, unknown> | null) {
-  const storagePath = typeof detay?.storagePath === 'string' ? detay.storagePath : typeof detay?.path === 'string' ? detay.path : null
-  return storagePath || null
+function activityPhotoUrl(activity: ActivityRow) {
+  return activity.tur === 'photo' && typeof activity.detay?.url === 'string' ? activity.detay.url : null
 }
 
 async function uploadPhotoFile(okulId: number | string, ogrenciId: number, file: File) {
@@ -206,6 +205,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
   const dark = resolvedTheme === 'dark'
   // Prevents re-fetching when auth fires TOKEN_REFRESHED for the same user/school
   const loadedRef = useRef<string | null>(null)
+  const teacherStudentIdsRef = useRef<Set<number>>(new Set())
 
   useEffect(() => {
     void params.then((value) => setSlug(value.slug))
@@ -281,7 +281,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
     async function loadData() {
       setPageLoading(true)
       try {
-        const [{ data: personel, error: personelError }, { data: studentRows, error: studentError }, { data: classRows }] = await Promise.all([
+        const [{ data: personel, error: personelError }, { data: studentRows, error: studentError }] = await Promise.all([
           supabase
             .from('personel')
             .select('id,ad_soyad,sinif')
@@ -294,7 +294,6 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
             .eq('okul_id', currentOkul.id)
             .eq('aktif', true)
             .order('ad_soyad'),
-          supabase.from('siniflar').select('id,ad').eq('okul_id', currentOkul.id).order('ad'),
         ])
 
         if (!alive) return
@@ -308,7 +307,17 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
           setStatusMessage(getSupabaseErrorMessage(studentError, 'Öğrenciler yüklenemedi.'))
         }
 
-        const nextStudents = (studentRows || []) as Ogrenci[]
+        const allStudents = (studentRows || []) as Ogrenci[]
+        const teacherAssignedClass = typeof personel.sinif === 'string' ? personel.sinif.trim() : ''
+        const nextStudents = teacherAssignedClass
+          ? allStudents.filter((student) => student.sinif === teacherAssignedClass)
+          : []
+        const allowedStudentIds = new Set(nextStudents.map((student) => student.id))
+        teacherStudentIdsRef.current = allowedStudentIds
+
+        if (!teacherAssignedClass) {
+          setStatusMessage('Bu öğretmene sınıf atanmamış. Admin panelinden sınıf seçildiğinde öğrenciler görünecek.')
+        }
 
         const [attendanceQuery, activityQuery, messageQuery, announcementQuery] = await Promise.all([
           supabase.from('yoklama').select('ogrenci_id,durum').eq('okul_id', currentOkul.id).eq('tarih', today()),
@@ -327,34 +336,32 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
 
         const nextAttendance: Record<number, AttendanceStatus> = {}
         ;(attendanceQuery.data || []).forEach((row: { ogrenci_id: number; durum: AttendanceStatus }) => {
+          if (!allowedStudentIds.has(row.ogrenci_id)) return
           nextAttendance[row.ogrenci_id] = row.durum
         })
 
-        const activityRows = (activityQuery.data || []) as ActivityRow[]
+        const rawActivityRows = ((activityQuery.data || []) as ActivityRow[]).filter((activity) => allowedStudentIds.has(activity.ogrenci_id))
+        const activityRows = await withSignedPhotoUrls(rawActivityRows)
         const photoRows = activityRows.filter((item) => item.tur === 'photo')
-        const nextPhotos = await Promise.all(
-          photoRows.map(async (row) => {
+        const nextPhotos = photoRows.map((row) => {
             const detay = row.detay || {}
             const existingUrl = typeof detay.url === 'string' ? detay.url : null
-            const storagePath = getStoragePath(detay)
-            const signed = storagePath ? await createSignedPhotoUrl(storagePath) : { data: existingUrl, error: null }
             return {
               id: row.id,
               ogrenci_id: row.ogrenci_id,
               studentName: activityStudentName(row),
               note: typeof detay.not === 'string' ? detay.not : typeof detay.aciklama === 'string' ? detay.aciklama : '',
-              imageUrl: signed.data || existingUrl,
+              imageUrl: existingUrl,
               createdAt: row.created_at || row.olusturuldu || null,
             } satisfies PhotoCard
           })
-        )
 
-        const teacherClass = personel.sinif || (classRows || [])[0]?.ad || 'all'
+        const teacherClass = teacherAssignedClass || 'all'
         setTeacher(personel as TeacherProfile)
         setStudents(nextStudents)
         setAttendance(nextAttendance)
         setActivities(activityRows)
-        setMessages(messageQuery.data || [])
+        setMessages((messageQuery.data || []).filter((message) => !message.ogrenci_id || allowedStudentIds.has(message.ogrenci_id)))
         setAnnouncements(announcementQuery.data || [])
         setPhotoCards(nextPhotos.filter((item) => item.imageUrl))
         setClassFilter((current) => (current === 'all' ? teacherClass : current))
@@ -377,7 +384,8 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
       .channel(`ogretmen-web-${currentOkul.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mesajlar', filter: `okul_id=eq.${currentOkul.id}` }, async () => {
         const result = await loadSchoolMessagesCompat(currentOkul.id, 400)
-        setMessages(result.data || [])
+        const allowedIds = teacherStudentIdsRef.current
+        setMessages((result.data || []).filter((message) => !message.ogrenci_id || allowedIds.has(message.ogrenci_id)))
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'aktiviteler', filter: `okul_id=eq.${currentOkul.id}` }, async () => {
         const { data } = await supabase
@@ -387,30 +395,29 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
           .eq('tarih', today())
           .order('id', { ascending: false })
           .limit(120)
-        const rows = (data || []) as ActivityRow[]
+        const allowedIds = teacherStudentIdsRef.current
+        const rows = await withSignedPhotoUrls(((data || []) as ActivityRow[]).filter((item) => allowedIds.has(item.ogrenci_id)))
         setActivities(rows)
-        const nextPhotos = await Promise.all(
-          rows.filter((item) => item.tur === 'photo').map(async (row) => {
+        const nextPhotos = rows.filter((item) => item.tur === 'photo').map((row) => {
             const detay = row.detay || {}
             const existingUrl = typeof detay.url === 'string' ? detay.url : null
-            const storagePath = getStoragePath(detay)
-            const signed = storagePath ? await createSignedPhotoUrl(storagePath) : { data: existingUrl, error: null }
             return {
               id: row.id,
               ogrenci_id: row.ogrenci_id,
               studentName: activityStudentName(row),
               note: typeof detay.not === 'string' ? detay.not : typeof detay.aciklama === 'string' ? detay.aciklama : '',
-              imageUrl: signed.data || existingUrl,
+              imageUrl: existingUrl,
               createdAt: row.created_at || row.olusturuldu || null,
             } satisfies PhotoCard
           })
-        )
         setPhotoCards(nextPhotos.filter((item) => item.imageUrl))
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'yoklama', filter: `okul_id=eq.${currentOkul.id}` }, async () => {
         const { data } = await supabase.from('yoklama').select('ogrenci_id,durum').eq('okul_id', currentOkul.id).eq('tarih', today())
+        const allowedIds = teacherStudentIdsRef.current
         const nextAttendance: Record<number, AttendanceStatus> = {}
         ;(data || []).forEach((row: { ogrenci_id: number; durum: AttendanceStatus }) => {
+          if (!allowedIds.has(row.ogrenci_id)) return
           nextAttendance[row.ogrenci_id] = row.durum
         })
         setAttendance(nextAttendance)
@@ -564,7 +571,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
       return
     }
 
-    const { error } = await sendMessageToRecipientsCompat({
+    const result = await sendMessageToRecipientsCompat({
       okul_id: okul.id,
       ogrenci_id: selectedMessageStudent.id,
       gonderen_id: parties.senderId,
@@ -577,23 +584,27 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
 
     setSendingThread(false)
 
-    if (error) {
-      setStatusMessage(getUserFacingErrorMessage(error, 'Mesaj gönderilemedi.'))
+    if (result.error) {
+      setStatusMessage(getUserFacingErrorMessage(result.error, 'Mesaj gönderilemedi.'))
       return
     }
 
     setThreadDraft('')
-    setStatusMessage('Mesaj gönderildi.')
+    setStatusMessage(result.failedCount > 0
+      ? `Mesaj ${result.sentCount} veliye gönderildi, ${result.failedCount} veliye gönderilemedi.`
+      : 'Mesaj gönderildi.')
   }
 
   async function handleBulkMessage() {
     if (!session || !okul || !bulkDraft.trim()) return
     setSendingBulk(true)
 
+    let sentCount = 0
+    let failedCount = 0
     for (const student of filteredStudents) {
       const { data: parties } = await resolveTeacherMessageParties(session.user.id, okul.id, student.id)
       if (!parties?.receiverIds?.length) continue
-      await sendMessageToRecipientsCompat({
+      const result = await sendMessageToRecipientsCompat({
         okul_id: okul.id,
         ogrenci_id: student.id,
         gonderen_id: parties.senderId,
@@ -603,11 +614,15 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
         okundu: false,
         created_at: new Date().toISOString(),
       }, parties.receiverIds, bulkDraft.trim())
+      sentCount += result.sentCount > 0 ? 1 : 0
+      failedCount += result.failedCount
     }
 
     setSendingBulk(false)
     setBulkDraft('')
-    setStatusMessage(`Toplu mesaj ${filteredStudents.length} veliye iletildi.`)
+    setStatusMessage(failedCount > 0
+      ? `Toplu mesaj ${sentCount} öğrenci hattına iletildi, ${failedCount} veliye gönderilemedi.`
+      : `Toplu mesaj ${sentCount} öğrenci hattına iletildi.`)
   }
 
   async function handleAnnouncementSave() {
@@ -876,6 +891,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
                 <div className="mt-6 space-y-3">
                   {activities.slice(0, 8).map((activity) => {
                     const meta = activityMeta(activity.tur)
+                    const photoUrl = activityPhotoUrl(activity)
                     return (
                       <div key={activity.id} className="flex items-start gap-4 rounded-[22px] border border-slate-200 px-4 py-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: meta.bg }}>
@@ -887,6 +903,16 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
                             <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{formatTime(activity.created_at || activity.olusturuldu)}</div>
                           </div>
                           <div className="mt-2 text-sm text-slate-600">{activitySummary(activity)}</div>
+                          {photoUrl ? (
+                            <a href={photoUrl} target="_blank" rel="noreferrer" className="mt-3 block overflow-hidden rounded-[18px] border border-slate-200 bg-slate-50">
+                              <img src={photoUrl} alt="Aktivite fotoğrafı" className="h-52 w-full object-cover" />
+                            </a>
+                          ) : null}
+                          {activity.tur === 'photo' && !photoUrl ? (
+                            <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                              Fotoğraf yükleniyor veya erişim izni bekleniyor.
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     )
@@ -1077,6 +1103,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
                   <div className="mt-5 space-y-3">
                     {activities.map((activity) => {
                       const meta = activityMeta(activity.tur)
+                      const photoUrl = activityPhotoUrl(activity)
                       return (
                         <div key={activity.id} className="flex items-start gap-4 rounded-[20px] border border-slate-200 px-4 py-4">
                           <div className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: meta.bg }}>
@@ -1088,6 +1115,16 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
                               <div className="text-xs text-slate-400">{formatTime(activity.created_at || activity.olusturuldu)}</div>
                             </div>
                             <div className="mt-1 text-sm text-slate-600">{activitySummary(activity)}</div>
+                            {photoUrl ? (
+                              <a href={photoUrl} target="_blank" rel="noreferrer" className="mt-3 block overflow-hidden rounded-[18px] border border-slate-200 bg-slate-50">
+                                <img src={photoUrl} alt="Aktivite fotoğrafı" className="h-56 w-full object-cover" />
+                              </a>
+                            ) : null}
+                            {activity.tur === 'photo' && !photoUrl ? (
+                              <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                                Fotoğraf yükleniyor veya erişim izni bekleniyor.
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                       )
@@ -1286,6 +1323,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
                 <div className="mt-6 space-y-4">
                   {reportActivities.map((activity, index) => {
                     const meta = activityMeta(activity.tur)
+                    const photoUrl = activityPhotoUrl(activity)
                     return (
                       <div key={activity.id} className="flex gap-4">
                         <div className="flex flex-col items-center">
@@ -1300,6 +1338,16 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
                             <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{formatTime(activity.created_at || activity.olusturuldu)}</div>
                           </div>
                           <div className="mt-2 text-sm text-slate-600">{activitySummary(activity)}</div>
+                          {photoUrl ? (
+                            <a href={photoUrl} target="_blank" rel="noreferrer" className="mt-3 block overflow-hidden rounded-[18px] border border-slate-200 bg-slate-50">
+                              <img src={photoUrl} alt="Aktivite fotoğrafı" className="h-56 w-full object-cover" />
+                            </a>
+                          ) : null}
+                          {activity.tur === 'photo' && !photoUrl ? (
+                            <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                              Fotoğraf yükleniyor veya erişim izni bekleniyor.
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     )

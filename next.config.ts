@@ -18,6 +18,9 @@ function lanDevHosts(): string[] {
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["*.kinderx.app", ...lanDevHosts()],
+  turbopack: {
+    root: process.cwd(),
+  },
 };
 
 export default nextConfig;

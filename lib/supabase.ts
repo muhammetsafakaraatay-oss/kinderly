@@ -5,20 +5,25 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 export const hasSupabaseEnv = Boolean(supabaseUrl && supabaseAnonKey)
 
-const sessionStorageAdapter = {
+const dynamicStorageAdapter = {
   getItem: (key: string) => {
     if (typeof window === 'undefined') return null
-    return window.sessionStorage.getItem(key)
+    const remember = window.localStorage.getItem('kinderly.remember') !== '0'
+    return (remember ? window.localStorage : window.sessionStorage).getItem(key)
   },
   setItem: (key: string, value: string) => {
     if (typeof window === 'undefined') return
-    window.sessionStorage.setItem(key, value)
+    const remember = window.localStorage.getItem('kinderly.remember') !== '0'
+    window.localStorage.removeItem(key)
+    window.sessionStorage.removeItem(key)
+    ;(remember ? window.localStorage : window.sessionStorage).setItem(key, value)
   },
   removeItem: (key: string) => {
     if (typeof window === 'undefined') return
+    window.localStorage.removeItem(key)
     window.sessionStorage.removeItem(key)
   },
- }
+}
 
 export const supabase = createClient(
   supabaseUrl ?? 'https://placeholder.supabase.co',
@@ -27,6 +32,6 @@ export const supabase = createClient(
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    storage: sessionStorageAdapter,
+    storage: dynamicStorageAdapter,
   },
 })

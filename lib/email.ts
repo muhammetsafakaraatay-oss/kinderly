@@ -14,7 +14,7 @@ export async function sendPersonelWelcomeEmail({
   sifre: string
 }): Promise<{ success: boolean; error?: unknown }> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://kinderly.app'
-  const loginUrl = `${appUrl}/${slug}/giris`
+  const loginUrl = `${appUrl}/giris?redirect=${encodeURIComponent(`/${slug}/ogretmen`)}`
 
   try {
     const resend = new Resend(process.env.RESEND_API_KEY)

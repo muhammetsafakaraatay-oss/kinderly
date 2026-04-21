@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "2fe6ced2-9f82-4a43-9320-0dd98866d120"
+      }
+    },
+    "android": {
+      "package": "com.safaxx.kinderly"
+    }
+  }
+}

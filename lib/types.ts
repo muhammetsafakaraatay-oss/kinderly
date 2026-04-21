@@ -7,7 +7,6 @@ export interface Okul {
   adres?: string
   plan?: string
   plan_bitis?: string
-  sifre?: string
 }
 
 export interface Sinif {

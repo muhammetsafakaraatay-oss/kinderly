@@ -22,7 +22,13 @@ export function normalizeRole(value: string | null | undefined): Role {
     normalized.includes('kurucu')
   ) return 'admin'
 
-  if (normalized.includes('ogretmen') || normalized.includes('teacher')) return 'ogretmen'
+  if (
+    normalized.includes('ogretmen') ||
+    normalized.includes('teacher') ||
+    normalized.includes('yardimci') ||
+    normalized.includes('assistant') ||
+    normalized.includes('staff')
+  ) return 'ogretmen'
   if (normalized.includes('veli') || normalized.includes('parent')) return 'veli'
 
   return null

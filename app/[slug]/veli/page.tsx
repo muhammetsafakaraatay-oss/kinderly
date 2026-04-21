@@ -18,6 +18,7 @@ import {
   loadStudentMessagesCompat,
   markMessagesReadCompat,
   resolveParentMessageParties,
+  withSignedPhotoUrls,
   type AnnouncementItem,
   type NormalizedMessage,
 } from '@/lib/supabase-helpers'
@@ -119,6 +120,10 @@ function activitySummary(row: ActivityRow) {
   ].filter(Boolean)
 
   return values[0] ? String(values[0]) : 'Detay eklenmedi'
+}
+
+function activityPhotoUrl(row: ActivityRow) {
+  return row.tur === 'photo' && typeof row.detay?.url === 'string' ? row.detay.url : null
 }
 
 function ageFromBirthDate(value?: string | null) {
@@ -311,9 +316,11 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
           loadStudentMessagesCompat(currentOkul.id, currentChildId, 200),
         ])
 
+        const signedActivities = await withSignedPhotoUrls((activityQuery.data || []) as ActivityRow[])
+
         if (!alive) return
 
-        setActivities((activityQuery.data || []) as ActivityRow[])
+        setActivities(signedActivities)
         setAttendanceStatus(attendanceQuery.data?.durum || '')
         setAnnouncements(announcementQuery.data || [])
         setFees((feeQuery.data || []) as Aidat[])
@@ -345,7 +352,8 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
           .eq('veli_gosterilsin', true)
           .order('id', { ascending: false })
           .limit(60)
-        setActivities((data || []) as ActivityRow[])
+        const signedActivities = await withSignedPhotoUrls((data || []) as ActivityRow[])
+        setActivities(signedActivities)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'yoklama', filter: `okul_id=eq.${currentOkul.id}` }, async () => {
         const { data } = await supabase
@@ -597,6 +605,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
                 <div className="mt-6 space-y-3">
                   {activities.length ? activities.map((activity) => {
                     const meta = activityTypes[activity.tur] || { emoji: '📋', label: activity.tur, color: '#64748b' }
+                    const photoUrl = activityPhotoUrl(activity)
                     return (
                       <div key={activity.id} className="flex items-start gap-4 rounded-[22px] border border-slate-200 px-4 py-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-xl text-white" style={{ backgroundColor: meta.color }}>
@@ -608,6 +617,16 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
                             <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{formatDateTime(activity.created_at || activity.olusturuldu)}</div>
                           </div>
                           <div className="mt-2 text-sm text-slate-600">{activitySummary(activity)}</div>
+                          {photoUrl ? (
+                            <a href={photoUrl} target="_blank" rel="noreferrer" className="mt-3 block overflow-hidden rounded-[18px] border border-slate-200 bg-slate-50">
+                              <img src={photoUrl} alt="Aktivite fotoğrafı" className="h-56 w-full object-cover" />
+                            </a>
+                          ) : null}
+                          {activity.tur === 'photo' && !photoUrl ? (
+                            <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                              Fotoğraf yükleniyor veya erişim izni bekleniyor.
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     )

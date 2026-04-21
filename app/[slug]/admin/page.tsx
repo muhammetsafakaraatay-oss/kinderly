@@ -23,9 +23,8 @@ import {
   Settings,
 } from 'lucide-react'
 import { SiniflarPanel } from '@/components/admin/siniflar-panel'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { supabase } from '@/lib/supabase'
-import { createSignedStorageUrl } from '@/lib/supabase-helpers'
+import { getPhotoStoragePath, withSignedPhotoUrls } from '@/lib/supabase-helpers'
 import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
 import { Ogrenci, Sinif, Okul } from '@/lib/types'
@@ -56,7 +55,7 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
         .order('ad_soyad')
         .limit(500),
       supabase.from('siniflar').select('id,ad,okul_id').eq('okul_id', okulId).order('ad'),
-      supabase.from('okullar').select('id,ad,slug,logo_url,telefon,adres,sifre').eq('id', okulId).maybeSingle(),
+      supabase.from('okullar').select('id,ad,slug,logo_url,telefon,adres').eq('id', okulId).maybeSingle(),
     ])
     if (ogr) setOgrenciler(ogr)
     if (sinif) setSiniflar(sinif)
@@ -201,7 +200,6 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
             <h1 className="text-base font-semibold text-white">{navItems.find(n => n.id === activePage)?.label}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <ThemeToggle />
             <button onClick={() => setActivePage('yoklama')} className="bg-[#4ade80] text-black text-xs font-semibold px-3 py-1.5 rounded-lg">Yoklama Al</button>
           </div>
         </header>
@@ -214,7 +212,7 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
           {activePage === 'aktivite' && <AktivitePage ogrenciler={ogrenciler} okul={activeOkul} dark={dark} />}
           {activePage === 'gunluk' && <GunlukRaporPage ogrenciler={ogrenciler} siniflar={siniflar} okul={activeOkul} dark={dark} />}
           {activePage === 'gelisim' && <GelisimPage ogrenciler={ogrenciler} okul={activeOkul} dark={dark} />}
-          {activePage === 'fotograflar' && <Fotograflar siniflar={siniflar} okul={activeOkul} dark={dark} />}
+          {activePage === 'fotograflar' && <Fotograflar ogrenciler={ogrenciler} siniflar={siniflar} okul={activeOkul} dark={dark} />}
           {activePage === 'aidat' && <AidatPage ogrenciler={ogrenciler} okul={activeOkul} dark={dark} />}
           {activePage === 'yemek' && <YemekListesi okul={activeOkul} dark={dark} />}
           {activePage === 'personel' && <Personel siniflar={siniflar} okul={activeOkul} dark={dark} />}
@@ -288,6 +286,7 @@ const AKT_TYPES = [
   { id: 'food', label: 'Yemek', emoji: '🍎', color: '#00b884' },
   { id: 'nap', label: 'Uyku', emoji: '😴', color: '#3d4eb8' },
   { id: 'potty', label: 'Tuvalet', emoji: '🚽', color: '#00b8d4' },
+  { id: 'photo', label: 'Fotoğraf', emoji: '📷', color: '#e91e8c' },
   { id: 'kudos', label: 'Tebrik', emoji: '⭐', color: '#9c27b0' },
   { id: 'meds', label: 'İlaç', emoji: '💊', color: '#f5a623' },
   { id: 'incident', label: 'Kaza', emoji: '🩹', color: '#f44336' },
@@ -299,29 +298,24 @@ const AKT_TYPES = [
 function today() { return new Date().toISOString().split('T')[0] }
 function fmtM(n: number) { return '₺' + (Number(n) || 0).toLocaleString('tr-TR') }
 
-function getStoragePathFromValue(bucket: string, value?: string | null) {
-  if (!value) return null
-  if (!value.startsWith('http://') && !value.startsWith('https://')) return value
+function activityPhotoUrl(row: any) {
+  return row?.tur === 'photo' && typeof row.detay?.url === 'string' ? row.detay.url : null
+}
 
-  try {
-    const url = new URL(value)
-    const markers = [
-      `/object/public/${bucket}/`,
-      `/object/sign/${bucket}/`,
-      `/object/authenticated/${bucket}/`,
-    ]
+function photoContentType(file: File) {
+  if (file.type) return file.type
+  const name = file.name.toLocaleLowerCase('tr-TR')
+  if (name.endsWith('.png')) return 'image/png'
+  if (name.endsWith('.webp')) return 'image/webp'
+  if (name.endsWith('.heic')) return 'image/heic'
+  if (name.endsWith('.heif')) return 'image/heif'
+  return 'image/jpeg'
+}
 
-    for (const marker of markers) {
-      const index = url.pathname.indexOf(marker)
-      if (index >= 0) {
-        return decodeURIComponent(url.pathname.slice(index + marker.length))
-      }
-    }
-  } catch {
-    return null
-  }
-
-  return null
+function photoStoragePath(okulId: string | number, ogrenciId: string | number, file: File) {
+  const extension = file.name.split('.').pop()?.toLocaleLowerCase('tr-TR')
+  const safeExtension = extension && ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'].includes(extension) ? extension : 'jpg'
+  return `${okulId}/${ogrenciId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${safeExtension}`
 }
 
 // ── DASHBOARD ──
@@ -757,6 +751,8 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
   const [modal, setModal] = useState(false)
   const [aktType, setAktType] = useState('')
   const [form, setForm] = useState<any>({})
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -764,14 +760,50 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
 
   async function loadFeed() {
     const { data } = await supabase.from('aktiviteler').select('*').eq('okul_id', okul.id).eq('ogrenci_id', selected!.id).eq('tarih', tarih).order('id', { ascending: false })
-    setFeed(data || [])
+    const signedRows = await withSignedPhotoUrls(data || [])
+    setFeed(signedRows)
   }
 
   async function saveAkt() {
-    if (!selected) return
-    await supabase.from('aktiviteler').insert({ okul_id: okul.id, ogrenci_id: selected.id, tarih, tur: aktType, detay: form, kaydeden: 'Yönetici', veli_gosterilsin: true })
-    await supabase.from('bildirimler').insert({ okul_id: okul.id, ogrenci_id: selected.id, baslik: AKT_TYPES.find(t => t.id === aktType)?.label || aktType, mesaj: selected.ad_soyad.split(' ')[0] + ' için kayıt eklendi.', tur: aktType, okundu: false })
-    setModal(false); loadFeed()
+    if (!selected || !aktType) return
+    if (aktType === 'photo' && !photoFile) {
+      alert('Fotoğraf seçin.')
+      return
+    }
+
+    setSaving(true)
+    let uploadedStoragePath: string | null = null
+    const detay = { ...form }
+
+    try {
+      if (aktType === 'photo' && photoFile) {
+        uploadedStoragePath = photoStoragePath(okul.id, selected.id, photoFile)
+        const { error: uploadError } = await supabase.storage.from('photos').upload(uploadedStoragePath, photoFile, {
+          contentType: photoContentType(photoFile),
+          cacheControl: '3600',
+          upsert: true,
+        })
+
+        if (uploadError) throw uploadError
+        detay.storagePath = uploadedStoragePath
+        detay.url = null
+      }
+
+      const { error } = await supabase.from('aktiviteler').insert({ okul_id: okul.id, ogrenci_id: selected.id, tarih, tur: aktType, detay, kaydeden: 'Yönetici', veli_gosterilsin: true })
+
+      if (error) throw error
+
+      await supabase.from('bildirimler').insert({ okul_id: okul.id, ogrenci_id: selected.id, baslik: AKT_TYPES.find(t => t.id === aktType)?.label || aktType, mesaj: selected.ad_soyad.split(' ')[0] + ' için kayıt eklendi.', tur: aktType, okundu: false })
+      setModal(false)
+      setPhotoFile(null)
+      setForm({})
+      await loadFeed()
+    } catch (error: any) {
+      if (uploadedStoragePath) await supabase.storage.from('photos').remove([uploadedStoragePath])
+      alert(error?.message || 'Aktivite kaydedilemedi.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const filtered = ogrenciler.filter((o: Ogrenci) => o.ad_soyad.toLowerCase().includes(search.toLowerCase()))
@@ -806,7 +838,7 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
           </div>
           <div className="p-4 grid grid-cols-3 sm:grid-cols-5 gap-2">
             {AKT_TYPES.map(t => (
-              <button key={t.id} onClick={() => { if (!selected) { alert('Önce öğrenci seçin!'); return }; setAktType(t.id); setForm({}); setModal(true) }}
+              <button key={t.id} onClick={() => { if (!selected) { alert('Önce öğrenci seçin!'); return }; setAktType(t.id); setForm({}); setPhotoFile(null); setModal(true) }}
                 className="rounded-xl p-3 flex flex-col items-center gap-1 text-white text-xs font-semibold transition-transform hover:-translate-y-0.5"
                 style={{ background: t.color }}>
                 <span className="text-2xl">{t.emoji}</span>
@@ -825,11 +857,22 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
           <div>
             {feed.length ? feed.map(a => {
               const tp = AKT_TYPES.find(x => x.id === a.tur)
+              const photoUrl = activityPhotoUrl(a)
               return <div key={a.id} className={`flex items-center gap-3 px-4 py-3 border-b last:border-0 ${dark ? 'border-[rgba(74,222,128,0.14)]' : 'border-gray-50'}`}>
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base flex-shrink-0" style={{ background: tp?.color || '#9e9e9e' }}>{tp?.emoji || '📋'}</div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <div className={`text-sm font-medium text-white`}>{tp?.label || a.tur}{a.detay?.not ? ' · ' + a.detay.not : ''}</div>
                   <div className="text-xs text-[rgba(255,255,255,0.54)]">{a.kaydeden}</div>
+                  {photoUrl ? (
+                    <button type="button" onClick={() => window.open(photoUrl, '_blank')} className="mt-3 block w-full overflow-hidden rounded-xl border border-[rgba(74,222,128,0.14)] bg-[#0d160d]">
+                      <img src={photoUrl} alt="Aktivite fotoğrafı" className="h-48 w-full object-cover" />
+                    </button>
+                  ) : null}
+                  {a.tur === 'photo' && !photoUrl ? (
+                    <div className="mt-3 rounded-lg bg-[#0d160d] px-3 py-2 text-xs text-[rgba(255,255,255,0.54)]">
+                      Fotoğraf yükleniyor veya erişim izni bekleniyor.
+                    </div>
+                  ) : null}
                 </div>
               </div>
             }) : <div className="text-center py-8 text-[rgba(255,255,255,0.35)] text-sm">Aktivite yok</div>}
@@ -876,6 +919,12 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
                 className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
             </div>
           </>}
+          {aktType === 'photo' && <div>
+            <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Fotoğraf</label>
+            <input type="file" accept="image/*" onChange={e => setPhotoFile(e.target.files?.[0] ?? null)}
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white file:mr-3 file:rounded-lg file:border-0 file:bg-[#4ade80] file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-black focus:border-[#4ade80]`} />
+            {photoFile && <div className="mt-2 text-xs text-[rgba(255,255,255,0.54)]">{photoFile.name}</div>}
+          </div>}
           <div>
             <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Not</label>
             <textarea value={form.not || ''} onChange={e => setForm({...form, not: e.target.value}) }
@@ -884,7 +933,7 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
         </div>
         <div className={`px-5 py-4 border-t flex justify-end gap-2 border-[rgba(74,222,128,0.14)]`}>
           <button onClick={() => setModal(false)} className="border border-[rgba(74,222,128,0.2)] px-4 py-2 rounded-lg text-sm text-[rgba(255,255,255,0.6)] hover:border-[rgba(74,222,128,0.4)] transition-colors">İptal</button>
-          <button onClick={saveAkt} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">Kaydet</button>
+          <button onClick={saveAkt} disabled={saving} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60">{saving ? 'Kaydediliyor...' : 'Kaydet'}</button>
         </div>
       </Modal>
     </div>
@@ -1086,7 +1135,7 @@ function GelisimPage({ ogrenciler, okul, dark }: any) {
 }
 
 // ── FOTOĞRAFLAR ──
-function Fotograflar({ siniflar, okul, dark }: any) {
+function Fotograflar({ ogrenciler, siniflar, okul, dark }: any) {
   const [fotos, setFotos] = useState<any[]>([])
   const [modal, setModal] = useState(false)
   const [files, setFiles] = useState<File[]>([])
@@ -1098,58 +1147,67 @@ function Fotograflar({ siniflar, okul, dark }: any) {
   useEffect(() => { if (okul) load() }, [okul])
 
   async function load() {
-    const { data } = await supabase.from('fotograflar').select('*').eq('okul_id', okul.id).order('id', { ascending: false }).limit(50)
-    const rows = await Promise.all((data || []).map(async (row: any) => {
-      const storagePath =
-        row.storage_path ||
-        row.storagePath ||
-        row.path ||
-        getStoragePathFromValue('fotograflar', row.url)
-
-      if (!storagePath) {
-        return { ...row, signedUrl: row.url || null, storagePath: null }
-      }
-
-      const signed = await createSignedStorageUrl('fotograflar', storagePath)
-      return {
-        ...row,
-        storagePath,
-        signedUrl: signed.data || row.url || null,
-      }
-    }))
+    const { data } = await supabase
+      .from('aktiviteler')
+      .select('id,ogrenci_id,tur,detay,kaydeden,tarih,created_at,olusturuldu,ogrenciler(ad_soyad,sinif)')
+      .eq('okul_id', okul.id)
+      .eq('tur', 'photo')
+      .order('id', { ascending: false })
+      .limit(80)
+    const rows = await withSignedPhotoUrls(data || [])
     setFotos(rows)
   }
 
-  async function upload() {
-    if (!files.length) return
-    setUploading(true)
-    for (const f of files) {
-      const storagePath = `${okul.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`
-      const { error } = await supabase.storage.from('fotograflar').upload(storagePath, f, {
-        contentType: f.type || 'image/jpeg',
-        upsert: true,
-      })
-      if (!error) {
-        const insertWithPath = await supabase
-          .from('fotograflar')
-          .insert({ okul_id: okul.id, url: storagePath, storage_path: storagePath, aciklama: form.aciklama, sinif: form.sinif, tarih: today() })
+  const selectableStudents = ogrenciler.filter((ogrenci: Ogrenci) => !form.sinif || ogrenci.sinif === form.sinif)
 
-        if (insertWithPath.error) {
-          await supabase
-            .from('fotograflar')
-            .insert({ okul_id: okul.id, url: storagePath, aciklama: form.aciklama, sinif: form.sinif, tarih: today() })
+  async function upload() {
+    const ogrenciId = Number(form.ogrenci_id)
+    if (!files.length || !Number.isFinite(ogrenciId)) return
+    setUploading(true)
+    try {
+      for (const f of files) {
+        const storagePath = photoStoragePath(okul.id, ogrenciId, f)
+        const { error } = await supabase.storage.from('photos').upload(storagePath, f, {
+          contentType: photoContentType(f),
+          cacheControl: '3600',
+          upsert: true,
+        })
+        if (error) throw error
+
+        const insert = await supabase
+          .from('aktiviteler')
+          .insert({
+            okul_id: okul.id,
+            ogrenci_id: ogrenciId,
+            tur: 'photo',
+            tarih: today(),
+            detay: { storagePath, url: null, not: form.aciklama || '', aciklama: form.aciklama || '' },
+            kaydeden: 'Yönetim',
+            veli_gosterilsin: true,
+          })
+
+        if (insert.error) {
+          await supabase.storage.from('photos').remove([storagePath])
+          throw insert.error
         }
       }
+      setModal(false)
+      setFiles([])
+      setForm({})
+      await load()
+    } catch (error: any) {
+      alert(error?.message || 'Fotoğraf yüklenemedi.')
+    } finally {
+      setUploading(false)
     }
-    setUploading(false); setModal(false); load()
   }
 
   async function deleteFoto(id: number, storagePath?: string | null) {
     if (!confirm('Sil?')) return
     if (storagePath) {
-      await supabase.storage.from('fotograflar').remove([storagePath])
+      await supabase.storage.from('photos').remove([storagePath])
     }
-    await supabase.from('fotograflar').delete().eq('id', id)
+    await supabase.from('aktiviteler').delete().eq('id', id)
     load()
   }
 
@@ -1167,23 +1225,32 @@ function Fotograflar({ siniflar, okul, dark }: any) {
         <button onClick={() => { setFiles([]); setForm({}); setModal(true) }} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">+ Fotoğraf Ekle</button>
       </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {fotos.map(f => (
-          <div key={f.id} className="relative aspect-square rounded-xl overflow-hidden group cursor-pointer" onClick={() => setViewer(f.signedUrl || f.url)}>
-            <Image
-              src={f.signedUrl || f.url}
-              alt={f.aciklama || 'Okul fotografi'}
-              fill
-              sizes="(max-width: 1024px) 50vw, 25vw"
-              className="object-cover transition-transform group-hover:scale-105"
-              unoptimized
-            />
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-              <p className="text-white text-xs">{f.aciklama || ''}</p>
-            </div>
-            <button onClick={e => { e.stopPropagation(); deleteFoto(f.id, f.storagePath) }}
-              className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">×</button>
-          </div>
-        ))}
+          {fotos.map(f => {
+            const src = activityPhotoUrl(f)
+            const student = Array.isArray(f.ogrenciler) ? f.ogrenciler[0] : f.ogrenciler
+            return (
+              <div key={f.id} className="relative aspect-square rounded-xl overflow-hidden group cursor-pointer bg-[#0d160d]" onClick={() => src && setViewer(src)}>
+                {src ? (
+                  <Image
+                    src={src}
+                    alt={f.detay?.not || student?.ad_soyad || 'Okul fotoğrafı'}
+                    fill
+                    sizes="(max-width: 1024px) 50vw, 25vw"
+                    className="object-cover transition-transform group-hover:scale-105"
+                    unoptimized
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-4xl">📷</div>
+                )}
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                  <p className="text-white text-xs font-semibold">{student?.ad_soyad || 'Öğrenci'}</p>
+                  <p className="text-white/80 text-xs">{f.detay?.not || f.detay?.aciklama || ''}</p>
+                </div>
+                <button onClick={e => { e.stopPropagation(); deleteFoto(f.id, getPhotoStoragePath(f.detay)) }}
+                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+              </div>
+            )
+          })}
         {!fotos.length && <div className="col-span-4 text-center py-16 text-[rgba(255,255,255,0.35)]">📷 Fotoğraf yok</div>}
       </div>
 
@@ -1202,16 +1269,24 @@ function Fotograflar({ siniflar, okul, dark }: any) {
           </div>
           <div>
             <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Sınıf</label>
-            <select value={form.sinif || ''} onChange={e => setForm({ ...form, sinif: e.target.value })}
+            <select value={form.sinif || ''} onChange={e => setForm({ ...form, sinif: e.target.value, ogrenci_id: '' })}
               className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]`}>
               <option value="">Tüm okul</option>
               {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
             </select>
           </div>
+          <div>
+            <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Öğrenci</label>
+            <select value={form.ogrenci_id || ''} onChange={e => setForm({ ...form, ogrenci_id: e.target.value })}
+              className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]`}>
+              <option value="">Öğrenci seçin</option>
+              {selectableStudents.map((o: Ogrenci) => <option key={o.id} value={o.id}>{o.ad_soyad}</option>)}
+            </select>
+          </div>
         </div>
         <div className={`px-5 py-4 border-t flex justify-end gap-2 border-[rgba(74,222,128,0.14)]`}>
           <button onClick={() => setModal(false)} className="border border-[rgba(74,222,128,0.2)] px-4 py-2 rounded-lg text-sm text-[rgba(255,255,255,0.6)] hover:border-[rgba(74,222,128,0.4)] transition-colors">İptal</button>
-          <button onClick={upload} disabled={uploading} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60">
+          <button onClick={upload} disabled={uploading || !files.length || !form.ogrenci_id} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60">
             {uploading ? '⏳ Yükleniyor...' : '💾 Yükle'}
           </button>
         </div>
@@ -1433,9 +1508,13 @@ function Personel({ siniflar, okul, dark }: any) {
     setSaving(true)
     setSaveError(null)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/personel-ekle', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({
           okul_id: okul.id,
           ad_soyad: form.ad_soyad,
@@ -1859,7 +1938,7 @@ function OkulAyarlari({ okul, dark, setOkul }: any) {
   useEffect(() => { if (okul) setForm({ ...okul }) }, [okul])
 
   async function save() {
-    await supabase.from('okullar').update({ ad: form.ad, telefon: form.telefon, adres: form.adres, sifre: form.sifre, logo_url: form.logo_url || null }).eq('id', okul.id)
+    await supabase.from('okullar').update({ ad: form.ad, telefon: form.telefon, adres: form.adres, logo_url: form.logo_url || null }).eq('id', okul.id)
     setOkul({ ...okul, ...form })
     setSaved(true); setTimeout(() => setSaved(false), 2000)
   }
@@ -1880,11 +1959,9 @@ function OkulAyarlari({ okul, dark, setOkul }: any) {
       } else {
         const { data } = supabase.storage.from('logos').getPublicUrl(storagePath)
         const newLogoUrl = data.publicUrl
-        console.log('[logo] getPublicUrl:', newLogoUrl)
         setForm((prev: any) => ({ ...prev, logo_url: newLogoUrl }))
         setOkul({ ...okul, logo_url: newLogoUrl })
-        const { error: dbError } = await supabase.from('okullar').update({ logo_url: newLogoUrl }).eq('id', okul.id)
-        console.log('[logo] db update error:', dbError)
+        await supabase.from('okullar').update({ logo_url: newLogoUrl }).eq('id', okul.id)
       }
     } finally {
       setUploadingLogo(false)
@@ -1917,11 +1994,6 @@ function OkulAyarlari({ okul, dark, setOkul }: any) {
               className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
           </div>
         ))}
-        <div>
-          <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Yönetici Şifresi</label>
-          <input type="password" value={form.sifre || ''} onChange={e => setForm({ ...form, sifre: e.target.value })}
-            className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
-        </div>
         <button onClick={save} className="w-full bg-[#4ade80] text-black py-3 rounded-lg text-sm font-semibold">
           {saved ? '✅ Kaydedildi!' : 'Kaydet'}
         </button>

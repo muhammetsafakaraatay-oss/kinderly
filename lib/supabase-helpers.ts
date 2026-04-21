@@ -8,6 +8,20 @@ type SupabaseErrorLike = {
   hint?: string | null
 } | null | undefined
 
+type MessageRowLike = {
+  id?: number | string | null
+  okul_id?: string | number | null
+  ogrenci_id?: number | null
+  gonderen_id?: string | number | null
+  gonderen_rol?: string | null
+  gonderen_ad?: string | null
+  alici_id?: number | null
+  icerik?: string | null
+  mesaj?: string | null
+  content?: string | null
+  created_at?: string | null
+}
+
 export type ChildRecord = {
   id: number
   ad_soyad: string
@@ -18,6 +32,24 @@ type MessagePartyResult = {
   senderId: number
   receiverId: number | null
   receiverIds: number[]
+}
+
+type SendMessageCompatResult = {
+  sentCount: number
+  failedCount: number
+  attemptedCount: number
+  error: SupabaseErrorLike
+  partialFailure: SupabaseErrorLike
+}
+
+export type ActivityWithPhotoDetail = {
+  detay?: {
+    url?: string | null
+    storagePath?: string | null
+    path?: string | null
+    [key: string]: unknown
+  } | null
+  [key: string]: unknown
 }
 
 export type AnnouncementItem = {
@@ -41,6 +73,8 @@ export type NormalizedMessage = {
 }
 
 const PHOTO_BUCKET = 'photos'
+const SIGNED_URL_EXPIRES_IN = 60 * 60
+const PARENT_APP_ACCESS_TYPES = ['parent', 'family']
 
 function errorText(error: SupabaseErrorLike) {
   return `${error?.code ?? ''} ${error?.message ?? ''} ${error?.details ?? ''} ${error?.hint ?? ''}`.toLowerCase()
@@ -52,6 +86,57 @@ function isInvalidIntegerError(error: SupabaseErrorLike) {
 
 function isProduction() {
   return process.env.NODE_ENV === 'production'
+}
+
+function normalizeEmail(value: unknown) {
+  return String(value ?? '').trim().toLocaleLowerCase('tr-TR')
+}
+
+function messageText(row: MessageRowLike) {
+  return `${row.content ?? row.icerik ?? row.mesaj ?? ''}`.trim()
+}
+
+function messageTimestamp(row: MessageRowLike) {
+  const value = row.created_at ? Date.parse(row.created_at) : Number.NaN
+  return Number.isFinite(value) ? value : null
+}
+
+function isStaffFanoutDuplicate(a: MessageRowLike, b: MessageRowLike) {
+  if (!a || !b) return false
+  if (!['admin', 'ogretmen'].includes(a.gonderen_rol ?? '')) return false
+  if (!['admin', 'ogretmen'].includes(b.gonderen_rol ?? '')) return false
+  if ((a.gonderen_rol ?? null) !== (b.gonderen_rol ?? null)) return false
+  if ((a.ogrenci_id ?? null) !== (b.ogrenci_id ?? null)) return false
+  if (`${a.gonderen_id ?? ''}` !== `${b.gonderen_id ?? ''}`) return false
+  if (messageText(a) !== messageText(b)) return false
+
+  const senderRecipient = a.alici_id == null ? null : String(a.alici_id)
+  const candidateRecipient = b.alici_id == null ? null : String(b.alici_id)
+
+  if (!senderRecipient || !candidateRecipient || senderRecipient === candidateRecipient) {
+    return false
+  }
+
+  const firstTs = messageTimestamp(a)
+  const secondTs = messageTimestamp(b)
+
+  if (firstTs == null || secondTs == null) return false
+
+  return Math.abs(firstTs - secondTs) <= 3000
+}
+
+export function dedupeThreadMessages<T extends MessageRowLike>(rows: T[]) {
+  const deduped: T[] = []
+
+  for (const row of rows) {
+    const previous = deduped[deduped.length - 1]
+    if (previous && isStaffFanoutDuplicate(previous, row)) {
+      continue
+    }
+    deduped.push(row)
+  }
+
+  return deduped
 }
 
 export function isMissingColumnError(error: SupabaseErrorLike, columns: string[]) {
@@ -77,12 +162,98 @@ export function getUserFacingErrorMessage(error: SupabaseErrorLike, fallback = '
   return fallback
 }
 
-export async function loadParentChildren(userId: string, okulId: string | number) {
-  const relationQuery = await supabase
+async function selectActiveParentRows(okulId: string | number, ogrenciId: number) {
+  const scoped = await supabase
+    .from('veliler')
+    .select('id,iliski_tipi')
+    .eq('okul_id', okulId)
+    .eq('ogrenci_id', ogrenciId)
+    .eq('aktif', true)
+    .in('iliski_tipi', PARENT_APP_ACCESS_TYPES)
+    .limit(10)
+
+  if (!scoped.error || !isMissingColumnError(scoped.error, ['iliski_tipi'])) {
+    return scoped
+  }
+
+  return supabase
+    .from('veliler')
+    .select('id')
+    .eq('okul_id', okulId)
+    .eq('ogrenci_id', ogrenciId)
+    .eq('aktif', true)
+    .limit(10)
+}
+
+async function selectParentChildrenRows(userId: string, okulId: string | number) {
+  const scoped = await supabase
     .from('veliler')
     .select('ogrenci_id, ogrenciler(id,ad_soyad,sinif)')
     .eq('user_id', userId)
     .eq('okul_id', okulId)
+    .eq('aktif', true)
+    .in('iliski_tipi', PARENT_APP_ACCESS_TYPES)
+
+  if (!scoped.error || !isMissingColumnError(scoped.error, ['iliski_tipi'])) {
+    return scoped
+  }
+
+  return supabase
+    .from('veliler')
+    .select('ogrenci_id, ogrenciler(id,ad_soyad,sinif)')
+    .eq('user_id', userId)
+    .eq('okul_id', okulId)
+    .eq('aktif', true)
+}
+
+async function selectParentChildIds(userId: string, okulId: string | number) {
+  const scoped = await supabase
+    .from('veliler')
+    .select('ogrenci_id')
+    .eq('user_id', userId)
+    .eq('okul_id', okulId)
+    .eq('aktif', true)
+    .in('iliski_tipi', PARENT_APP_ACCESS_TYPES)
+
+  if (!scoped.error || !isMissingColumnError(scoped.error, ['iliski_tipi'])) {
+    return scoped
+  }
+
+  return supabase
+    .from('veliler')
+    .select('ogrenci_id')
+    .eq('user_id', userId)
+    .eq('okul_id', okulId)
+    .eq('aktif', true)
+}
+
+async function selectParentMessageRows(userId: string, okulId: string | number, ogrenciId: number) {
+  const scoped = await supabase
+    .from('veliler')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('okul_id', okulId)
+    .eq('ogrenci_id', ogrenciId)
+    .eq('aktif', true)
+    .in('iliski_tipi', PARENT_APP_ACCESS_TYPES)
+    .limit(1)
+
+  if (!scoped.error || !isMissingColumnError(scoped.error, ['iliski_tipi'])) {
+    return scoped
+  }
+
+  return supabase
+    .from('veliler')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('okul_id', okulId)
+    .eq('ogrenci_id', ogrenciId)
+    .eq('aktif', true)
+    .limit(1)
+}
+
+export async function loadParentChildren(userId: string, okulId: string | number) {
+  const relationQuery = await selectParentChildrenRows(userId, okulId)
 
   const relationRows = (relationQuery.data || [])
     .map((item) => {
@@ -96,11 +267,7 @@ export async function loadParentChildren(userId: string, okulId: string | number
     return { data: relationRows, error: null as SupabaseErrorLike }
   }
 
-  const veliQuery = await supabase
-    .from('veliler')
-    .select('ogrenci_id')
-    .eq('user_id', userId)
-    .eq('okul_id', okulId)
+  const veliQuery = await selectParentChildIds(userId, okulId)
 
   if (veliQuery.error) {
     return { data: [] as ChildRecord[], error: veliQuery.error }
@@ -127,14 +294,9 @@ export async function loadParentChildren(userId: string, okulId: string | number
 }
 
 export async function resolveParentMessageParties(userId: string, okulId: string | number, ogrenciId: number) {
-  const { data: veli, error: veliError } = await supabase
-    .from('veliler')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('okul_id', okulId)
-    .eq('ogrenci_id', ogrenciId)
-    .maybeSingle()
+  const { data: veliRows, error: veliError } = await selectParentMessageRows(userId, okulId, ogrenciId)
 
+  const veli = veliRows?.[0]
   if (veliError || !veli?.id) {
     return { data: null as MessagePartyResult | null, error: veliError ?? { message: 'Veli kaydı bulunamadı.' } }
   }
@@ -187,24 +349,69 @@ export async function resolveParentMessageParties(userId: string, okulId: string
 }
 
 export async function resolveTeacherMessageParties(userId: string, okulId: string | number, ogrenciId: number) {
-  const { data: personel, error: personelError } = await supabase
+  const { data: user, error: userError } = await supabase.auth.getUser()
+  if (userError) {
+    return { data: null as MessagePartyResult | null, error: userError }
+  }
+
+  let personel: { id: number; rol?: string | null; sinif?: string | null } | null = null
+
+  const { data: personelByUserId, error: personelError } = await supabase
     .from('personel')
-    .select('id')
+    .select('id,rol,sinif')
     .eq('user_id', userId)
     .eq('okul_id', okulId)
+    .eq('aktif', true)
     .maybeSingle()
+
+  personel = personelByUserId
+
+  if (!personel?.id && user?.user?.email) {
+    const email = normalizeEmail(user.user.email)
+    const { data: personelByEmailRows, error: emailError } = await supabase
+      .from('personel')
+      .select('id,email,rol,sinif')
+      .eq('okul_id', okulId)
+      .ilike('email', email)
+      .eq('aktif', true)
+      .limit(5)
+
+    if (emailError) {
+      return { data: null as MessagePartyResult | null, error: emailError }
+    }
+
+    const personelByEmail = personelByEmailRows?.find((row) => normalizeEmail(row.email) === email)
+    personel = personelByEmail ? { id: Number(personelByEmail.id), rol: personelByEmail.rol, sinif: personelByEmail.sinif } : null
+  }
 
   if (personelError || !personel?.id) {
     return { data: null as MessagePartyResult | null, error: personelError ?? { message: 'Personel kaydı bulunamadı.' } }
   }
 
-  const { data: veli, error: veliError } = await supabase
-    .from('veliler')
-    .select('id')
-    .eq('okul_id', okulId)
-    .eq('ogrenci_id', ogrenciId)
-    .eq('aktif', true)
-    .limit(10)
+  if (isTeacherRole(personel.rol)) {
+    const teacherClass = typeof personel.sinif === 'string' ? personel.sinif.trim() : ''
+    if (!teacherClass) {
+      return { data: null as MessagePartyResult | null, error: { message: 'Bu öğretmene sınıf atanmamış.' } }
+    }
+
+    const { data: childClass, error: childClassError } = await supabase
+      .from('ogrenciler')
+      .select('id,sinif')
+      .eq('okul_id', okulId)
+      .eq('id', ogrenciId)
+      .eq('aktif', true)
+      .maybeSingle()
+
+    if (childClassError || !childClass) {
+      return { data: null as MessagePartyResult | null, error: childClassError ?? { message: 'Öğrenci kaydı bulunamadı.' } }
+    }
+
+    if (childClass.sinif !== teacherClass) {
+      return { data: null as MessagePartyResult | null, error: { message: 'Bu öğrenci öğretmenin atanmış sınıfında değil.' } }
+    }
+  }
+
+  const { data: veli, error: veliError } = await selectActiveParentRows(okulId, ogrenciId)
 
   const receiverIds = Array.from(
     new Set((veli || []).map((item) => Number(item.id)).filter((id) => Number.isFinite(id)))
@@ -227,23 +434,28 @@ export async function resolveTeacherMessageParties(userId: string, okulId: strin
   }
 }
 
-export async function sendMessageToRecipientsCompat(base: Record<string, unknown>, receiverIds: number[], content: string) {
+export async function sendMessageToRecipientsCompat(base: Record<string, unknown>, receiverIds: number[], content: string): Promise<SendMessageCompatResult> {
   const uniqueReceiverIds = Array.from(new Set(receiverIds)).filter((id) => Number.isFinite(id))
 
   if (!uniqueReceiverIds.length) {
     return {
       sentCount: 0,
+      failedCount: 0,
+      attemptedCount: 0,
       error: { message: 'Mesaj gönderilecek alıcı bulunamadı.' } as SupabaseErrorLike,
+      partialFailure: null as SupabaseErrorLike,
     }
   }
 
   let lastError: SupabaseErrorLike = null
   let sentCount = 0
+  let failedCount = 0
 
   for (const receiverId of uniqueReceiverIds) {
     const { error } = await insertMessageCompat({ ...base, alici_id: receiverId }, content)
     if (error) {
       lastError = error
+      failedCount += 1
       continue
     }
     sentCount += 1
@@ -251,7 +463,10 @@ export async function sendMessageToRecipientsCompat(base: Record<string, unknown
 
   return {
     sentCount,
+    failedCount,
+    attemptedCount: uniqueReceiverIds.length,
     error: sentCount > 0 ? null as SupabaseErrorLike : lastError,
+    partialFailure: failedCount > 0 ? lastError : null as SupabaseErrorLike,
   }
 }
 
@@ -436,7 +651,7 @@ export async function loadSchoolMessagesCompat(okulId: string | number, limit = 
       : primary
 
   return {
-    data: (response.data || []).map((row) => normalizeMessage(row as Record<string, unknown>)),
+    data: dedupeThreadMessages((response.data || []).map((row) => normalizeMessage(row as Record<string, unknown>))),
     error: response.error,
   }
 }
@@ -462,7 +677,7 @@ export async function loadStudentMessagesCompat(okulId: string | number, ogrenci
       : primary
 
   return {
-    data: (response.data || []).map((row) => normalizeMessage(row as Record<string, unknown>)).reverse(),
+    data: dedupeThreadMessages((response.data || []).map((row) => normalizeMessage(row as Record<string, unknown>)).reverse()),
     error: response.error,
   }
 }
@@ -489,6 +704,58 @@ export async function createSignedPhotoUrl(storagePath: string, expiresIn = 60 *
     data: data?.signedUrl ?? null,
     error,
   }
+}
+
+export function getPhotoStoragePath(detay: ActivityWithPhotoDetail['detay']) {
+  if (detay?.storagePath || detay?.path) {
+    return detay.storagePath || detay.path || null
+  }
+
+  const rawUrl = typeof detay?.url === 'string' ? detay.url : null
+  if (!rawUrl) return null
+  if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) return rawUrl
+
+  try {
+    const url = new URL(rawUrl)
+    const markers = [
+      `/object/public/${PHOTO_BUCKET}/`,
+      `/object/sign/${PHOTO_BUCKET}/`,
+      `/object/authenticated/${PHOTO_BUCKET}/`,
+      `/${PHOTO_BUCKET}/`,
+    ]
+
+    for (const marker of markers) {
+      const markerIndex = url.pathname.indexOf(marker)
+      if (markerIndex >= 0) {
+        return decodeURIComponent(url.pathname.slice(markerIndex + marker.length))
+      }
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
+export async function withSignedPhotoUrls<T extends ActivityWithPhotoDetail>(rows: T[]) {
+  return Promise.all(
+    rows.map(async (row) => {
+      const storagePath = getPhotoStoragePath(row.detay)
+      const existingUrl = typeof row.detay?.url === 'string' ? row.detay.url : null
+      if (!storagePath) return row
+
+      const signed = await createSignedPhotoUrl(storagePath, SIGNED_URL_EXPIRES_IN)
+
+      return {
+        ...row,
+        detay: {
+          ...row.detay,
+          url: signed.data || existingUrl || null,
+          storagePath,
+        },
+      }
+    })
+  )
 }
 
 export async function createSignedStorageUrl(bucket: string, storagePath: string, expiresIn = 60 * 60) {
