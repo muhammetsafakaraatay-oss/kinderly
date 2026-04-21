@@ -1149,7 +1149,7 @@ function Fotograflar({ ogrenciler, siniflar, okul, dark }: any) {
   async function load() {
     const { data } = await supabase
       .from('aktiviteler')
-      .select('id,ogrenci_id,tur,detay,kaydeden,tarih,created_at,olusturuldu,ogrenciler(ad_soyad,sinif)')
+      .select('id,ogrenci_id,tur,detay,kaydeden,tarih,olusturuldu,ogrenciler(ad_soyad,sinif)')
       .eq('okul_id', okul.id)
       .eq('tur', 'photo')
       .order('id', { ascending: false })

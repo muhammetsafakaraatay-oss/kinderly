@@ -323,7 +323,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
           supabase.from('yoklama').select('ogrenci_id,durum').eq('okul_id', currentOkul.id).eq('tarih', today()),
           supabase
             .from('aktiviteler')
-            .select('id,ogrenci_id,tur,detay,kaydeden,created_at,olusturuldu,ogrenciler(ad_soyad)')
+            .select('id,ogrenci_id,tur,detay,kaydeden,olusturuldu,ogrenciler(ad_soyad)')
             .eq('okul_id', currentOkul.id)
             .eq('tarih', today())
             .order('id', { ascending: false })
@@ -390,7 +390,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
       .on('postgres_changes', { event: '*', schema: 'public', table: 'aktiviteler', filter: `okul_id=eq.${currentOkul.id}` }, async () => {
         const { data } = await supabase
           .from('aktiviteler')
-          .select('id,ogrenci_id,tur,detay,kaydeden,created_at,olusturuldu,ogrenciler(ad_soyad)')
+          .select('id,ogrenci_id,tur,detay,kaydeden,olusturuldu,ogrenciler(ad_soyad)')
           .eq('okul_id', currentOkul.id)
           .eq('tarih', today())
           .order('id', { ascending: false })

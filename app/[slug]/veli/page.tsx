@@ -292,7 +292,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
         const [activityQuery, attendanceQuery, announcementQuery, feeQuery, messageQuery] = await Promise.all([
           supabase
             .from('aktiviteler')
-            .select('id,tur,detay,kaydeden,created_at,olusturuldu')
+            .select('id,tur,detay,kaydeden,olusturuldu')
             .eq('okul_id', currentOkul.id)
             .eq('ogrenci_id', currentChildId)
             .eq('tarih', today())
@@ -345,7 +345,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
       .on('postgres_changes', { event: '*', schema: 'public', table: 'aktiviteler', filter: `okul_id=eq.${currentOkul.id}` }, async () => {
         const { data } = await supabase
           .from('aktiviteler')
-          .select('id,tur,detay,kaydeden,created_at,olusturuldu')
+          .select('id,tur,detay,kaydeden,olusturuldu')
           .eq('okul_id', currentOkul.id)
           .eq('ogrenci_id', currentChildId)
           .eq('tarih', today())
