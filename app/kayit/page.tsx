@@ -47,21 +47,21 @@ export default function KayitPage() {
 
   const stepCopy = {
     1: {
-      eyebrow: 'Adim 1',
-      title: 'Okulunuzun adini yazin, geri kalanini biz hazirlayalim.',
-      text: 'Kinderly paneliniz otomatik olarak olusur. Ilk adimda sadece okul adinizi bilmemiz yeterli.',
+      eyebrow: 'Adım 1',
+      title: 'Okulunuzun adını yazın, geri kalanını biz hazırlayalım.',
+      text: 'KinderX paneliniz otomatik olarak oluşur. İlk adımda sadece okul adınızı bilmemiz yeterli.',
     },
     2: {
-      eyebrow: 'Adim 2',
+      eyebrow: 'Adım 2',
       title: schoolName
-        ? `Merhaba! ${schoolName} icin yonetici hesabini olusturalim.`
-        : 'Merhaba! Yönetici hesabini olusturalim.',
-      text: 'Bu hesap ayni anda okul sahibiniz, yonetim paneliniz ve ilk operasyon merkeziniz olacak.',
+        ? `Merhaba! ${schoolName} için yönetici hesabını oluşturalım.`
+        : 'Merhaba! Yönetici hesabını oluşturalım.',
+      text: 'Bu hesap aynı anda okul sahibiniz, yönetim paneliniz ve ilk operasyon merkeziniz olacak.',
     },
     3: {
-      eyebrow: 'Hazir',
-      title: `${schoolName} icin her sey canli.`,
-      text: 'Admin paneliniz acildi, ekip daveti ve ilk kurulum adimlari sizi bekliyor.',
+      eyebrow: 'Hazır',
+      title: `${schoolName} için her şey canlı.`,
+      text: 'Admin paneliniz açıldı, ekip daveti ve ilk kurulum adımları sizi bekliyor.',
     },
   } as const
 
@@ -107,7 +107,7 @@ export default function KayitPage() {
       })
     } catch {
       setSubmitting(false)
-      setError('Kayit servisine ulasilamadi. Baglantinizi kontrol edip tekrar deneyin.')
+      setError('Kayıt servisine ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.')
       return
     }
 
@@ -115,13 +115,13 @@ export default function KayitPage() {
 
     if (!response.ok) {
       setSubmitting(false)
-      setError(typeof result?.error === 'string' ? result.error : 'Kayit tamamlanamadi.')
+      setError(typeof result?.error === 'string' ? result.error : 'Kayıt tamamlanamadı.')
       return
     }
 
     if (!hasSupabaseEnv) {
       setSubmitting(false)
-      setError('Kayit olustu fakat web oturumu icin Supabase ayarlari eksik. Lutfen daha sonra giris yapin.')
+      setError('Kayıt oluştu fakat web oturumu için Supabase ayarları eksik. Lütfen daha sonra giriş yapın.')
       setPanelHref('/giris')
       setStep(3)
       return
@@ -136,7 +136,7 @@ export default function KayitPage() {
 
     if (signInError) {
       setSubmitting(false)
-      setError('Kayit tamamlandi fakat otomatik giris basarisiz oldu. Lutfen giris ekranindan devam edin.')
+      setError('Kayıt tamamlandı fakat otomatik giriş başarısız oldu. Lütfen giriş ekranından devam edin.')
       setPanelHref('/giris')
       setStep(3)
       return
@@ -205,19 +205,19 @@ export default function KayitPage() {
               K
             </div>
             <div>
-              <div className="text-sm font-semibold text-white">Kinderly</div>
-              <div className="text-xs text-[var(--muted)]">Kuruluma hos geldiniz</div>
+              <div className="text-sm font-semibold text-white">KinderX</div>
+              <div className="text-xs text-[var(--muted)]">Kuruluma hoş geldiniz</div>
             </div>
           </Link>
           <Link href="/giris" className="text-sm text-[var(--muted)] transition-colors hover:text-white">
-            Zaten hesabin var mi?
+            Zaten hesabın var mı?
           </Link>
         </div>
 
         <div className="mt-10">
           <div className="mb-4 flex items-center justify-between text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">
-            <span>Kurulum akisi</span>
-            <span>Adim {step} / 3</span>
+            <span>Kurulum akışı</span>
+            <span>Adım {step} / 3</span>
           </div>
           <div className="h-2 rounded-full bg-white/[0.05]">
             <div
@@ -257,16 +257,16 @@ export default function KayitPage() {
                   <br />
                   operasyon merkezi
                   <br />
-                  hazirlaniyor.
+                  hazırlanıyor.
                 </>
               )}
               {step === 2 && (
                 <>
                   Simdi guvenli
                   <br />
-                  yonetici hesabini
+                  yönetici hesabını
                   <br />
-                  olusturup
+                  oluşturup
                   <br />
                   acilisi yapalim.
                 </>
@@ -275,7 +275,7 @@ export default function KayitPage() {
                 <>
                   {schoolName}
                   <br />
-                  Kinderly&apos;e
+                  KinderX&apos;e
                   <br />
                   katildi ve
                   <br />
@@ -286,13 +286,13 @@ export default function KayitPage() {
             <p className="mt-6 text-lg leading-relaxed text-[var(--muted)]">{stepCopy[step].text}</p>
 
             <div className="mt-10 rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-6 backdrop-blur-xl">
-              <div className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Neler hazir olacak?</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Neler hazır olacak?</div>
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 {[
                   ['Canli admin paneli', 'Rol bazli yonetim ekranlari'],
                   ['Premium veli deneyimi', 'Mesaj, feed ve galeri akisi'],
                   ['Tahsilat gorunurlugu', 'Aidat ve finans modulleri'],
-                  ['Operasyon hizlanmasi', 'Yoklama ve gunluk rapor otomasyonu'],
+                  ['Operasyon hızlanması', 'Yoklama ve günlük rapor otomasyonu'],
                 ].map(([title, text]) => (
                   <div key={title} className="rounded-[20px] border border-[var(--border)] bg-white/[0.02] p-4">
                     <div className="text-sm font-semibold text-white">{title}</div>
@@ -329,7 +329,7 @@ export default function KayitPage() {
                       className="w-full border-none bg-transparent text-2xl font-medium text-white outline-none placeholder:text-white/26"
                     />
                     <div className="mt-6 border-t border-[var(--border)] pt-4 text-sm text-[var(--muted)]">
-                      Paneliniz: <span className="font-semibold text-[var(--green)]">kinderly.app/{slug || 'okulunuz'}</span>
+                      Paneliniz: <span className="font-semibold text-[var(--green)]">kinderx.app/{slug || 'okulunuz'}</span>
                     </div>
                   </div>
 
@@ -347,10 +347,10 @@ export default function KayitPage() {
                 <div className="space-y-8">
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
-                      Adim 2
+                      Adım 2
                     </div>
                     <h2 className="serif mt-3 text-4xl text-white">
-                      Merhaba! {schoolName} icin hesap olusturalim.
+                      Merhaba! {schoolName} için hesap oluşturalım.
                     </h2>
                   </div>
 
@@ -408,7 +408,7 @@ export default function KayitPage() {
                       onClick={handleCreateAccount}
                       className="flex-1 rounded-full bg-[var(--green)] px-6 py-4 text-sm font-bold text-[#060a06] transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_40px_rgba(74,222,128,0.22)] disabled:opacity-60"
                     >
-                      {submitting ? 'Hesap olusturuluyor...' : 'Hesap Olustur →'}
+                      {submitting ? 'Hesap oluşturuluyor...' : 'Hesap Oluştur →'}
                     </button>
                   </div>
                 </div>
@@ -420,16 +420,16 @@ export default function KayitPage() {
                     🎉
                   </div>
                   <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--green)]">Hazir!</div>
-                    <h2 className="serif mt-4 text-5xl text-white">{schoolName} Kinderly&apos;e Katildi!</h2>
+                    <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--green)]">Hazır!</div>
+                    <h2 className="serif mt-4 text-5xl text-white">{schoolName} KinderX&apos;e Katıldı!</h2>
                     <p className="mx-auto mt-4 max-w-[520px] text-lg leading-relaxed text-[var(--muted)]">
-                      Admin paneliniz olustu, oturumunuz acildi ve ilk kurulum adimlari sizin icin hazir.
+                      Admin paneliniz oluştu, oturumunuz açıldı ve ilk kurulum adımları sizin için hazır.
                     </p>
                   </div>
 
                   <div className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-6 text-left">
-                    <div className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Hazirlanan alan</div>
-                    <div className="mt-3 text-xl font-semibold text-white">kinderly.app/{slug}/admin</div>
+                    <div className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Hazırlanan alan</div>
+                    <div className="mt-3 text-xl font-semibold text-white">kinderx.app/{slug}/admin</div>
                     <div className="mt-2 text-sm text-[var(--muted)]">
                       Öğrenciler, sınıflar, aidatlar ve iletişim modülleri kullanıma hazır.
                     </div>

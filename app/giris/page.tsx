@@ -20,8 +20,8 @@ const trustStats = [
 
 const supportPoints = [
   'Yöneticiler, öğretmenler ve veliler tek hesap altyapısında buluşur.',
-  'Bildirim, aidat ve gunluk akislara ayni oturumdan erisirsiniz.',
-  'Yeni premium onboarding ile acilan okul paneli burada devam eder.',
+  'Bildirim, aidat ve günlük akışlara aynı oturumdan erişirsiniz.',
+  'Yeni premium onboarding ile açılan okul paneli burada devam eder.',
 ] as const
 
 const REDIRECT_RESOLUTION_TIMEOUT_MS = 3000
@@ -72,7 +72,7 @@ function GirisContent() {
     submitting
       ? 'Giriş yapılıyor...'
       : authLoading && session && !hasValidSession
-        ? 'Panel hazirlaniyor...'
+        ? 'Panel hazırlanıyor...'
         : 'Panele giriş yap'
   const isPreparingPanel = authLoading && !!session && !hasValidSession
   const isBusy = submitting || (isPreparingPanel && !prepareOverlayTimedOut)
@@ -242,7 +242,7 @@ function GirisContent() {
               K
             </div>
             <div>
-              <div className="text-sm font-semibold text-white">Kinderly</div>
+              <div className="text-sm font-semibold text-white">KinderX</div>
               <div className="text-xs text-[var(--muted)]">Premium okul operasyonu</div>
             </div>
           </Link>
@@ -252,13 +252,13 @@ function GirisContent() {
               href="/kayit"
               className="hidden rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--muted)] transition-colors hover:text-white sm:inline-flex"
             >
-              Yeni okul kur
+              Yeni okul oluştur
             </Link>
             <Link
               href="/"
               className="rounded-full border border-[var(--border)] bg-white/[0.03] px-4 py-2 text-sm text-white transition-colors hover:bg-white/[0.06]"
             >
-              Landing page
+              Ana sayfa
             </Link>
           </div>
         </header>
@@ -272,7 +272,7 @@ function GirisContent() {
             <h1 className="serif mt-6 text-[clamp(3.1rem,6.8vw,6.4rem)] leading-[0.92] tracking-[-0.06em] text-white">
               Ekip, veli ve yönetim
               <br />
-              ayni premium sistemde
+              aynı premium sistemde
               <br />
               bulusuyor.
             </h1>
@@ -322,7 +322,7 @@ function GirisContent() {
                   <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">Hesabınızla devam edin</h2>
                 </div>
                 <div className="rounded-full border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-xs text-[var(--muted)]">
-                  Mobil ile ayni hesap
+                  Mobil ile aynı hesap
                 </div>
               </div>
 
@@ -332,8 +332,8 @@ function GirisContent() {
 
               {!hasSupabaseEnv && (
                 <div className="mt-6 rounded-[22px] border border-amber-300/20 bg-amber-400/10 px-4 py-4 text-sm leading-6 text-amber-100">
-                  Vercel ortam degiskenleri eksik. `NEXT_PUBLIC_SUPABASE_URL` ve `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-                  tanimlanmadan web girisi calismaz.
+                  Vercel ortam değişkenleri eksik. `NEXT_PUBLIC_SUPABASE_URL` ve `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+                  tanımlanmadan web girişi çalışmaz.
                 </div>
               )}
 
@@ -370,6 +370,11 @@ function GirisContent() {
                     autoComplete="current-password"
                     className="w-full rounded-[20px] border border-[var(--border)] bg-white/[0.03] px-4 py-4 text-sm font-medium text-white outline-none transition-all placeholder:text-white/25 focus:border-[var(--green)] focus:bg-white/[0.05]"
                   />
+                  <div className="mt-3 flex justify-end">
+                    <Link href="/sifremi-unuttum" className="text-xs font-semibold text-[var(--green-strong)] transition-colors hover:text-white">
+                      Şifremi unuttum
+                    </Link>
+                  </div>
                 </div>
               </div>
 
@@ -423,10 +428,10 @@ function GirisContent() {
                   <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--green-strong)]">Destek</div>
                   <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Kurulum, erişim veya davet sorunlarında ekip hızlıca yardımcı olur.</p>
                   <a
-                    href="mailto:info@kinderly.app"
+                    href="mailto:support@kinderx.app"
                     className="mt-4 inline-flex text-sm font-semibold text-white transition-colors hover:text-[var(--green-strong)]"
                   >
-                    info@kinderly.app
+                    support@kinderx.app
                   </a>
                 </div>
               </div>

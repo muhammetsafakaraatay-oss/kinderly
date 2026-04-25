@@ -1,7 +1,7 @@
 'use client'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import {
@@ -23,11 +23,16 @@ import {
   Settings,
 } from 'lucide-react'
 import { SiniflarPanel } from '@/components/admin/siniflar-panel'
+import { FinansPanel } from '@/components/admin/finans-panel'
+import { TeslimPanel } from '@/components/admin/teslim-panel'
+import { VelilerPanel } from '@/components/admin/veliler-panel'
+import { firstActiveContact } from '@/lib/contact-utils'
 import { supabase } from '@/lib/supabase'
 import { getPhotoStoragePath, withSignedPhotoUrls } from '@/lib/supabase-helpers'
 import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
-import { Ogrenci, Sinif, Okul } from '@/lib/types'
+import { localMonthKey, toLocalDateKey, todayLocalKey } from '@/lib/date-utils'
+import { Ogrenci, Sinif, Okul, VeliRecord } from '@/lib/types'
 
 export default function AdminPage({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter()
@@ -36,6 +41,7 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   const [okul, setOkul] = useState<Okul | null>(null)
   const [ogrenciler, setOgrenciler] = useState<Ogrenci[]>([])
   const [siniflar, setSiniflar] = useState<Sinif[]>([])
+  const [veliler, setVeliler] = useState<VeliRecord[]>([])
   const [activePage, setActivePage] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [authTimeout, setAuthTimeout] = useState(false)
@@ -46,20 +52,26 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   const activeOkul = okul ?? (authOkul as Okul | null)
 
   async function loadAll(okulId: number) {
-    const [{ data: ogr }, { data: sinif }, { data: okulData }] = await Promise.all([
+    const [{ data: ogr }, { data: sinif }, { data: okulData }, { data: veliData }] = await Promise.all([
       supabase
         .from('ogrenciler')
-        .select('id,ad_soyad,sinif,okul_id,aktif,dogum_tarihi,alerjiler,veli_ad,veli_telefon,veli2_ad,veli2_telefon,aidat_tutari,kan_grubu,ilac,adres,aciklama,kayit_tarihi')
+        .select('id,ad_soyad,sinif,okul_id,aktif,dogum_tarihi,alerjiler,aidat_tutari,kan_grubu,ilac,adres,aciklama,kayit_tarihi,baglanti_kodu,profil_foto_path,veli_ad,veli_telefon,veli2_ad,veli2_telefon')
         .eq('okul_id', okulId)
         .eq('aktif', true)
         .order('ad_soyad')
         .limit(500),
       supabase.from('siniflar').select('id,ad,okul_id').eq('okul_id', okulId).order('ad'),
       supabase.from('okullar').select('id,ad,slug,logo_url,telefon,adres').eq('id', okulId).maybeSingle(),
+      supabase
+        .from('veliler')
+        .select('id,okul_id,ogrenci_id,user_id,ad_soyad,email,telefon,aktif,iliski_tipi,yakinlik,teslim_alabilir,acil_durum_kisisi,notlar,davet_gonderildi_at,son_davet_durumu,teslim_pin,ogrenciler(id,ad_soyad,sinif,baglanti_kodu)')
+        .eq('okul_id', okulId)
+        .order('ad_soyad'),
     ])
     if (ogr) setOgrenciler(ogr)
     if (sinif) setSiniflar(sinif)
     if (okulData) setOkul(okulData as Okul)
+    if (veliData) setVeliler(veliData as VeliRecord[])
   }
 
   useEffect(() => { params.then(p => setSlug(p.slug)) }, [params])
@@ -138,7 +150,10 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
   const navItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Ana Panel' },
     { id: 'ogrenciler', icon: Users, label: 'Öğrenciler' },
+    { id: 'veliler', icon: Users, label: 'Aile Kişileri' },
     { id: 'siniflar', icon: School, label: 'Sınıflar' },
+    { id: 'finans', icon: Wallet, label: 'Finans' },
+    { id: 'teslim', icon: ClipboardCheck, label: 'QR Teslim' },
     { id: 'yoklama', icon: ClipboardCheck, label: 'Yoklama' },
     { id: 'aktivite', icon: Sparkles, label: 'Aktiviteler' },
     { id: 'gunluk', icon: FileText, label: 'Günlük Rapor' },
@@ -164,11 +179,11 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
             <img src={activeOkul.logo_url} alt={activeOkul.ad} className="h-9 w-9 rounded-lg object-cover" />
           ) : (
             <div className="w-9 h-9 bg-[#4ade80] rounded-lg flex items-center justify-center text-sm font-bold text-black">
-              {(activeOkul?.ad || 'Kinderly').split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase()}
+              {(activeOkul?.ad || 'KinderX').split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase()}
             </div>
           )}
           <div>
-            <div className="text-sm font-semibold text-white">{activeOkul?.ad || 'Kinderly'}</div>
+            <div className="text-sm font-semibold text-white">{activeOkul?.ad || 'KinderX'}</div>
             <div className="text-xs text-[rgba(255,255,255,0.54)]">Yönetim Paneli</div>
           </div>
         </div>
@@ -206,18 +221,21 @@ export default function AdminPage({ params }: { params: Promise<{ slug: string }
 
         <main className="flex-1 p-4 lg:p-6">
           {activePage === 'dashboard' && <Dashboard okul={activeOkul} ogrenciler={ogrenciler} dark={dark} setActivePage={setActivePage} />}
-          {activePage === 'ogrenciler' && <Ogrenciler ogrenciler={ogrenciler} siniflar={siniflar} okul={activeOkul} dark={dark} reload={() => loadAll(Number(activeOkul.id))} />}
+          {activePage === 'ogrenciler' && <Ogrenciler ogrenciler={ogrenciler} veliler={veliler} siniflar={siniflar} okul={activeOkul} dark={dark} reload={() => loadAll(Number(activeOkul.id))} setActivePage={setActivePage} />}
+          {activePage === 'veliler' && <VelilerPanel okul={activeOkul} onChanged={() => loadAll(Number(activeOkul.id))} />}
           {activePage === 'siniflar' && <SiniflarPanel siniflar={siniflar} ogrenciler={ogrenciler} okul={activeOkul} dark={dark} reload={() => loadAll(Number(activeOkul.id))} />}
+          {activePage === 'finans' && <FinansPanel okul={activeOkul} ogrenciler={ogrenciler} veliler={veliler} />}
+          {activePage === 'teslim' && <TeslimPanel okul={activeOkul} sessionUserId={session?.user.id} />}
           {activePage === 'yoklama' && <Yoklama ogrenciler={ogrenciler} siniflar={siniflar} okul={activeOkul} dark={dark} />}
           {activePage === 'aktivite' && <AktivitePage ogrenciler={ogrenciler} okul={activeOkul} dark={dark} />}
           {activePage === 'gunluk' && <GunlukRaporPage ogrenciler={ogrenciler} siniflar={siniflar} okul={activeOkul} dark={dark} />}
           {activePage === 'gelisim' && <GelisimPage ogrenciler={ogrenciler} okul={activeOkul} dark={dark} />}
           {activePage === 'fotograflar' && <Fotograflar ogrenciler={ogrenciler} siniflar={siniflar} okul={activeOkul} dark={dark} />}
-          {activePage === 'aidat' && <AidatPage ogrenciler={ogrenciler} okul={activeOkul} dark={dark} />}
+          {activePage === 'aidat' && <AidatPage ogrenciler={ogrenciler} veliler={veliler} okul={activeOkul} dark={dark} />}
           {activePage === 'yemek' && <YemekListesi okul={activeOkul} dark={dark} />}
           {activePage === 'personel' && <Personel siniflar={siniflar} okul={activeOkul} dark={dark} />}
           {activePage === 'servis' && <ServisPage ogrenciler={ogrenciler} siniflar={siniflar} okul={activeOkul} dark={dark} />}
-          {activePage === 'mesajlar' && <MesajlarPage ogrenciler={ogrenciler} okul={activeOkul} dark={dark} />}
+          {activePage === 'mesajlar' && <MesajlarPage ogrenciler={ogrenciler} veliler={veliler} okul={activeOkul} dark={dark} />}
           {activePage === 'duyurular' && <Duyurular okul={activeOkul} dark={dark} />}
           {activePage === 'etkinlikler' && <Etkinlikler siniflar={siniflar} okul={activeOkul} dark={dark} />}
           {activePage === 'ayarlar' && <OkulAyarlari okul={activeOkul} dark={dark} setOkul={setOkul} />}
@@ -295,7 +313,7 @@ const AKT_TYPES = [
   { id: 'absence', label: 'Devamsızlık', emoji: '📅', color: '#9e9e9e' },
 ]
 
-function today() { return new Date().toISOString().split('T')[0] }
+function today() { return todayLocalKey() }
 function fmtM(n: number) { return '₺' + (Number(n) || 0).toLocaleString('tr-TR') }
 
 function activityPhotoUrl(row: any) {
@@ -479,7 +497,7 @@ function Dashboard({ okul, ogrenciler, dark, setActivePage }: any) {
 }
 
 // ── ÖĞRENCİLER ──
-function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
+function Ogrenciler({ ogrenciler, veliler, siniflar, okul, dark, reload, setActivePage }: any) {
   const [search, setSearch] = useState('')
   const [sinifFilter, setSinifFilter] = useState('')
   const [modal, setModal] = useState(false)
@@ -493,11 +511,19 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
     (!sinifFilter || o.sinif === sinifFilter)
   )
 
+  const primaryContacts = useMemo(() => {
+    const map: Record<number, VeliRecord | null> = {}
+    ogrenciler.forEach((ogrenci: Ogrenci) => {
+      map[ogrenci.id] = firstActiveContact(veliler as VeliRecord[], ogrenci.id)
+    })
+    return map
+  }, [ogrenciler, veliler])
+
   function openAdd() { setEditing(null); setForm({ aidat_tutari: 3000 }); setSaveError(null); setModal(true) }
   function openEdit(o: Ogrenci) { setEditing(o); setForm({ ...o }); setSaveError(null); setModal(true) }
 
   async function save() {
-    if (!form.ad_soyad || !form.veli_ad || !form.veli_telefon) { setSaveError('Ad, veli ve telefon zorunlu!'); return }
+    if (!form.ad_soyad) { setSaveError('Ad zorunlu!'); return }
     setSaving(true)
     setSaveError(null)
     try {
@@ -505,10 +531,6 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
         ad_soyad: form.ad_soyad?.trim(),
         dogum_tarihi: form.dogum_tarihi || null,
         sinif: form.sinif || null,
-        veli_ad: form.veli_ad?.trim() || null,
-        veli_telefon: form.veli_telefon?.trim() || null,
-        veli2_ad: form.veli2_ad?.trim() || null,
-        veli2_telefon: form.veli2_telefon?.trim() || null,
         alerjiler: form.alerjiler?.trim() || null,
         ilac: form.ilac?.trim() || null,
         adres: form.adres?.trim() || null,
@@ -562,7 +584,17 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
 
   function exportCSV() {
     const rows = [['Ad Soyad', 'Sınıf', 'Veli', 'Telefon', 'Alerjiler', 'Aidat']]
-    ogrenciler.forEach((o: Ogrenci) => rows.push([o.ad_soyad, o.sinif || '', o.veli_ad || '', o.veli_telefon || '', o.alerjiler || '', String(o.aidat_tutari || '')]))
+    ogrenciler.forEach((o: Ogrenci) => {
+      const contact = primaryContacts[o.id]
+      rows.push([
+        o.ad_soyad,
+        o.sinif || '',
+        contact?.ad_soyad || o.veli_ad || '',
+        contact?.telefon || o.veli_telefon || '',
+        o.alerjiler || '',
+        String(o.aidat_tutari || ''),
+      ])
+    })
     const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n')
     const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv); a.download = 'ogrenciler.csv'; a.click()
   }
@@ -578,6 +610,7 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
           {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
         </select>
         <button onClick={exportCSV} className="border border-[rgba(74,222,128,0.3)] px-4 py-2 rounded-lg text-sm font-semibold text-[rgba(255,255,255,0.7)] hover:text-white hover:border-[#4ade80] transition-colors">📥 CSV</button>
+        <button onClick={() => setActivePage('veliler')} className="border border-[rgba(245,158,11,0.25)] px-4 py-2 rounded-lg text-sm font-semibold text-[#fbbf24] hover:text-[#fde68a] transition-colors">Aile Kişileri</button>
         <button onClick={openAdd} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">+ Ekle</button>
       </div>
 
@@ -592,15 +625,17 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((o: Ogrenci) => (
-                <tr key={o.id} className="border-t border-[rgba(74,222,128,0.08)] hover:bg-[#0d160d] transition-colors">
+              {filtered.map((o: Ogrenci) => {
+                const contact = primaryContacts[o.id]
+                return (
+                  <tr key={o.id} className="border-t border-[rgba(74,222,128,0.08)] hover:bg-[#0d160d] transition-colors">
                   <td className="px-4 py-3">
                     <div className="font-semibold text-sm text-white">{o.ad_soyad}</div>
                     {o.alerjiler && <div className="text-xs text-red-400 font-semibold">🚨 {o.alerjiler}</div>}
                   </td>
                   <td className="px-4 py-3"><span className="bg-[rgba(74,222,128,0.12)] text-[#4ade80] text-xs font-semibold px-2 py-1 rounded-full">{o.sinif || '—'}</span></td>
-                  <td className="px-4 py-3 text-sm text-[rgba(255,255,255,0.7)]">{o.veli_ad || '—'}</td>
-                  <td className="px-4 py-3 text-sm text-[rgba(255,255,255,0.7)]">{o.veli_telefon || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-[rgba(255,255,255,0.7)]">{contact?.ad_soyad || o.veli_ad || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-[rgba(255,255,255,0.7)]">{contact?.telefon || o.veli_telefon || '—'}</td>
                   <td className="px-4 py-3">{o.alerjiler ? <span className="bg-[rgba(239,68,68,0.12)] text-red-400 text-xs font-semibold px-2 py-1 rounded-full">⚠️ Var</span> : <span className="text-[rgba(255,255,255,0.35)] text-xs">Yok</span>}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
@@ -608,8 +643,9 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
                       <button onClick={() => deleteOgr(o.id)} className="text-xs bg-[rgba(239,68,68,0.1)] text-red-400 border border-[rgba(239,68,68,0.2)] px-2 py-1 rounded">🗑</button>
                     </div>
                   </td>
-                </tr>
-              ))}
+                  </tr>
+                )
+              })}
               {!filtered.length && <tr><td colSpan={6} className="text-center py-8 text-[rgba(255,255,255,0.35)] text-sm">Öğrenci bulunamadı</td></tr>}
             </tbody>
           </table>
@@ -618,14 +654,13 @@ function Ogrenciler({ ogrenciler, siniflar, okul, dark, reload }: any) {
 
       <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Öğrenci Düzenle' : 'Öğrenci Ekle'} dark={dark}>
         <div className="p-5 grid grid-cols-2 gap-3">
+          <div className="col-span-2 rounded-2xl border border-[rgba(245,158,11,0.18)] bg-[rgba(245,158,11,0.08)] px-4 py-4 text-sm leading-7 text-[#fef3c7]">
+            Veli, aile ve teslim kişilerini artık <button onClick={() => { setModal(false); setActivePage('veliler') }} className="font-semibold underline">Aile Kişileri</button> bölümünden yönetebilirsin.
+          </div>
           {[
             { label: 'Ad Soyad *', key: 'ad_soyad', full: true },
             { label: 'Doğum Tarihi', key: 'dogum_tarihi', type: 'date' },
             { label: 'Aylık Aidat (₺)', key: 'aidat_tutari', type: 'number' },
-            { label: 'Veli Adı *', key: 'veli_ad' },
-            { label: 'Veli Telefon *', key: 'veli_telefon' },
-            { label: '2. Veli', key: 'veli2_ad' },
-            { label: '2. Veli Tel', key: 'veli2_telefon' },
             { label: 'Alerjiler', key: 'alerjiler', full: true },
             { label: 'Sürekli İlaç', key: 'ilac', full: true },
             { label: 'Adres', key: 'adres', full: true },
@@ -695,7 +730,7 @@ function Yoklama({ ogrenciler, siniflar, okul, dark }: any) {
   function sendWA() {
     const geldi = ogrenciler.filter((o: Ogrenci) => state[o.id] === 'geldi').map((o: Ogrenci) => o.ad_soyad.split(' ')[0])
     const gelmedi = ogrenciler.filter((o: Ogrenci) => state[o.id] === 'gelmedi').map((o: Ogrenci) => o.ad_soyad.split(' ')[0])
-    const msg = `🌱 *Kinderly Yoklama — ${tarih}*\n\n✅ Gelen (${geldi.length}): ${geldi.join(', ') || '—'}\n❌ Gelmeyen (${gelmedi.length}): ${gelmedi.join(', ') || '—'}`
+    const msg = `🌱 *KinderX Yoklama — ${tarih}*\n\n✅ Gelen (${geldi.length}): ${geldi.join(', ') || '—'}\n❌ Gelmeyen (${gelmedi.length}): ${gelmedi.join(', ') || '—'}`
     window.open('https://wa.me/?text=' + encodeURIComponent(msg))
   }
 
@@ -1296,15 +1331,23 @@ function Fotograflar({ ogrenciler, siniflar, okul, dark }: any) {
 }
 
 // ── AİDAT ──
-function AidatPage({ ogrenciler, okul, dark }: any) {
+function AidatPage({ ogrenciler, veliler, okul, dark }: any) {
   const [ay, setAy] = useState(today().slice(0, 7))
   const [data, setData] = useState<any[]>([])
+
+  const primaryContacts = useMemo(() => {
+    const map: Record<number, VeliRecord | null> = {}
+    ogrenciler.forEach((ogrenci: Ogrenci) => {
+      map[ogrenci.id] = firstActiveContact(veliler as VeliRecord[], ogrenci.id)
+    })
+    return map
+  }, [ogrenciler, veliler])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (okul) load() }, [ay, okul])
 
   async function load() {
-    const { data: d } = await supabase.from('aidatlar').select('*,ogrenciler(ad_soyad,veli_ad,veli_telefon)').eq('okul_id', okul.id).eq('ay', ay)
+    const { data: d } = await supabase.from('aidatlar').select('*,ogrenciler(ad_soyad)').eq('okul_id', okul.id).eq('ay', ay)
     setData(d || [])
   }
 
@@ -1327,7 +1370,7 @@ function AidatPage({ ogrenciler, okul, dark }: any) {
   async function sendWA() {
     const bekleyenler = data.filter(a => !a.odendi)
     if (!bekleyenler.length) { alert('Tüm aidatlar ödendi!'); return }
-    const msg = '🌱 *Kinderly Aidat Hatırlatması*\n\n' + bekleyenler.map(a => (a.ogrenciler as any)?.ad_soyad + ': ' + fmtM(a.tutar)).join('\n') + '\n\nLütfen ödemenizi yapınız.'
+    const msg = '🌱 *KinderX Aidat Hatırlatması*\n\n' + bekleyenler.map(a => (a.ogrenciler as any)?.ad_soyad + ': ' + fmtM(a.tutar)).join('\n') + '\n\nLütfen ödemenizi yapınız.'
     window.open('https://wa.me/?text=' + encodeURIComponent(msg))
   }
 
@@ -1364,7 +1407,7 @@ function AidatPage({ ogrenciler, okul, dark }: any) {
               {data.map(a => (
                 <tr key={a.id} className={`border-t border-[rgba(74,222,128,0.14)]`}>
                   <td className={`px-4 py-3 text-sm font-semibold text-white`}>{(a.ogrenciler as any)?.ad_soyad || '—'}</td>
-                  <td className={`px-4 py-3 text-sm text-[rgba(255,255,255,0.7)]`}>{(a.ogrenciler as any)?.veli_ad || '—'}</td>
+                  <td className={`px-4 py-3 text-sm text-[rgba(255,255,255,0.7)]`}>{primaryContacts[a.ogrenci_id]?.ad_soyad || '—'}</td>
                   <td className={`px-4 py-3 text-sm font-semibold text-white`}>{fmtM(a.tutar)}</td>
                   <td className="px-4 py-3">{a.odendi ? <span className="bg-[rgba(74,222,128,0.12)] text-[#4ade80] text-xs font-semibold px-2 py-1 rounded-full">✅ Ödendi</span> : <span className="bg-[rgba(239,68,68,0.12)] text-red-400 text-xs font-semibold px-2 py-1 rounded-full">⏳ Bekliyor</span>}</td>
                   <td className={`px-4 py-3 text-xs text-[rgba(255,255,255,0.54)]`}>{a.odeme_tarihi || '—'}</td>
@@ -1394,7 +1437,7 @@ function YemekListesi({ okul, dark }: any) {
   function getHaftaBasi() {
     const d = new Date(); const day = d.getDay()
     const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-    return new Date(d.setDate(diff)).toISOString().split('T')[0]
+    return toLocalDateKey(new Date(d.setDate(diff)))
   }
 
   const [hafta, setHafta] = useState(getHaftaBasi())
@@ -1404,7 +1447,7 @@ function YemekListesi({ okul, dark }: any) {
 
   async function load() {
     const bitis = new Date(hafta); bitis.setDate(bitis.getDate() + 6)
-    const { data: d } = await supabase.from('yemek_listesi').select('*').eq('okul_id', okul.id).gte('tarih', hafta).lte('tarih', bitis.toISOString().split('T')[0]).order('tarih')
+    const { data: d } = await supabase.from('yemek_listesi').select('*').eq('okul_id', okul.id).gte('tarih', hafta).lte('tarih', toLocalDateKey(bitis)).order('tarih')
     setData(d || [])
   }
 
@@ -1417,7 +1460,7 @@ function YemekListesi({ okul, dark }: any) {
 
   async function sendWA() {
     const gunler = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma']
-    let msg = '🌱 *Kinderly — Haftalık Yemek Listesi*\n\n'
+    let msg = '🌱 *KinderX — Haftalık Yemek Listesi*\n\n'
     data.forEach((y, i) => { msg += `*${gunler[i] || ''} - ${y.tarih}*\n🍳 ${y.kahvalti || '—'}\n🍽️ ${y.ogle || '—'}\n🍪 ${y.ikindi || '—'}\n\n` })
     window.open('https://wa.me/?text=' + encodeURIComponent(msg))
   }
@@ -1425,17 +1468,17 @@ function YemekListesi({ okul, dark }: any) {
   const gunler = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma']
   const rows = gunler.map((g, i) => {
     const d = new Date(hafta); d.setDate(d.getDate() + i)
-    const str = d.toISOString().split('T')[0]
+    const str = toLocalDateKey(d)
     return { gun: g, tarih: str, yemek: data.find(y => y.tarih === str) || {} }
   })
 
   return (
     <div>
       <div className="flex gap-2 mb-4 items-center flex-wrap">
-        <button onClick={() => { const d = new Date(hafta); d.setDate(d.getDate() - 7); setHafta(d.toISOString().split('T')[0]) }}
+        <button onClick={() => { const d = new Date(hafta); d.setDate(d.getDate() - 7); setHafta(toLocalDateKey(d)) }}
           className={`border px-3 py-2 rounded-lg text-sm border-[rgba(74,222,128,0.2)] text-[rgba(255,255,255,0.7)]`}>‹</button>
         <span className={`text-sm font-medium flex-1 text-center text-white`}>{new Date(hafta).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} haftası</span>
-        <button onClick={() => { const d = new Date(hafta); d.setDate(d.getDate() + 7); setHafta(d.toISOString().split('T')[0]) }}
+        <button onClick={() => { const d = new Date(hafta); d.setDate(d.getDate() + 7); setHafta(toLocalDateKey(d)) }}
           className={`border px-3 py-2 rounded-lg text-sm border-[rgba(74,222,128,0.2)] text-[rgba(255,255,255,0.7)]`}>›</button>
         <button onClick={sendWA} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">📱 WA</button>
       </div>
@@ -1649,7 +1692,7 @@ function ServisPage({ ogrenciler, siniflar, okul, dark }: any) {
   function sendWA() {
     const bindi = ogrenciler.filter((o: Ogrenci) => state[o.id] === 'bindi').map((o: Ogrenci) => o.ad_soyad.split(' ')[0])
     const indi = ogrenciler.filter((o: Ogrenci) => state[o.id] === 'indi').map((o: Ogrenci) => o.ad_soyad.split(' ')[0])
-    const msg = `🚌 *Kinderly Servis — ${tarih}*\n\n✅ Bindi (${bindi.length}): ${bindi.join(', ') || '—'}\n🏠 İndi (${indi.length}): ${indi.join(', ') || '—'}`
+    const msg = `🚌 *KinderX Servis — ${tarih}*\n\n✅ Bindi (${bindi.length}): ${bindi.join(', ') || '—'}\n🏠 İndi (${indi.length}): ${indi.join(', ') || '—'}`
     window.open('https://wa.me/?text=' + encodeURIComponent(msg))
   }
 
@@ -1697,11 +1740,19 @@ function ServisPage({ ogrenciler, siniflar, okul, dark }: any) {
 }
 
 // ── MESAJLAR ──
-function MesajlarPage({ ogrenciler, okul, dark }: any) {
+function MesajlarPage({ ogrenciler, veliler, okul, dark }: any) {
   const [mesajlar, setMesajlar] = useState<any[]>([])
   const [selected, setSelected] = useState<Ogrenci | null>(null)
   const [icerik, setIcerik] = useState('')
   const [thread, setThread] = useState<any[]>([])
+
+  const primaryContacts = useMemo(() => {
+    const map: Record<number, VeliRecord | null> = {}
+    ogrenciler.forEach((ogrenci: Ogrenci) => {
+      map[ogrenci.id] = firstActiveContact(veliler as VeliRecord[], ogrenci.id)
+    })
+    return map
+  }, [ogrenciler, veliler])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (okul) loadMesajlar() }, [okul])
@@ -1738,13 +1789,14 @@ function MesajlarPage({ ogrenciler, okul, dark }: any) {
         <div className="flex-1 overflow-y-auto">
           {ogrenciler.map((o: Ogrenci) => {
             const unreadCount = mesajlar.filter(m => m.gonderen_id === o.id && !m.okundu).length
+            const contact = primaryContacts[o.id]
             return (
               <div key={o.id} onClick={() => setSelected(o)}
                 className={`flex items-center gap-3 px-4 py-3 cursor-pointer border-b border-[rgba(74,222,128,0.08)] ${selected?.id === o.id ? 'bg-[rgba(74,222,128,0.08)]' : 'hover:bg-[#0d160d]'} transition-colors`}>
                 <div className="w-9 h-9 rounded-full bg-[rgba(74,222,128,0.12)] flex items-center justify-center text-lg flex-shrink-0">🌸</div>
                 <div className="flex-1">
                   <div className="text-sm font-medium text-white">{o.ad_soyad.split(' ')[0]}</div>
-                  <div className="text-xs text-[rgba(255,255,255,0.54)]">{o.veli_ad || ''}</div>
+                  <div className="text-xs text-[rgba(255,255,255,0.54)]">{contact?.ad_soyad || o.veli_ad || ''}</div>
                 </div>
                 {unreadCount > 0 && <span className="bg-[#4ade80] text-black text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">{unreadCount}</span>}
               </div>
@@ -1755,13 +1807,18 @@ function MesajlarPage({ ogrenciler, okul, dark }: any) {
 
       <Card dark={dark} className="lg:col-span-2 flex flex-col overflow-hidden">
         {selected ? <>
+          {(() => {
+            const selectedContact = primaryContacts[selected.id]
+            return (
           <div className={`px-4 py-3 border-b flex items-center gap-3 border-[rgba(74,222,128,0.14)]`}>
             <div className="w-9 h-9 rounded-full bg-[rgba(74,222,128,0.12)] flex items-center justify-center text-lg">🌸</div>
             <div>
               <div className={`font-semibold text-sm text-white`}>{selected.ad_soyad}</div>
-              <div className="text-xs text-[rgba(255,255,255,0.54)]">{selected.veli_ad}</div>
+              <div className="text-xs text-[rgba(255,255,255,0.54)]">{selectedContact?.ad_soyad || selected.veli_ad}</div>
             </div>
           </div>
+            )
+          })()}
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {thread.map(m => (
               <div key={m.id} className={`flex ${m.gonderen_tip === 'okul' ? 'justify-end' : 'justify-start'}`}>
@@ -1979,7 +2036,7 @@ function OkulAyarlari({ okul, dark, setOkul }: any) {
               <img src={form.logo_url} alt={form.ad || 'Logo'} className="h-16 w-16 rounded-2xl object-cover border border-[rgba(74,222,128,0.14)]" />
             ) : (
               <div className="h-16 w-16 rounded-2xl bg-[rgba(74,222,128,0.12)] flex items-center justify-center text-[#4ade80] font-bold">
-                {(form.ad || 'Kinderly').split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase()}
+                {(form.ad || 'KinderX').split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase()}
               </div>
             )}
             <input type="file" accept="image/*" onChange={e => handleLogoUpload(e.target.files?.[0] ?? null)}

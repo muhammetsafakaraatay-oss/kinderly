@@ -9,6 +9,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
+import { todayLocalKey } from '@/lib/date-utils'
 import {
   getUserFacingErrorMessage,
   getSupabaseErrorMessage,
@@ -55,7 +56,8 @@ type PhotoCard = {
   ogrenci_id: number
   studentName: string
   note: string
-  imageUrl: string | null
+  mediaUrl: string | null
+  mediaType: 'photo' | 'video'
   createdAt: string | null
 }
 
@@ -83,7 +85,7 @@ const activityTypeConfig: Array<{ id: ActivityType; label: string; emoji: string
 ]
 
 function today() {
-  return new Date().toISOString().split('T')[0]
+  return todayLocalKey()
 }
 
 function cx(...parts: Array<string | false | null | undefined>) {
@@ -91,7 +93,7 @@ function cx(...parts: Array<string | false | null | undefined>) {
 }
 
 function initials(name?: string | null) {
-  return (name || 'Kinderly')
+  return (name || 'KinderX')
     .split(' ')
     .filter(Boolean)
     .map((part) => part[0])
@@ -121,6 +123,9 @@ function formatDateTime(value?: string | null) {
 }
 
 function activityMeta(type: string) {
+  if (type === 'video') {
+    return { id: 'photo' as ActivityType, label: 'Video', emoji: '🎥', color: '#0ea5e9', bg: '#e0f2fe' }
+  }
   return activityTypeConfig.find((item) => item.id === type) || { id: type as ActivityType, label: type, emoji: '📋', color: '#64748b', bg: '#f1f5f9' }
 }
 
@@ -145,19 +150,43 @@ function activitySummary(activity: ActivityRow) {
   return values[0] ? String(values[0]) : 'Detay eklenmedi'
 }
 
-function activityPhotoUrl(activity: ActivityRow) {
-  return activity.tur === 'photo' && typeof activity.detay?.url === 'string' ? activity.detay.url : null
+function activityMediaUrl(activity: ActivityRow) {
+  return (activity.tur === 'photo' || activity.tur === 'video') && typeof activity.detay?.url === 'string' ? activity.detay.url : null
 }
 
-async function uploadPhotoFile(okulId: number | string, ogrenciId: number, file: File) {
+function isVideoFile(file: File) {
+  return file.type.startsWith('video/') || /\.(mp4|mov|webm|m4v)$/i.test(file.name)
+}
+
+async function uploadMediaFile(okulId: number | string, ogrenciId: number, file: File) {
   const storagePath = `${okulId}/${ogrenciId}/${Date.now()}-${file.name.replace(/\s+/g, '-')}`
   const { error } = await supabase.storage.from('photos').upload(storagePath, file, {
-    contentType: file.type || 'image/jpeg',
+    contentType: file.type || 'application/octet-stream',
     upsert: true,
   })
 
   if (error) throw error
   return storagePath
+}
+
+function ActivityMediaCard({
+  url,
+  mediaType,
+  className,
+}: {
+  url: string
+  mediaType: 'photo' | 'video'
+  className: string
+}) {
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="mt-3 block overflow-hidden rounded-[18px] border border-slate-200 bg-slate-50">
+      {mediaType === 'video' ? (
+        <video src={url} controls preload="metadata" className={`${className} bg-slate-950`} />
+      ) : (
+        <img src={url} alt="Aktivite medyası" className={`${className} object-cover`} />
+      )}
+    </a>
+  )
 }
 
 export default function OgretmenPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -342,19 +371,20 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
 
         const rawActivityRows = ((activityQuery.data || []) as ActivityRow[]).filter((activity) => allowedStudentIds.has(activity.ogrenci_id))
         const activityRows = await withSignedPhotoUrls(rawActivityRows)
-        const photoRows = activityRows.filter((item) => item.tur === 'photo')
+        const photoRows = activityRows.filter((item) => item.tur === 'photo' || item.tur === 'video')
         const nextPhotos = photoRows.map((row) => {
-            const detay = row.detay || {}
-            const existingUrl = typeof detay.url === 'string' ? detay.url : null
-            return {
-              id: row.id,
-              ogrenci_id: row.ogrenci_id,
-              studentName: activityStudentName(row),
-              note: typeof detay.not === 'string' ? detay.not : typeof detay.aciklama === 'string' ? detay.aciklama : '',
-              imageUrl: existingUrl,
-              createdAt: row.created_at || row.olusturuldu || null,
-            } satisfies PhotoCard
-          })
+          const detay = row.detay || {}
+          const existingUrl = typeof detay.url === 'string' ? detay.url : null
+          return {
+            id: row.id,
+            ogrenci_id: row.ogrenci_id,
+            studentName: activityStudentName(row),
+            note: typeof detay.not === 'string' ? detay.not : typeof detay.aciklama === 'string' ? detay.aciklama : '',
+            mediaUrl: existingUrl,
+            mediaType: row.tur === 'video' ? 'video' : 'photo',
+            createdAt: row.created_at || row.olusturuldu || null,
+          } satisfies PhotoCard
+        })
 
         const teacherClass = teacherAssignedClass || 'all'
         setTeacher(personel as TeacherProfile)
@@ -363,7 +393,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
         setActivities(activityRows)
         setMessages((messageQuery.data || []).filter((message) => !message.ogrenci_id || allowedStudentIds.has(message.ogrenci_id)))
         setAnnouncements(announcementQuery.data || [])
-        setPhotoCards(nextPhotos.filter((item) => item.imageUrl))
+        setPhotoCards(nextPhotos.filter((item) => item.mediaUrl))
         setClassFilter((current) => (current === 'all' ? teacherClass : current))
         setSelectedActivityStudentId((current) => current ?? nextStudents[0]?.id ?? null)
         setSelectedMessageStudentId((current) => current ?? nextStudents[0]?.id ?? null)
@@ -398,19 +428,20 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
         const allowedIds = teacherStudentIdsRef.current
         const rows = await withSignedPhotoUrls(((data || []) as ActivityRow[]).filter((item) => allowedIds.has(item.ogrenci_id)))
         setActivities(rows)
-        const nextPhotos = rows.filter((item) => item.tur === 'photo').map((row) => {
-            const detay = row.detay || {}
-            const existingUrl = typeof detay.url === 'string' ? detay.url : null
-            return {
-              id: row.id,
-              ogrenci_id: row.ogrenci_id,
-              studentName: activityStudentName(row),
-              note: typeof detay.not === 'string' ? detay.not : typeof detay.aciklama === 'string' ? detay.aciklama : '',
-              imageUrl: existingUrl,
-              createdAt: row.created_at || row.olusturuldu || null,
-            } satisfies PhotoCard
-          })
-        setPhotoCards(nextPhotos.filter((item) => item.imageUrl))
+        const nextPhotos = rows.filter((item) => item.tur === 'photo' || item.tur === 'video').map((row) => {
+          const detay = row.detay || {}
+          const existingUrl = typeof detay.url === 'string' ? detay.url : null
+          return {
+            id: row.id,
+            ogrenci_id: row.ogrenci_id,
+            studentName: activityStudentName(row),
+            note: typeof detay.not === 'string' ? detay.not : typeof detay.aciklama === 'string' ? detay.aciklama : '',
+            mediaUrl: existingUrl,
+            mediaType: row.tur === 'video' ? 'video' : 'photo',
+            createdAt: row.created_at || row.olusturuldu || null,
+          } satisfies PhotoCard
+        })
+        setPhotoCards(nextPhotos.filter((item) => item.mediaUrl))
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'yoklama', filter: `okul_id=eq.${currentOkul.id}` }, async () => {
         const { data } = await supabase.from('yoklama').select('ogrenci_id,durum').eq('okul_id', currentOkul.id).eq('tarih', today())
@@ -528,7 +559,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
 
     try {
       if (activityType === 'photo' && activityPhotoFile) {
-        const storagePath = await uploadPhotoFile(okul.id, selectedActivityStudentId, activityPhotoFile)
+        const storagePath = await uploadMediaFile(okul.id, selectedActivityStudentId, activityPhotoFile)
         detail.storagePath = storagePath
         detail.url = null
       }
@@ -556,7 +587,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
       setStatusMessage('Aktivite kaydı oluşturuldu.')
     } catch (error) {
       setSavingActivity(false)
-      setStatusMessage(getUserFacingErrorMessage(error as { message?: string }, 'Fotoğraf yüklenemedi.'))
+      setStatusMessage(getUserFacingErrorMessage(error as { message?: string }, 'Medya yüklenemedi.'))
     }
   }
 
@@ -662,14 +693,16 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
 
     setUploadingGallery(true)
     try {
-      const storagePath = await uploadPhotoFile(okul.id, selectedPhotoStudentId, galleryUpload)
+      const mediaType = isVideoFile(galleryUpload) ? 'video' : 'photo'
+      const storagePath = await uploadMediaFile(okul.id, selectedPhotoStudentId, galleryUpload)
       const { error } = await insertActivityCompat({
         okul_id: okul.id,
         ogrenci_id: selectedPhotoStudentId,
         tarih: today(),
-        tur: 'photo',
+        tur: mediaType,
         detay: {
           storagePath,
+          mediaType,
           not: galleryNote.trim(),
         },
         kaydeden: teacher?.ad_soyad || 'Öğretmen',
@@ -678,16 +711,16 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
       setUploadingGallery(false)
 
       if (error) {
-        setStatusMessage(getSupabaseErrorMessage(error, 'Fotoğraf paylaşılamadı.'))
+        setStatusMessage(getSupabaseErrorMessage(error, 'Medya paylaşılamadı.'))
         return
       }
 
       setGalleryUpload(null)
       setGalleryNote('')
-      setStatusMessage('Fotoğraf galeriye eklendi.')
+      setStatusMessage(mediaType === 'video' ? 'Video galeriye eklendi.' : 'Fotoğraf galeriye eklendi.')
     } catch (error) {
       setUploadingGallery(false)
-      setStatusMessage(getSupabaseErrorMessage(error as { message?: string }, 'Fotoğraf yüklenemedi.'))
+      setStatusMessage(getSupabaseErrorMessage(error as { message?: string }, 'Medya yüklenemedi.'))
     }
   }
 
@@ -891,7 +924,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
                 <div className="mt-6 space-y-3">
                   {activities.slice(0, 8).map((activity) => {
                     const meta = activityMeta(activity.tur)
-                    const photoUrl = activityPhotoUrl(activity)
+                    const mediaUrl = activityMediaUrl(activity)
                     return (
                       <div key={activity.id} className="flex items-start gap-4 rounded-[22px] border border-slate-200 px-4 py-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: meta.bg }}>
@@ -903,14 +936,10 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
                             <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{formatTime(activity.created_at || activity.olusturuldu)}</div>
                           </div>
                           <div className="mt-2 text-sm text-slate-600">{activitySummary(activity)}</div>
-                          {photoUrl ? (
-                            <a href={photoUrl} target="_blank" rel="noreferrer" className="mt-3 block overflow-hidden rounded-[18px] border border-slate-200 bg-slate-50">
-                              <img src={photoUrl} alt="Aktivite fotoğrafı" className="h-52 w-full object-cover" />
-                            </a>
-                          ) : null}
-                          {activity.tur === 'photo' && !photoUrl ? (
+                          {mediaUrl ? <ActivityMediaCard url={mediaUrl} mediaType={activity.tur === 'video' ? 'video' : 'photo'} className="h-52 w-full object-cover" /> : null}
+                          {(activity.tur === 'photo' || activity.tur === 'video') && !mediaUrl ? (
                             <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                              Fotoğraf yükleniyor veya erişim izni bekleniyor.
+                              Medya yükleniyor veya erişim izni bekleniyor.
                             </div>
                           ) : null}
                         </div>
@@ -1103,7 +1132,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
                   <div className="mt-5 space-y-3">
                     {activities.map((activity) => {
                       const meta = activityMeta(activity.tur)
-                      const photoUrl = activityPhotoUrl(activity)
+                      const mediaUrl = activityMediaUrl(activity)
                       return (
                         <div key={activity.id} className="flex items-start gap-4 rounded-[20px] border border-slate-200 px-4 py-4">
                           <div className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: meta.bg }}>
@@ -1115,14 +1144,10 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
                               <div className="text-xs text-slate-400">{formatTime(activity.created_at || activity.olusturuldu)}</div>
                             </div>
                             <div className="mt-1 text-sm text-slate-600">{activitySummary(activity)}</div>
-                            {photoUrl ? (
-                              <a href={photoUrl} target="_blank" rel="noreferrer" className="mt-3 block overflow-hidden rounded-[18px] border border-slate-200 bg-slate-50">
-                                <img src={photoUrl} alt="Aktivite fotoğrafı" className="h-56 w-full object-cover" />
-                              </a>
-                            ) : null}
-                            {activity.tur === 'photo' && !photoUrl ? (
+                            {mediaUrl ? <ActivityMediaCard url={mediaUrl} mediaType={activity.tur === 'video' ? 'video' : 'photo'} className="h-56 w-full object-cover" /> : null}
+                            {(activity.tur === 'photo' || activity.tur === 'video') && !mediaUrl ? (
                               <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                                Fotoğraf yükleniyor veya erişim izni bekleniyor.
+                                Medya yükleniyor veya erişim izni bekleniyor.
                               </div>
                             ) : null}
                           </div>
@@ -1239,7 +1264,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
           {activeTab === 'fotograflar' && (
             <section className="mt-6 grid gap-6 xl:grid-cols-[360px_1fr]">
               <PanelCard>
-                <h2 className="text-lg font-semibold text-slate-900">Fotoğraf yükle</h2>
+                <h2 className="text-lg font-semibold text-slate-900">Fotoğraf veya video yükle</h2>
                 <div className="mt-5 flex gap-2 overflow-x-auto pb-2">
                   {students.map((student) => (
                     <Chip key={student.id} active={selectedPhotoStudentId === student.id} onClick={() => setSelectedPhotoStudentId(student.id)}>
@@ -1248,26 +1273,36 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
                   ))}
                 </div>
                 <div className="mt-4 space-y-4">
-                  <input type="file" accept="image/*" className="panel-input" onChange={(event) => setGalleryUpload(event.target.files?.[0] ?? null)} />
-                  <textarea className="panel-input min-h-[120px] resize-none" value={galleryNote} onChange={(event) => setGalleryNote(event.target.value)} placeholder="Fotoğraf notu..." />
+                  <input type="file" accept="image/*,video/*" className="panel-input" onChange={(event) => setGalleryUpload(event.target.files?.[0] ?? null)} />
+                  {galleryUpload ? (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                      {isVideoFile(galleryUpload) ? '🎥 Video seçildi' : '📷 Fotoğraf seçildi'} · {galleryUpload.name}
+                    </div>
+                  ) : null}
+                  <textarea className="panel-input min-h-[120px] resize-none" value={galleryNote} onChange={(event) => setGalleryNote(event.target.value)} placeholder="Medya notu..." />
                   <button onClick={handleGalleryUpload} disabled={uploadingGallery || !selectedPhotoStudentId || !galleryUpload} className="w-full rounded-2xl bg-[#10b981] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
-                    {uploadingGallery ? 'Yükleniyor...' : 'Fotoğraf yükle'}
+                    {uploadingGallery ? 'Yükleniyor...' : 'Medyayı yükle'}
                   </button>
                 </div>
               </PanelCard>
 
               <PanelCard>
-                <h2 className="text-lg font-semibold text-slate-900">Grid galeri</h2>
+                <h2 className="text-lg font-semibold text-slate-900">Galeri akışı</h2>
                 <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                   {galleryItems.map((item) => (
-                    <a key={item.id} href={item.imageUrl || '#'} target="_blank" rel="noreferrer" className="overflow-hidden rounded-[22px] border border-slate-200 bg-slate-50">
-                      {item.imageUrl ? (
-                        <img src={item.imageUrl} alt={item.note || item.studentName} className="h-48 w-full object-cover" />
+                    <a key={item.id} href={item.mediaUrl || '#'} target="_blank" rel="noreferrer" className="overflow-hidden rounded-[22px] border border-slate-200 bg-slate-50">
+                      {item.mediaUrl ? (
+                        item.mediaType === 'video' ? (
+                          <video src={item.mediaUrl} controls preload="metadata" className="h-48 w-full bg-slate-950 object-cover" />
+                        ) : (
+                          <img src={item.mediaUrl} alt={item.note || item.studentName} className="h-48 w-full object-cover" />
+                        )
                       ) : (
-                        <div className="flex h-48 items-center justify-center text-4xl">📸</div>
+                        <div className="flex h-48 items-center justify-center text-4xl">{item.mediaType === 'video' ? '🎥' : '📸'}</div>
                       )}
                       <div className="space-y-2 p-4">
                         <div className="text-sm font-semibold text-slate-900">{item.studentName}</div>
+                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{item.mediaType === 'video' ? 'Video' : 'Fotoğraf'}</div>
                         <div className="text-sm text-slate-600">{item.note || 'Not eklenmedi'}</div>
                         <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{formatDateTime(item.createdAt)}</div>
                       </div>
@@ -1323,7 +1358,7 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
                 <div className="mt-6 space-y-4">
                   {reportActivities.map((activity, index) => {
                     const meta = activityMeta(activity.tur)
-                    const photoUrl = activityPhotoUrl(activity)
+                    const mediaUrl = activityMediaUrl(activity)
                     return (
                       <div key={activity.id} className="flex gap-4">
                         <div className="flex flex-col items-center">
@@ -1338,14 +1373,10 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
                             <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{formatTime(activity.created_at || activity.olusturuldu)}</div>
                           </div>
                           <div className="mt-2 text-sm text-slate-600">{activitySummary(activity)}</div>
-                          {photoUrl ? (
-                            <a href={photoUrl} target="_blank" rel="noreferrer" className="mt-3 block overflow-hidden rounded-[18px] border border-slate-200 bg-slate-50">
-                              <img src={photoUrl} alt="Aktivite fotoğrafı" className="h-56 w-full object-cover" />
-                            </a>
-                          ) : null}
-                          {activity.tur === 'photo' && !photoUrl ? (
+                          {mediaUrl ? <ActivityMediaCard url={mediaUrl} mediaType={activity.tur === 'video' ? 'video' : 'photo'} className="h-56 w-full object-cover" /> : null}
+                          {(activity.tur === 'photo' || activity.tur === 'video') && !mediaUrl ? (
                             <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                              Fotoğraf yükleniyor veya erişim izni bekleniyor.
+                              Medya yükleniyor veya erişim izni bekleniyor.
                             </div>
                           ) : null}
                         </div>

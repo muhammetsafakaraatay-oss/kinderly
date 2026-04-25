@@ -7,13 +7,13 @@ const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", variable: "-
 const sans = DM_Sans({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "KinderX — Türkiye'nin #1 Anaokulu Yönetim Platformu",
+  title: "KinderX — Anaokulu Yönetim Platformu",
   description:
-    "Yoklama, aktivite takibi, veli iletişimi ve aidat yönetimi. Öğretmenler için tasarlandı, veliler için sevindi.",
+    "Yoklama, aktivite takibi, veli iletişimi ve aidat yönetimi için anaokulu operasyon platformu.",
   keywords: "anaokulu yönetim, okul takip, veli iletişim, yoklama sistemi, kinderx",
   openGraph: {
     title: "KinderX — Anaokulu Yönetim Platformu",
-    description: "Türkiye'nin #1 anaokulu yönetim platformu",
+    description: "Anaokulları için yönetim, öğretmen ve veli iletişim platformu.",
     url: "https://kinderx.app",
     siteName: "KinderX",
     locale: "tr_TR",
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "KinderX",
-    description: "Türkiye'nin #1 anaokulu yönetim platformu",
+    description: "Anaokulları için yönetim, öğretmen ve veli iletişim platformu.",
   },
 };
 

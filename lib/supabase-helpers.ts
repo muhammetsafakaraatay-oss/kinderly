@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { isTeacherRole } from '@/lib/role-utils'
+import { todayLocalKey } from '@/lib/date-utils'
 
 type SupabaseErrorLike = {
   message?: string
@@ -543,7 +544,7 @@ export async function loadAnnouncementsCompat(okulId: string | number, limit = 5
 export async function insertAnnouncementCompat(base: Record<string, unknown>, baslik: string, icerik: string) {
   const attempts: Record<string, unknown>[] = [
     { ...base, baslik, icerik, created_at: new Date().toISOString() },
-    { ...base, baslik, icerik, tarih: new Date().toISOString().split('T')[0] },
+    { ...base, baslik, icerik, tarih: todayLocalKey() },
     { ...base, baslik, mesaj: icerik, created_at: new Date().toISOString() },
     { ...base, baslik, aciklama: icerik, created_at: new Date().toISOString() },
   ]

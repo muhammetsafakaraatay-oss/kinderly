@@ -6,9 +6,12 @@ import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { Instrument_Serif, DM_Sans } from 'next/font/google'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { ParentTeslimPanel } from '@/components/veli/teslim-panel'
+import { getContactType } from '@/lib/contact-utils'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
+import { todayLocalKey } from '@/lib/date-utils'
 import {
   getSupabaseErrorMessage,
   getUserFacingErrorMessage,
@@ -22,12 +25,12 @@ import {
   type AnnouncementItem,
   type NormalizedMessage,
 } from '@/lib/supabase-helpers'
-import type { Aidat, Ogrenci, Okul } from '@/lib/types'
+import type { Aidat, Ogrenci, Okul, VeliRecord } from '@/lib/types'
 
 const serif = Instrument_Serif({ subsets: ['latin'], weight: '400', variable: '--font-serif' })
 const sans = DM_Sans({ subsets: ['latin'], weight: ['300', '400', '500', '600', '700'], variable: '--font-sans' })
 
-type ParentTab = 'bugun' | 'mesajlar' | 'duyurular' | 'aidatlar' | 'cocugum'
+type ParentTab = 'bugun' | 'mesajlar' | 'duyurular' | 'aidatlar' | 'teslim' | 'cocugum'
 
 type ActivityRow = {
   id: number
@@ -48,8 +51,16 @@ const tabs: Array<{ id: ParentTab; label: string; icon: string }> = [
   { id: 'mesajlar', label: 'Mesajlar', icon: '💬' },
   { id: 'duyurular', label: 'Duyurular', icon: '📢' },
   { id: 'aidatlar', label: 'Aidatlar', icon: '💳' },
+  { id: 'teslim', label: 'Teslim', icon: '🔐' },
   { id: 'cocugum', label: 'Çocuğum', icon: '🌸' },
 ]
+
+const CONTACT_ROLE_LABELS = {
+  parent: 'Veli',
+  family: 'Aile',
+  approved_pickup: 'Teslim yetkilisi',
+  emergency: 'Acil durum',
+}
 
 const activityTypes: Record<string, { emoji: string; label: string; color: string }> = {
   food: { emoji: '🍎', label: 'Yemek', color: '#00b884' },
@@ -64,7 +75,7 @@ const activityTypes: Record<string, { emoji: string; label: string; color: strin
 }
 
 function today() {
-  return new Date().toISOString().split('T')[0]
+  return todayLocalKey()
 }
 
 function cx(...parts: Array<string | false | null | undefined>) {
@@ -72,7 +83,7 @@ function cx(...parts: Array<string | false | null | undefined>) {
 }
 
 function initials(name?: string | null) {
-  return (name || 'Kinderly')
+  return (name || 'KinderX')
     .split(' ')
     .filter(Boolean)
     .map((item) => item[0])
@@ -154,6 +165,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
   const [activities, setActivities] = useState<ActivityRow[]>([])
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([])
   const [fees, setFees] = useState<Aidat[]>([])
+  const [contacts, setContacts] = useState<VeliRecord[]>([])
   const [messages, setMessages] = useState<NormalizedMessage[]>([])
   const [messageDraft, setMessageDraft] = useState('')
   const [messageState, setMessageState] = useState('')
@@ -252,11 +264,23 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
         let detailedChildren = data as ChildDetails[]
 
         if (childIds.length) {
-          const { data: detailRows } = await supabase
-            .from('ogrenciler')
-            .select('*')
-            .in('id', childIds)
+          const [{ data: detailRows }, { data: contactRows }] = await Promise.all([
+            supabase
+              .from('ogrenciler')
+              .select('*')
+              .in('id', childIds),
+            supabase
+              .from('veliler')
+              .select('id,ogrenci_id,ad_soyad,email,telefon,aktif,iliski_tipi,yakinlik,teslim_alabilir,acil_durum_kisisi,teslim_pin,notlar')
+              .eq('okul_id', currentOkul.id)
+              .in('ogrenci_id', childIds)
+              .eq('aktif', true)
+              .order('ad_soyad'),
+          ])
           detailedChildren = (detailRows || []) as ChildDetails[]
+          setContacts((contactRows || []) as VeliRecord[])
+        } else {
+          setContacts([])
         }
 
         setChildren(detailedChildren)
@@ -381,6 +405,11 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
   const selectedChild = useMemo(
     () => children.find((child) => child.id === selectedChildId) || null,
     [children, selectedChildId]
+  )
+
+  const selectedContacts = useMemo(
+    () => contacts.filter((contact) => Number(contact.ogrenci_id) === Number(selectedChildId)),
+    [contacts, selectedChildId]
   )
 
   const filteredFees = useMemo(() => {
@@ -751,8 +780,18 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
             </section>
           )}
 
+          {activeTab === 'teslim' && (
+            <ParentTeslimPanel
+              okul={okul}
+              children={children}
+              contacts={contacts}
+              selectedChildId={selectedChildId}
+              onSelectChild={setSelectedChildId}
+            />
+          )}
+
           {activeTab === 'cocugum' && (
-            <section className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+            <section className="mt-6 grid gap-6 xl:grid-cols-[0.9fr_1fr_0.95fr]">
               <PanelCard>
                 <h2 className="text-lg font-semibold text-slate-900">Çocuk bilgileri</h2>
                 <div className="mt-6 space-y-3">
@@ -760,7 +799,10 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
                   <InfoRow label="Sınıf" value={selectedChild?.sinif} />
                   <InfoRow label="Yaş" value={childAge !== null ? `${childAge} yaş` : null} />
                   <InfoRow label="Doğum tarihi" value={formatDateLabel(selectedChild?.dogum_tarihi)} />
+                  <InfoRow label="Kan grubu" value={selectedChild?.kan_grubu} />
                   <InfoRow label="Alerji / özel durum" value={selectedChild?.alerji || selectedChild?.alerjiler || selectedChild?.notlar} />
+                  <InfoRow label="Sürekli ilaç" value={selectedChild?.ilac} />
+                  <InfoRow label="Adres" value={selectedChild?.adres} />
                 </div>
               </PanelCard>
 
@@ -771,6 +813,40 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
                   <SummaryCard title="Yoklama" value={attendanceStatus || 'Bekleniyor'} />
                   <SummaryCard title="Bekleyen aidat" value={`${fees.filter((item) => !item.odendi).length} kalem`} />
                   <SummaryCard title="Son güncelleme" value={activities[0] ? formatDateTime(activities[0].created_at || activities[0].olusturuldu) : 'Bugün'} />
+                </div>
+              </PanelCard>
+
+              <PanelCard>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Aile ve teslim kişileri</h2>
+                    <p className="mt-1 text-sm leading-6 text-slate-500">Okulun bu çocuk için tanımladığı kişiler.</p>
+                  </div>
+                  <button onClick={() => setActiveTab('teslim')} className="rounded-full bg-amber-50 px-3 py-2 text-xs font-semibold text-[#f59e0b]">
+                    Teslim ekranı
+                  </button>
+                </div>
+                <div className="mt-5 space-y-3">
+                  {selectedContacts.length ? selectedContacts.map((contact) => (
+                    <div key={contact.id} className="rounded-[20px] border border-slate-200 px-4 py-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold text-slate-900">{contact.ad_soyad || 'Kişi'}</div>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          {contact.yakinlik || CONTACT_ROLE_LABELS[getContactType(contact.iliski_tipi)]}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
+                        {contact.email ? <span>✉️ {contact.email}</span> : null}
+                        {contact.telefon ? <span>☎️ {contact.telefon}</span> : null}
+                        {contact.teslim_alabilir ? <span>🔐 Teslim alabilir</span> : null}
+                        {contact.teslim_pin ? <span>PIN {contact.teslim_pin}</span> : null}
+                        {contact.acil_durum_kisisi ? <span>Acil durum</span> : null}
+                      </div>
+                      {contact.notlar ? <div className="mt-3 text-sm leading-6 text-slate-600">{contact.notlar}</div> : null}
+                    </div>
+                  )) : (
+                    <EmptyState title="Kişi kaydı yok" description="Okul bu çocuk için henüz veli veya teslim kişisi tanımlamadı." />
+                  )}
                 </div>
               </PanelCard>
             </section>

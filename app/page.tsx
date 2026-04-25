@@ -31,20 +31,20 @@ const audienceMenu: MenuItem[] = [
 ]
 
 const resourceMenu: MenuItem[] = [
-  { icon: '⌘', title: 'Yardım Merkezi', description: 'Kurulum, destek ve sık sorulan sorular için kaynak merkezi.', href: '#cta' },
+  { icon: '⌘', title: 'Yardım Merkezi', description: 'Kurulum, destek ve sık sorulan sorular için kaynak merkezi.', href: '/support' },
   { icon: '✦', title: 'Blog', description: 'Anaokulu operasyonu ve dijital dönüşüm için editör seçimi içerikler.', href: '#cta' },
-  { icon: '♥', title: 'Başarı Hikayeleri', description: 'KinderX ile büyüyen okulların gerçek sonuçları.', href: '#yorumlar' },
+  { icon: '♥', title: 'Kullanım Senaryoları', description: 'Yönetici, öğretmen ve veli akışlarını örneklerle görün.', href: '#yorumlar' },
   { icon: '▶', title: 'Webinarlar', description: 'Canlı ürün turları ve sektör uzmanlarıyla online oturumlar.', href: '#cta' },
 ]
 
 const stats = [
-  ['512+', 'aktif okul'],
-  ['48.000+', 'öğrenci profili'],
-  ['%98', 'yenileme oranı'],
-  ['23 saat', 'aylık zaman kazancı'],
+  ['3 rol', 'yönetici, öğretmen, veli'],
+  ['8+ modül', 'günlük okul akışı'],
+  ['QR', 'giriş çıkış takibi'],
+  ['Tek panel', 'okul iletişimi'],
 ]
 
-const proofSchools = ['Nova Kids', 'Papatya Koleji', 'Atölye Çocuk', 'Gökkuşağı Kampüsü', 'Mimoza Akademi']
+const proofSchools = ['Yoklama', 'Aktivite', 'Mesajlar', 'Fotoğraflar', 'Aidat']
 
 type Feature = {
   icon: React.ReactNode
@@ -118,34 +118,34 @@ const timeline = [
 
 const testimonials = [
   {
-    quote: 'KinderX ile sabah operasyonu ilk kez sakin hissettirdi. Her şeyin tek akışta olması ekibi doğrudan rahatlattı.',
-    name: 'Ayşe H.',
-    role: 'Müdür, Nova Kids',
+    quote: 'Yönetici; yoklama, veli bağlantısı, duyuru, aidat ve okul genel görünümünü tek panelden takip eder.',
+    name: 'Yönetici ekranı',
+    role: 'Ürün senaryosu',
   },
   {
-    quote: 'Velilerden gelen geri bildirim tek kelimeyle premium. Uygulama okul markamızın bir parçası gibi hissettiriyor.',
-    name: 'Fatma K.',
-    role: 'Öğretmen, Papatya Koleji',
+    quote: 'Öğretmen; sınıfındaki öğrenciler için yemek, uyku, sağlık, fotoğraf ve günlük notları hızlıca paylaşır.',
+    name: 'Öğretmen akışı',
+    role: 'Ürün senaryosu',
   },
   {
-    quote: 'Tahsilat ve duyuru tarafında kaybettiğimiz günleri geri aldık. Yönetim paneli gerçekten gelir yaratan bir araç oldu.',
-    name: 'Mehmet A.',
-    role: 'Kurucu, Gökkuşağı Kampüsü',
+    quote: 'Veli; yalnızca bağlı olduğu çocuğun günlük akışını, fotoğraflarını, duyurularını ve mesajlarını görür.',
+    name: 'Veli deneyimi',
+    role: 'Ürün senaryosu',
   },
 ]
 
 const pricing = [
   {
     name: 'Starter',
-    price: 'Ücretsiz',
-    detail: 'ilk kampüsünü açan okullar',
+    price: 'Pilot',
+    detail: 'ilk kurulum ve deneme süreci',
     featured: false,
     items: ['50 öğrenciye kadar', 'Temel yoklama ve mesajlaşma', 'Mobil veli deneyimi', 'Standart destek'],
   },
   {
     name: 'Pro',
-    price: '₺1.000',
-    detail: '/ ay',
+    price: 'Okula özel',
+    detail: 'kurum ihtiyacına göre planlama',
     featured: true,
     items: ['Sınırsız öğrenci', 'Tüm modül ve rol ekranları', 'Aidat ve fotoğraf yönetimi', 'Premium destek ve onboarding'],
   },
@@ -362,7 +362,7 @@ export default function Home() {
               href="/kayit"
               className="rounded-full bg-[var(--green)] px-5 py-3 text-sm font-bold text-[#060a06] transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_40px_rgba(74,222,128,0.22)]"
             >
-              Ücretsiz Başla
+              Demo Talep Et
             </Link>
           </div>
 
@@ -403,7 +403,7 @@ export default function Home() {
                 Giriş Yap
               </Link>
               <Link href="/kayit" className="flex-1 rounded-full bg-[var(--green)] px-5 py-3 text-center text-sm font-bold text-[#060a06]">
-                Ücretsiz Başla
+                Demo Talep Et
               </Link>
             </div>
           </div>
@@ -415,7 +415,7 @@ export default function Home() {
           <Reveal className="pt-10">
             <div className="mb-8 inline-flex items-center gap-3 rounded-full border border-[var(--border)] bg-[var(--green-dim)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--green)]">
               <span className="h-2 w-2 rounded-full bg-[var(--green)] shadow-[0_0_16px_#4ade80]" />
-              Türkiye&apos;nin #1 Anaokulu Platformu
+              Anaokulları için operasyon platformu
             </div>
             <h1 className="serif max-w-[720px] text-[clamp(3.7rem,8vw,7.2rem)] leading-[0.9] tracking-[-0.05em] text-white">
               Okulunuzu
@@ -435,7 +435,7 @@ export default function Home() {
                 href="/kayit"
                 className="group inline-flex items-center rounded-full bg-[var(--green)] px-7 py-4 text-sm font-bold text-[#060a06] transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_50px_rgba(74,222,128,0.2)]"
               >
-                Ücretsiz Başla
+                Demo Talep Et
                 <ArrowRight size={14} className="ml-2 transition-transform group-hover:translate-x-1" />
               </Link>
               <Link
@@ -495,9 +495,9 @@ export default function Home() {
                 <div className="space-y-5">
                   <div className="grid gap-4 sm:grid-cols-4">
                     {[
-                      ['94%', 'devam'],
+                      ['Bugün', 'devam takibi'],
                       ['18', 'yeni mesaj'],
-                      ['₺84K', 'bekleyen tahsilat'],
+                      ['Aidat', 'takip paneli'],
                       ['32', 'bugün aktivite'],
                     ].map(([value, label]) => (
                       <div key={label} className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-4 backdrop-blur-xl transition-all hover:-translate-y-1 hover:border-[rgba(74,222,128,0.28)]">
@@ -538,24 +538,24 @@ export default function Home() {
 
                     <div className="rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(74,222,128,0.14),rgba(74,222,128,0.03))] p-5 backdrop-blur-xl transition-all hover:-translate-y-1">
                       <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">Tahsilat sağlığı</div>
-                      <div className="mt-2 serif text-4xl text-[var(--green)]">₺1.2M</div>
-                      <div className="mt-2 text-sm text-[var(--muted)]">12 aylık tahmini yıllık gelir görünürlüğü</div>
+                      <div className="mt-2 serif text-4xl text-[var(--green)]">Planlı</div>
+                      <div className="mt-2 text-sm text-[var(--muted)]">Vade, ödeme durumu ve tahsilat notlarını tek ekranda izleyin.</div>
                       <div className="mt-6 rounded-[20px] border border-[var(--border)] bg-black/20 p-4">
                         <div className="mb-2 flex items-center justify-between text-sm">
-                          <span className="text-[var(--muted)]">Tahsil edilen</span>
-                          <span className="text-white">%82</span>
+                          <span className="text-[var(--muted)]">Durum görünürlüğü</span>
+                          <span className="text-white">Hazır</span>
                         </div>
                         <div className="h-2 rounded-full bg-white/[0.06]">
-                          <div className="h-2 w-[82%] rounded-full bg-[var(--green)]" />
+                          <div className="h-2 w-[74%] rounded-full bg-[var(--green)]" />
                         </div>
                         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                           <div className="rounded-2xl border border-[var(--border)] bg-white/[0.03] p-3">
                             <div className="text-[var(--muted)]">Bekleyen</div>
-                            <div className="mt-1 font-semibold text-white">₺216K</div>
+                            <div className="mt-1 font-semibold text-white">Takipte</div>
                           </div>
                           <div className="rounded-2xl border border-[var(--border)] bg-white/[0.03] p-3">
                             <div className="text-[var(--muted)]">Otomatik hatırlatma</div>
-                            <div className="mt-1 font-semibold text-white">bugün 09:00</div>
+                            <div className="mt-1 font-semibold text-white">planlanabilir</div>
                           </div>
                         </div>
                       </div>
@@ -570,7 +570,7 @@ export default function Home() {
 
       <Reveal className="border-y border-[var(--border)] bg-white/[0.02] px-[5%] py-6">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-8">
-          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">Bize güvenen okullar</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">Modül kapsamı</div>
           <div className="flex flex-1 flex-wrap items-center gap-6 text-sm text-white/28">
             {proofSchools.map((school) => (
               <span key={school} className="transition-colors hover:text-white/70">
@@ -579,8 +579,8 @@ export default function Home() {
             ))}
           </div>
           <div className="flex items-center gap-3 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-sm">
-            <span className="text-[var(--green)]">★★★★★</span>
-            <span className="text-[var(--muted)]">4.9 / 5 ortalama memnuniyet</span>
+            <span className="text-[var(--green)]">●</span>
+            <span className="text-[var(--muted)]">Rol bazlı güvenli erişim</span>
           </div>
         </div>
       </Reveal>
@@ -690,10 +690,10 @@ export default function Home() {
       <section id="metrikler" className="px-[5%] pb-24">
         <div className="mx-auto grid max-w-[1400px] gap-4 md:grid-cols-4">
           {[
-            ['18 dakika', 'ortalama sabah check-in süresi'],
-            ['%82', 'aidat tahsilat görünürlüğü'],
-            ['3.4x', 'veli uygulama etkileşimi'],
-            ['0 dağınık araç', 'tek platform operasyonu'],
+            ['Günlük', 'yoklama ve aktivite akışı'],
+            ['Sınıf bazlı', 'öğretmen yetki kapsamı'],
+            ['Veliye özel', 'çocuk odaklı görünüm'],
+            ['Tek uygulama', 'okul iletişimi'],
           ].map(([value, label], index) => (
             <Reveal key={label} delay={index * 60}>
               <div className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-7 text-center backdrop-blur-xl transition-all hover:-translate-y-1 hover:border-[rgba(74,222,128,0.28)]">
@@ -710,18 +710,18 @@ export default function Home() {
       <section id="yorumlar" className="px-[5%] py-24">
         <div className="mx-auto max-w-[1400px]">
           <Reveal>
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--green)]">Müşteri görüşleri</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--green)]">Kullanım senaryoları</div>
             <h2 className="serif mt-4 text-[clamp(2.5rem,4.5vw,4.5rem)] leading-[0.95] tracking-[-0.04em] text-white">
-              Ürünün kalitesi,
+              Uygulamadaki
               <br />
-              ekiplerin gününe yansıyor.
+              temel akışlar.
             </h2>
           </Reveal>
           <div className="mt-12 grid gap-4 lg:grid-cols-3">
             {testimonials.map((item, index) => (
               <Reveal key={item.name} delay={index * 90}>
                 <article className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-8 backdrop-blur-xl transition-all hover:-translate-y-1 hover:border-[rgba(74,222,128,0.28)]">
-                  <div className="mb-6 text-sm tracking-[0.3em] text-[var(--green)]">★★★★★</div>
+                  <div className="mb-6 text-xs font-bold uppercase tracking-[0.24em] text-[var(--green)]">Akış</div>
                   <blockquote className="serif text-3xl leading-[1.14] tracking-tight text-white">
                     &quot;{item.quote}&quot;
                   </blockquote>
@@ -806,7 +806,7 @@ export default function Home() {
                 href="/kayit"
                 className="rounded-full bg-[var(--green)] px-7 py-4 text-sm font-bold text-[#060a06] transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_40px_rgba(74,222,128,0.2)]"
               >
-                Ücretsiz Başla
+                Demo Talep Et
               </Link>
               <a
                 href="mailto:info@kinderx.app"
@@ -827,13 +827,15 @@ export default function Home() {
             </div>
             <div>
               <div className="text-sm font-semibold text-white">KinderX</div>
-              <div className="text-sm text-[var(--muted)]">Anaokullları için premium operasyon platformu</div>
+              <div className="text-sm text-[var(--muted)]">Anaokulları için operasyon platformu</div>
             </div>
           </div>
           <div className="flex flex-wrap gap-6 text-sm text-[var(--muted)]">
            <a href="#ozellikler" className="transition-colors hover:text-white">Özellikler</a>
             <a href="#roller" className="transition-colors hover:text-white">Roller</a>
             <a href="#fiyatlar" className="transition-colors hover:text-white">Fiyatlar</a>
+            <Link href="/support" className="transition-colors hover:text-white">Destek</Link>
+            <Link href="/privacy" className="transition-colors hover:text-white">Gizlilik</Link>
             <a href="mailto:info@kinderx.app" className="transition-colors hover:text-white">İletişim</a>
           </div>
         </div>

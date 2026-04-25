@@ -90,7 +90,7 @@ export function RoiCalculator() {
               ROI Hesaplayıcı
             </div>
             <h2 className="serif text-[clamp(2.4rem,4vw,4.3rem)] leading-[0.96] tracking-[-0.04em] text-white">
-              Kinderly ekibinize
+              KinderX ekibinize
               <br />
               ne kadar zaman ve
               <br />

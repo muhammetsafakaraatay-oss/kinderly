@@ -13,15 +13,15 @@ export async function sendPersonelWelcomeEmail({
   slug: string
   sifre: string
 }): Promise<{ success: boolean; error?: unknown }> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://kinderly.app'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://kinderx.app'
   const loginUrl = `${appUrl}/giris?redirect=${encodeURIComponent(`/${slug}/ogretmen`)}`
 
   try {
     const resend = new Resend(process.env.RESEND_API_KEY)
     const { error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM || 'Kinderly <noreply@kinderly.app>',
+      from: process.env.EMAIL_FROM || 'KinderX <noreply@kinderx.app>',
       to: email,
-      subject: `${okul_ad} - Kinderly Personel Hesabınız Oluşturuldu`,
+      subject: `${okul_ad} - KinderX Personel Hesabınız Oluşturuldu`,
       html: `<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -41,7 +41,7 @@ export async function sendPersonelWelcomeEmail({
         Merhaba <strong>${ad_soyad}</strong>,
       </p>
       <p style="font-size:15px;color:#4b5563;line-height:1.6;margin:0 0 28px;">
-        <strong>${okul_ad}</strong> yönetimi tarafından Kinderly sistemine personel olarak eklendiniz.
+        <strong>${okul_ad}</strong> yönetimi tarafından KinderX sistemine personel olarak eklendiniz.
         Aşağıdaki bilgilerle giriş yapabilirsiniz.
       </p>
 
