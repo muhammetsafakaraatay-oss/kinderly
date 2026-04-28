@@ -26,8 +26,8 @@ const supportPoints = [
 
 const REDIRECT_RESOLUTION_TIMEOUT_MS = 3000
 const AUTH_LOADING_HINT_TIMEOUT_MS = 15000
-const SIGNIN_SLOW_HINT_MS = 8000
-const SIGNIN_TIMEOUT_MS = 35000
+const SIGNIN_SLOW_HINT_MS = 4000
+const SIGNIN_TIMEOUT_MS = 12000
 const PREPARE_OVERLAY_MAX_MS = 30000
 
 async function getAccessToken() {
@@ -70,7 +70,7 @@ function GirisContent() {
   const [joinProcessing, setJoinProcessing] = useState(false)
 
   const normalizedEmail = email.trim().toLowerCase()
-  const canSubmit = normalizedEmail.length > 0 && password.trim().length > 0 && !submitting && !(authLoading && !hasValidSession)
+  const canSubmit = normalizedEmail.length > 0 && password.trim().length > 0 && !submitting && !(authLoading && !!session && !hasValidSession)
   const redirectPath = rolePath(role)
   const roleResolutionError =
     redirectIssue ||
@@ -85,7 +85,7 @@ function GirisContent() {
         ? 'Panel hazırlanıyor...'
         : 'Panele giriş yap'
   const isPreparingPanel = authLoading && !!session && !hasValidSession
-  const isBusy = submitting || (isPreparingPanel && !prepareOverlayTimedOut)
+  const isBusy = !!session && (submitting || (isPreparingPanel && !prepareOverlayTimedOut))
   const loadingMessages = [
     'Kimlik doğrulanıyor...',
     'Rol ve okul bilgisi hazırlanıyor...',
@@ -146,9 +146,13 @@ function GirisContent() {
   }, [authLoading, joinProcessing, joinToken, okul?.slug, router, session])
 
   useEffect(() => {
-    if (!session || joinProcessing || (authLoading && !hasValidSession)) return
+    if (!session || joinProcessing || authLoading) return
 
     if (okul?.slug && redirectPath) {
+      return
+    }
+
+    if (!hasValidSession) {
       return
     }
 
@@ -260,7 +264,7 @@ function GirisContent() {
       setError(
         signInError.message === 'Invalid login credentials'
           ? 'Email veya şifre hatalı.'
-          : getUserFacingErrorMessage(signInError, 'Giriş şu anda tamamlanamadı. Lütfen tekrar deneyin.')
+          : signInError.message || getUserFacingErrorMessage(signInError, 'Giriş şu anda tamamlanamadı. Lütfen tekrar deneyin.')
       )
     }
 

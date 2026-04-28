@@ -27,6 +27,7 @@ import { FinansPanel } from '@/components/admin/finans-panel'
 import { TeslimPanel } from '@/components/admin/teslim-panel'
 import { VelilerPanel } from '@/components/admin/veliler-panel'
 import { firstActiveContact } from '@/lib/contact-utils'
+import { buildDailyReport, buildDailyReportHighlights, buildDailyReportQualityTips } from '@/lib/daily-report'
 import { supabase } from '@/lib/supabase'
 import { getPhotoStoragePath, withSignedPhotoUrls } from '@/lib/supabase-helpers'
 import { useAuth } from '@/lib/auth'
@@ -317,12 +318,16 @@ function today() { return todayLocalKey() }
 function fmtM(n: number) { return '₺' + (Number(n) || 0).toLocaleString('tr-TR') }
 
 function activityPhotoUrl(row: any) {
-  return row?.tur === 'photo' && typeof row.detay?.url === 'string' ? row.detay.url : null
+  return (row?.tur === 'photo' || row?.tur === 'video') && typeof row.detay?.url === 'string' ? row.detay.url : null
 }
 
 function photoContentType(file: File) {
   if (file.type) return file.type
   const name = file.name.toLocaleLowerCase('tr-TR')
+  if (name.endsWith('.mp4')) return 'video/mp4'
+  if (name.endsWith('.mov')) return 'video/quicktime'
+  if (name.endsWith('.webm')) return 'video/webm'
+  if (name.endsWith('.m4v')) return 'video/x-m4v'
   if (name.endsWith('.png')) return 'image/png'
   if (name.endsWith('.webp')) return 'image/webp'
   if (name.endsWith('.heic')) return 'image/heic'
@@ -332,7 +337,7 @@ function photoContentType(file: File) {
 
 function photoStoragePath(okulId: string | number, ogrenciId: string | number, file: File) {
   const extension = file.name.split('.').pop()?.toLocaleLowerCase('tr-TR')
-  const safeExtension = extension && ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'].includes(extension) ? extension : 'jpg'
+  const safeExtension = extension && ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'mp4', 'mov', 'webm', 'm4v'].includes(extension) ? extension : 'jpg'
   return `${okulId}/${ogrenciId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${safeExtension}`
 }
 
@@ -843,6 +848,13 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
 
   const filtered = ogrenciler.filter((o: Ogrenci) => o.ad_soyad.toLowerCase().includes(search.toLowerCase()))
   const t = AKT_TYPES.find(x => x.id === aktType)
+  const feedTypes = new Set(feed.map((item) => item.tur))
+  const qualityTips = selected ? [
+    !feedTypes.has('food') ? 'Yemek kaydı eksik' : '',
+    !feedTypes.has('nap') ? 'Uyku bilgisi eklenebilir' : '',
+    !feedTypes.has('photo') && !feedTypes.has('video') ? 'Günün akışını güçlendirecek medya yok' : '',
+    !feedTypes.has('note') && !feedTypes.has('kudos') ? 'Kısa bir öğretmen notu raporu güçlendirir' : '',
+  ].filter(Boolean) : []
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -871,7 +883,29 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
           <div className={`px-4 py-3 border-b font-semibold text-sm border-[rgba(74,222,128,0.14)] text-white`}>
             {selected ? selected.ad_soyad : 'Öğrenci seçin'}
           </div>
-          <div className="p-4 grid grid-cols-3 sm:grid-cols-5 gap-2">
+          <div className="p-4 space-y-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                ['Bugünkü kayıt', feed.length, 'text-[#4ade80]'],
+                ['Medya', feed.filter((item) => item.tur === 'photo' || item.tur === 'video').length, 'text-fuchsia-400'],
+                ['Not / Tebrik', feed.filter((item) => item.tur === 'note' || item.tur === 'kudos').length, 'text-violet-400'],
+                ['Sağlık / İlaç', feed.filter((item) => item.tur === 'health' || item.tur === 'meds' || item.tur === 'incident').length, 'text-orange-300'],
+              ].map(([label, value, tone]) => (
+                <Card key={label as string} dark={dark} className="p-4">
+                  <div className="text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">{label}</div>
+                  <div className={`text-2xl font-bold ${tone}`}>{String(value)}</div>
+                </Card>
+              ))}
+            </div>
+            {qualityTips.length ? (
+              <div className="rounded-2xl border border-orange-400/30 bg-orange-400/10 px-4 py-4">
+                <div className="text-sm font-semibold text-orange-300">Rapor kalite ipuçları</div>
+                <div className="mt-3 space-y-2 text-sm text-orange-100/85">
+                  {qualityTips.map((tip) => <div key={tip}>• {tip}</div>)}
+                </div>
+              </div>
+            ) : null}
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
             {AKT_TYPES.map(t => (
               <button key={t.id} onClick={() => { if (!selected) { alert('Önce öğrenci seçin!'); return }; setAktType(t.id); setForm({}); setPhotoFile(null); setModal(true) }}
                 className="rounded-xl p-3 flex flex-col items-center gap-1 text-white text-xs font-semibold transition-transform hover:-translate-y-0.5"
@@ -880,6 +914,7 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
                 <span>{t.label}</span>
               </button>
             ))}
+            </div>
           </div>
         </Card>
 
@@ -899,13 +934,17 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
                   <div className={`text-sm font-medium text-white`}>{tp?.label || a.tur}{a.detay?.not ? ' · ' + a.detay.not : ''}</div>
                   <div className="text-xs text-[rgba(255,255,255,0.54)]">{a.kaydeden}</div>
                   {photoUrl ? (
-                    <button type="button" onClick={() => window.open(photoUrl, '_blank')} className="mt-3 block w-full overflow-hidden rounded-xl border border-[rgba(74,222,128,0.14)] bg-[#0d160d]">
-                      <img src={photoUrl} alt="Aktivite fotoğrafı" className="h-48 w-full object-cover" />
-                    </button>
+                    a.tur === 'video' ? (
+                      <video src={photoUrl} controls preload="metadata" className="mt-3 h-48 w-full rounded-xl bg-black object-cover" />
+                    ) : (
+                      <button type="button" onClick={() => window.open(photoUrl, '_blank')} className="mt-3 block w-full overflow-hidden rounded-xl border border-[rgba(74,222,128,0.14)] bg-[#0d160d]">
+                        <img src={photoUrl} alt="Aktivite fotoğrafı" className="h-48 w-full object-cover" />
+                      </button>
+                    )
                   ) : null}
-                  {a.tur === 'photo' && !photoUrl ? (
+                  {(a.tur === 'photo' || a.tur === 'video') && !photoUrl ? (
                     <div className="mt-3 rounded-lg bg-[#0d160d] px-3 py-2 text-xs text-[rgba(255,255,255,0.54)]">
-                      Fotoğraf yükleniyor veya erişim izni bekleniyor.
+                      Medya yükleniyor veya erişim izni bekleniyor.
                     </div>
                   ) : null}
                 </div>
@@ -979,81 +1018,235 @@ function AktivitePage({ ogrenciler, okul, dark }: any) {
 function GunlukRaporPage({ ogrenciler, siniflar, okul, dark }: any) {
   const [tarih, setTarih] = useState(today())
   const [sinifFilter, setSinifFilter] = useState('')
-  const [raporlar, setRaporlar] = useState<Record<number, any>>({})
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (okul) load() }, [tarih, okul])
-
-  async function load() {
-    const { data } = await supabase.from('gunluk_rapor').select('*').eq('okul_id', okul.id).eq('tarih', tarih)
-    const r: Record<number, any> = {}
-    data?.forEach(d => r[d.ogrenci_id] = d)
-    setRaporlar(r)
-  }
-
-  async function saveRapor(ogrId: number, rapor: any) {
-    const existing = raporlar[ogrId]
-    if (existing) {
-      await supabase.from('gunluk_rapor').update({ ...rapor, kaydeden: 'Yönetici' }).eq('id', existing.id)
-    } else {
-      await supabase.from('gunluk_rapor').insert({ okul_id: okul.id, ogrenci_id: ogrId, tarih, ...rapor, kaydeden: 'Yönetici' })
-    }
-    load()
-  }
+  const [selectedOgrId, setSelectedOgrId] = useState<number | null>(null)
+  const [activities, setActivities] = useState<any[]>([])
+  const [attendance, setAttendance] = useState('')
+  const [report, setReport] = useState<any | null>(null)
+  const [saving, setSaving] = useState(false)
 
   const filtered = sinifFilter ? ogrenciler.filter((o: Ogrenci) => o.sinif === sinifFilter) : ogrenciler
+  const selectedOgr = ogrenciler.find((ogrenci: Ogrenci) => ogrenci.id === selectedOgrId) || null
+
+  useEffect(() => {
+    if (selectedOgrId && filtered.some((ogrenci: Ogrenci) => ogrenci.id === selectedOgrId)) return
+    setSelectedOgrId(filtered[0]?.id ?? null)
+  }, [filtered, selectedOgrId])
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (okul && selectedOgrId) load() }, [tarih, okul, selectedOgrId])
+
+  async function load() {
+    if (!selectedOgrId) return
+    const [activityQuery, attendanceQuery, reportQuery] = await Promise.all([
+      supabase
+        .from('aktiviteler')
+        .select('id,ogrenci_id,tur,detay,kaydeden,created_at,olusturuldu')
+        .eq('okul_id', okul.id)
+        .eq('ogrenci_id', selectedOgrId)
+        .eq('tarih', tarih)
+        .order('id', { ascending: false }),
+      supabase
+        .from('yoklama')
+        .select('durum')
+        .eq('okul_id', okul.id)
+        .eq('ogrenci_id', selectedOgrId)
+        .eq('tarih', tarih)
+        .maybeSingle(),
+      supabase
+        .from('gun_sonu_raporlari')
+        .select('id,baslik,icerik,tarih,created_at,ozet')
+        .eq('okul_id', okul.id)
+        .eq('ogrenci_id', selectedOgrId)
+        .eq('tarih', tarih)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ])
+    setActivities(await withSignedPhotoUrls(activityQuery.data || []))
+    setAttendance(attendanceQuery.data?.durum || '')
+    setReport(reportQuery.data || null)
+  }
+
+  async function generateReport() {
+    if (!selectedOgr) return
+    setSaving(true)
+    const nextReport = buildDailyReport({
+      studentName: selectedOgr.ad_soyad,
+      date: tarih,
+      attendance,
+      activities,
+    })
+    const { data } = await supabase
+      .from('gun_sonu_raporlari')
+      .upsert({
+        okul_id: okul.id,
+        ogrenci_id: selectedOgr.id,
+        tarih,
+        baslik: nextReport.title,
+        icerik: nextReport.body,
+        ozet: nextReport.summary,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'okul_id,ogrenci_id,tarih' })
+      .select('id,baslik,icerik,tarih,created_at,ozet')
+      .single()
+    setSaving(false)
+    setReport(data || null)
+  }
+
+  const reportHighlights = buildDailyReportHighlights(activities)
+  const reportQualityTips = buildDailyReportQualityTips(activities)
 
   return (
-    <div>
-      <div className="flex gap-2 mb-4 flex-wrap items-center">
-        <input type="date" value={tarih} onChange={e => setTarih(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
-        <select value={sinifFilter} onChange={e => setSinifFilter(e.target.value)}
-          className={`border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]`}>
-          <option value="">Tüm Sınıflar</option>
-          {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
-        </select>
-      </div>
-      <div className="space-y-3">
-        {filtered.map((o: Ogrenci) => {
-          const r = raporlar[o.id] || {}
-          return (
-            <Card key={o.id} dark={dark}>
-              <div className={`px-4 py-3 border-b flex items-center gap-3 border-[rgba(74,222,128,0.14)]`}>
-                <span className="text-xl">🌸</span>
-                <span className={`font-semibold text-sm text-white`}>{o.ad_soyad}</span>
-                <span className="text-xs text-[rgba(255,255,255,0.54)]">{o.sinif}</span>
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[300px_1fr]">
+      <Card dark={dark}>
+        <div className="px-4 py-3 border-b border-[rgba(74,222,128,0.14)]">
+          <div className="flex gap-2 mb-3 flex-wrap items-center">
+            <input type="date" value={tarih} onChange={e => setTarih(e.target.value)}
+              className={`border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`} />
+            <select value={sinifFilter} onChange={e => setSinifFilter(e.target.value)}
+              className={`border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white focus:border-[#4ade80]`}>
+              <option value="">Tüm Sınıflar</option>
+              {siniflar.map((s: Sinif) => <option key={s.id} value={s.ad}>{s.ad}</option>)}
+            </select>
+          </div>
+          <div className="text-sm font-semibold text-white">Öğrenci seç</div>
+          <div className="text-xs text-[rgba(255,255,255,0.54)] mt-1">Seçili öğrencinin bugünkü raporu, medyası ve zaman akışı gösterilir.</div>
+        </div>
+        <div className="p-2 max-h-[780px] overflow-y-auto space-y-2">
+          {filtered.map((o: Ogrenci) => (
+            <button
+              key={o.id}
+              onClick={() => setSelectedOgrId(o.id)}
+              className={`w-full rounded-xl px-4 py-3 text-left transition ${selectedOgrId === o.id ? 'bg-[rgba(74,222,128,0.1)] border border-[rgba(74,222,128,0.35)]' : 'hover:bg-[#0d160d]'}`}
+            >
+              <div className="text-sm font-semibold text-white">{o.ad_soyad}</div>
+              <div className="text-xs text-[rgba(255,255,255,0.54)] mt-1">{o.sinif || 'Sınıf bilgisi yok'}</div>
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      <div className="space-y-4">
+        <Card dark={dark}>
+          <div className="p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[rgba(74,222,128,0.7)]">Günlük Rapor</div>
+                <div className="mt-2 text-xl font-semibold text-white">{selectedOgr?.ad_soyad || 'Öğrenci seçin'}</div>
+                <div className="mt-1 text-sm text-[rgba(255,255,255,0.54)]">{selectedOgr?.sinif || 'Bugünkü web özet merkezi'}</div>
               </div>
-              <div className="p-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
-                {[
-                  { label: '🍳 Kahvaltı', key: 'kahvalti', placeholder: 'Ne yedi?' },
-                  { label: '🍽️ Öğle', key: 'ogle', placeholder: 'Ne yedi?' },
-                  { label: '😴 Uyku', key: 'uyku_suresi', placeholder: 'Ne kadar?' },
-                  { label: '😊 Ruh Hali', key: 'ruh_hali', placeholder: 'Nasıldı?' },
-                ].map(f => (
-                  <div key={f.key}>
-                    <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">{f.label}</label>
-                    <input
-                      defaultValue={r[f.key] || ''}
-                      placeholder={f.placeholder}
-                      onBlur={e => saveRapor(o.id, { ...r, [f.key]: e.target.value })}
-                      className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`}
-                    />
-                  </div>
-                ))}
-                <div className="col-span-2 lg:col-span-4">
-                  <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">📝 Açıklama</label>
-                  <input
-                    defaultValue={r.aciklama || ''}
-                    placeholder="Günle ilgili not..."
-                    onBlur={e => saveRapor(o.id, { ...r, aciklama: e.target.value })}
-                    className={`w-full border rounded-lg px-3 py-2 text-sm outline-none bg-[#0d160d] border-[rgba(74,222,128,0.14)] text-white placeholder:text-[rgba(255,255,255,0.35)] focus:border-[#4ade80]`}
-                  />
+              <div className="flex items-center gap-3">
+                <span className={`rounded-full px-4 py-2 text-sm font-semibold ${attendance === 'geldi' ? 'bg-[rgba(74,222,128,0.15)] text-[#4ade80]' : attendance === 'gelmedi' ? 'bg-[rgba(239,68,68,0.12)] text-red-400' : attendance === 'izinli' ? 'bg-orange-400/10 text-orange-300' : 'bg-[#0d160d] text-[rgba(255,255,255,0.6)]'}`}>
+                  {attendance || 'bekleniyor'}
+                </span>
+                <button onClick={generateReport} disabled={saving || !selectedOgrId} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-60">
+                  {saving ? 'Hazırlanıyor...' : report ? 'Raporu Yenile' : 'Rapor Oluştur'}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
+              {[
+                ['Toplam Aktivite', activities.length, 'text-[#4ade80]'],
+                ['Foto / Video', (reportHighlights.counts.photo || 0) + (reportHighlights.counts.video || 0), 'text-fuchsia-400'],
+                ['Not / Tebrik', (reportHighlights.counts.note || 0) + (reportHighlights.counts.kudos || 0), 'text-violet-400'],
+                ['Sağlık / İlaç', (reportHighlights.counts.health || 0) + (reportHighlights.counts.meds || 0) + (reportHighlights.counts.incident || 0), 'text-orange-300'],
+              ].map(([label, value, tone]) => (
+                <Card key={label as string} dark={dark} className="p-4">
+                  <div className="text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">{label}</div>
+                  <div className={`text-2xl font-bold ${tone}`}>{String(value)}</div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+          <Card dark={dark}>
+            <div className="px-4 py-3 border-b border-[rgba(74,222,128,0.14)] flex items-center justify-between gap-3">
+              <div>
+                <div className="font-semibold text-sm text-white">📝 Veliye gidecek özet</div>
+                <div className="text-xs text-[rgba(255,255,255,0.54)] mt-1">Seçili günün okunabilir rapor metni.</div>
+              </div>
+              {report?.created_at ? <div className="text-[11px] uppercase tracking-[0.14em] text-[rgba(255,255,255,0.35)]">{new Date(report.created_at).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div> : null}
+            </div>
+            <div className="p-4">
+              {report ? (
+                <div className="rounded-2xl border border-[rgba(74,222,128,0.24)] bg-[rgba(74,222,128,0.06)] px-4 py-4">
+                  <div className="font-semibold text-white">{report.baslik}</div>
+                  <div className="mt-3 whitespace-pre-line text-sm leading-7 text-[rgba(255,255,255,0.78)]">{report.icerik}</div>
                 </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-[rgba(74,222,128,0.14)] bg-[#0d160d] px-4 py-8 text-sm text-[rgba(255,255,255,0.45)]">
+                  Henüz gün sonu raporu yok. Aktiviteler hazırsa “Rapor Oluştur” ile anında hazırlayabilirsiniz.
+                </div>
+              )}
+            </div>
+          </Card>
+
+          <Card dark={dark}>
+            <div className="px-4 py-3 border-b border-[rgba(74,222,128,0.14)]">
+              <div className="font-semibold text-sm text-white">✨ Kalite rehberi</div>
+              <div className="text-xs text-[rgba(255,255,255,0.54)] mt-1">Raporu daha güçlü kılacak sinyaller.</div>
+            </div>
+            <div className="p-4 space-y-3">
+              {(report?.ozet?.highlights?.length ? report.ozet.highlights : reportHighlights.highlights.length ? reportHighlights.highlights : ['Henüz öne çıkan kayıt oluşmadı.']).map((item: string) => (
+                <div key={item} className="rounded-xl border border-[rgba(74,222,128,0.14)] bg-[#0d160d] px-4 py-3 text-sm text-[rgba(255,255,255,0.78)]">
+                  {item}
+                </div>
+              ))}
+              {reportQualityTips.length ? (
+                <div className="rounded-xl border border-orange-400/30 bg-orange-400/10 px-4 py-4">
+                  <div className="text-sm font-semibold text-orange-300">Eksik görünen alanlar</div>
+                  <div className="mt-3 space-y-2 text-sm text-orange-100/85">
+                    {reportQualityTips.map((tip) => <div key={tip}>• {tip}</div>)}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </Card>
+        </div>
+
+        <Card dark={dark}>
+          <div className="px-4 py-3 border-b border-[rgba(74,222,128,0.14)]">
+            <div className="font-semibold text-sm text-white">📋 Bugünkü zaman akışı</div>
+            <div className="text-xs text-[rgba(255,255,255,0.54)] mt-1">Aktiviteler, medya ve notlar gün sırasıyla gösterilir.</div>
+          </div>
+          <div className="p-4 space-y-4">
+            {activities.length ? activities.map((activity, index) => {
+              const meta = AKT_TYPES.find((item) => item.id === activity.tur) || { label: activity.tur, emoji: '📋', color: '#64748b' }
+              const mediaUrl = activityPhotoUrl(activity)
+              return (
+                <div key={activity.id} className="flex gap-4">
+                  <div className="flex flex-col items-center">
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-lg" style={{ background: meta.color }}>{meta.emoji}</div>
+                    {index !== activities.length - 1 && <div className="mt-2 h-full w-px bg-[rgba(74,222,128,0.14)]" />}
+                  </div>
+                  <div className="flex-1 rounded-2xl border border-[rgba(74,222,128,0.14)] bg-[#0d160d] px-4 py-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-white">{meta.label}</div>
+                      <div className="text-[11px] uppercase tracking-[0.14em] text-[rgba(255,255,255,0.35)]">{new Date(activity.created_at || activity.olusturuldu || tarih).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</div>
+                    </div>
+                    <div className="mt-2 text-sm text-[rgba(255,255,255,0.72)]">{activity.detay?.not || activity.detay?.aciklama || activity.detay?.ogun || 'Detay eklenmedi'}</div>
+                    {mediaUrl ? (
+                      activity.tur === 'video' ? (
+                        <video src={mediaUrl} controls preload="metadata" className="mt-3 h-56 w-full rounded-xl bg-black object-cover" />
+                      ) : (
+                        <button type="button" onClick={() => window.open(mediaUrl, '_blank')} className="mt-3 block w-full overflow-hidden rounded-xl border border-[rgba(74,222,128,0.14)] bg-black">
+                          <img src={mediaUrl} alt="Aktivite medyası" className="h-56 w-full object-cover" />
+                        </button>
+                      )
+                    ) : null}
+                  </div>
+                </div>
+              )
+            }) : (
+              <div className="rounded-2xl border border-dashed border-[rgba(74,222,128,0.14)] bg-[#0d160d] px-4 py-8 text-sm text-[rgba(255,255,255,0.45)]">
+                Bu gün için henüz aktivite girilmedi.
               </div>
-            </Card>
-          )
-        })}
+            )}
+          </div>
+        </Card>
       </div>
     </div>
   )
@@ -1176,7 +1369,7 @@ function Fotograflar({ ogrenciler, siniflar, okul, dark }: any) {
   const [files, setFiles] = useState<File[]>([])
   const [form, setForm] = useState<any>({})
   const [uploading, setUploading] = useState(false)
-  const [viewer, setViewer] = useState<string | null>(null)
+  const [viewer, setViewer] = useState<{ url: string; type: 'photo' | 'video' } | null>(null)
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (okul) load() }, [okul])
@@ -1186,7 +1379,7 @@ function Fotograflar({ ogrenciler, siniflar, okul, dark }: any) {
       .from('aktiviteler')
       .select('id,ogrenci_id,tur,detay,kaydeden,tarih,olusturuldu,ogrenciler(ad_soyad,sinif)')
       .eq('okul_id', okul.id)
-      .eq('tur', 'photo')
+      .in('tur', ['photo', 'video'])
       .order('id', { ascending: false })
       .limit(80)
     const rows = await withSignedPhotoUrls(data || [])
@@ -1202,6 +1395,7 @@ function Fotograflar({ ogrenciler, siniflar, okul, dark }: any) {
     try {
       for (const f of files) {
         const storagePath = photoStoragePath(okul.id, ogrenciId, f)
+        const mediaType = photoContentType(f).startsWith('video/') ? 'video' : 'photo'
         const { error } = await supabase.storage.from('photos').upload(storagePath, f, {
           contentType: photoContentType(f),
           cacheControl: '3600',
@@ -1214,9 +1408,9 @@ function Fotograflar({ ogrenciler, siniflar, okul, dark }: any) {
           .insert({
             okul_id: okul.id,
             ogrenci_id: ogrenciId,
-            tur: 'photo',
+            tur: mediaType,
             tarih: today(),
-            detay: { storagePath, url: null, not: form.aciklama || '', aciklama: form.aciklama || '' },
+            detay: { storagePath, url: null, not: form.aciklama || '', aciklama: form.aciklama || '', mediaType },
             kaydeden: 'Yönetim',
             veli_gosterilsin: true,
           })
@@ -1250,35 +1444,52 @@ function Fotograflar({ ogrenciler, siniflar, okul, dark }: any) {
     <div>
       {viewer && (
         <div className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center p-4" onClick={() => setViewer(null)}>
-          {/* Fullscreen preview stays as img because it uses an arbitrary runtime URL and viewport-constrained sizing. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={viewer} alt="Buyuk fotograf onizleme" className="max-w-full max-h-[80vh] rounded-lg" />
+          {viewer.type === 'video' ? (
+            <video src={viewer.url} controls preload="metadata" className="max-w-full max-h-[80vh] rounded-lg bg-black" />
+          ) : (
+            // Fullscreen preview stays as img because it uses an arbitrary runtime URL and viewport-constrained sizing.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={viewer.url} alt="Buyuk fotograf onizleme" className="max-w-full max-h-[80vh] rounded-lg" />
+          )}
           <button className="mt-4 bg-white/20 text-white px-6 py-2 rounded-lg font-semibold" onClick={() => setViewer(null)}>Kapat</button>
         </div>
       )}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        {[['Toplam Medya', fotos.length, 'text-[#4ade80]'], ['Fotoğraf', fotos.filter((item) => item.tur === 'photo').length, 'text-fuchsia-400'], ['Video', fotos.filter((item) => item.tur === 'video').length, 'text-sky-400'], ['Bugün', fotos.filter((item) => item.tarih === today()).length, 'text-orange-300']].map(([label, value, tone]) => (
+          <Card key={label as string} dark={dark} className="p-4">
+            <div className="text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">{label}</div>
+            <div className={`text-2xl font-bold ${tone}`}>{String(value)}</div>
+          </Card>
+        ))}
+      </div>
       <div className="flex justify-end mb-4">
-        <button onClick={() => { setFiles([]); setForm({}); setModal(true) }} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">+ Fotoğraf Ekle</button>
+        <button onClick={() => { setFiles([]); setForm({}); setModal(true) }} className="bg-[#4ade80] text-black px-4 py-2 rounded-lg text-sm font-semibold">+ Medya Ekle</button>
       </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {fotos.map(f => {
             const src = activityPhotoUrl(f)
             const student = Array.isArray(f.ogrenciler) ? f.ogrenciler[0] : f.ogrenciler
             return (
-              <div key={f.id} className="relative aspect-square rounded-xl overflow-hidden group cursor-pointer bg-[#0d160d]" onClick={() => src && setViewer(src)}>
+              <div key={f.id} className="relative aspect-square rounded-xl overflow-hidden group cursor-pointer bg-[#0d160d]" onClick={() => src && setViewer({ url: src, type: f.tur === 'video' ? 'video' : 'photo' })}>
                 {src ? (
-                  <Image
-                    src={src}
-                    alt={f.detay?.not || student?.ad_soyad || 'Okul fotoğrafı'}
-                    fill
-                    sizes="(max-width: 1024px) 50vw, 25vw"
-                    className="object-cover transition-transform group-hover:scale-105"
-                    unoptimized
-                  />
+                  f.tur === 'video' ? (
+                    <video src={src} className="h-full w-full object-cover" muted playsInline />
+                  ) : (
+                    <Image
+                      src={src}
+                      alt={f.detay?.not || student?.ad_soyad || 'Okul medyası'}
+                      fill
+                      sizes="(max-width: 1024px) 50vw, 25vw"
+                      className="object-cover transition-transform group-hover:scale-105"
+                      unoptimized
+                    />
+                  )
                 ) : (
-                  <div className="flex h-full items-center justify-center text-4xl">📷</div>
+                  <div className="flex h-full items-center justify-center text-4xl">{f.tur === 'video' ? '🎥' : '📷'}</div>
                 )}
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
                   <p className="text-white text-xs font-semibold">{student?.ad_soyad || 'Öğrenci'}</p>
+                  <p className="text-white/70 text-[11px] uppercase tracking-[0.12em]">{f.tur === 'video' ? 'Video' : 'Fotoğraf'}</p>
                   <p className="text-white/80 text-xs">{f.detay?.not || f.detay?.aciklama || ''}</p>
                 </div>
                 <button onClick={e => { e.stopPropagation(); deleteFoto(f.id, getPhotoStoragePath(f.detay)) }}
@@ -1286,16 +1497,16 @@ function Fotograflar({ ogrenciler, siniflar, okul, dark }: any) {
               </div>
             )
           })}
-        {!fotos.length && <div className="col-span-4 text-center py-16 text-[rgba(255,255,255,0.35)]">📷 Fotoğraf yok</div>}
+        {!fotos.length && <div className="col-span-4 text-center py-16 text-[rgba(255,255,255,0.35)]">📷 Henüz medya yok</div>}
       </div>
 
-      <Modal open={modal} onClose={() => setModal(false)} title="Fotoğraf Ekle" dark={dark}>
+      <Modal open={modal} onClose={() => setModal(false)} title="Medya Ekle" dark={dark}>
         <div className="p-5 space-y-3">
           <div onClick={() => document.getElementById('foto-input')?.click()}
             className="border-2 border-dashed border-[rgba(74,222,128,0.3)] rounded-xl p-6 text-center cursor-pointer hover:border-[#4ade80] transition-colors">
-            <div className="text-3xl mb-2">📷</div>
-            <p className="text-sm font-medium">{files.length ? files.length + ' dosya seçildi' : 'Fotoğraf Seç'}</p>
-            <input id="foto-input" type="file" accept="image/*" multiple className="hidden" onChange={e => setFiles(Array.from(e.target.files || []))} />
+            <div className="text-3xl mb-2">🎞️</div>
+            <p className="text-sm font-medium">{files.length ? files.length + ' dosya seçildi' : 'Fotoğraf veya video seç'}</p>
+            <input id="foto-input" type="file" accept="image/*,video/*" multiple className="hidden" onChange={e => setFiles(Array.from(e.target.files || []))} />
           </div>
           <div>
             <label className="block text-xs font-semibold text-[rgba(255,255,255,0.54)] mb-1">Açıklama</label>

@@ -144,6 +144,11 @@ type SessionContextResponse = {
   role?: Role
 }
 
+type MembershipResolution = {
+  okul: OkulInfo | null
+  role: Role
+}
+
 async function fetchSessionContext(accessToken: string): Promise<SessionContextResponse | null> {
   if (!accessToken) return null
 
@@ -158,6 +163,96 @@ async function fetchSessionContext(accessToken: string): Promise<SessionContextR
     return (await response.json()) as SessionContextResponse
   } catch {
     return null
+  }
+}
+
+async function fetchSchoolById(okulId: number | string) {
+  const { data } = await supabase
+    .from('okullar')
+    .select('id, ad, slug')
+    .eq('id', okulId)
+    .maybeSingle()
+
+  return data ?? null
+}
+
+async function resolveSchoolFromSessionContext(accessToken?: string | null) {
+  if (!accessToken) return null
+  return (await fetchSessionContext(accessToken))?.activeSchool ?? null
+}
+
+async function resolveSchoolForMembership(okulId: number | string, accessToken?: string | null) {
+  return (await fetchSchoolById(okulId)) ?? (await resolveSchoolFromSessionContext(accessToken))
+}
+
+async function findMatchingPersonel(user: User) {
+  const { data: userRows } = await supabase
+    .from('personel')
+    .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
+    .eq('user_id', user.id)
+    .limit(5)
+
+  const matchedByUser =
+    (userRows || []).find((row) => row.user_id === user.id && row.aktif) ??
+    (userRows || []).find((row) => row.user_id === user.id) ??
+    null
+
+  if (matchedByUser) return matchedByUser
+
+  const email = user.email?.trim().toLocaleLowerCase('tr-TR')
+  if (!email) return null
+
+  const { data: emailRows } = await supabase
+    .from('personel')
+    .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
+    .ilike('email', email)
+    .limit(5)
+
+  return (
+    (emailRows || []).find((row) => row.email?.trim().toLocaleLowerCase('tr-TR') === email && row.aktif) ??
+    (emailRows || []).find((row) => row.email?.trim().toLocaleLowerCase('tr-TR') === email) ??
+    null
+  )
+}
+
+async function resolveStaffMembership(user: User, nextSession: Session | null): Promise<{
+  personel: PersonelInfo | null
+  membership: MembershipResolution | null
+}> {
+  const matchedPersonel = await findMatchingPersonel(user)
+  if (!matchedPersonel) {
+    return { personel: null, membership: null }
+  }
+
+  const normalizedRole = normalizeRole(matchedPersonel.rol)
+  if (!normalizedRole) {
+    return { personel: matchedPersonel, membership: { okul: null, role: null } }
+  }
+
+  const okul = await resolveSchoolForMembership(matchedPersonel.okul_id, nextSession?.access_token)
+
+  return {
+    personel: matchedPersonel,
+    membership: {
+      okul,
+      role: normalizedRole,
+    },
+  }
+}
+
+async function resolveParentMembership(userId: string, nextSession: Session | null): Promise<MembershipResolution | null> {
+  const { data: veli } = await supabase
+    .from('veliler')
+    .select('okul_id')
+    .eq('user_id', userId)
+    .eq('aktif', true)
+    .maybeSingle()
+
+  if (!veli) return null
+
+  return {
+    okul: await resolveSchoolForMembership(veli.okul_id, nextSession?.access_token),
+    role: 'veli',
   }
 }
 
@@ -271,87 +366,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true)
 
     try {
-      const email = user.email?.trim().toLocaleLowerCase('tr-TR')
-      let matchedPersonel: PersonelInfo | null = null
+      const { personel: matchedPersonel, membership: staffMembership } = await resolveStaffMembership(user, nextSession)
 
-      const { data: userRows } = await supabase
-          .from('personel')
-          .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
-          .eq('user_id', user.id)
-          .limit(5)
-      
-
-      const matchedByUser = (userRows || []).find((row) => row.user_id === user.id && row.aktif) ??
-        (userRows || []).find((row) => row.user_id === user.id) ??
-        null
-
-      matchedPersonel = matchedByUser
-
-      if (!matchedPersonel && email) {
-        const { data: emailRows } = await supabase
-            .from('personel')
-            .select('id, okul_id, ad_soyad, email, rol, sinif, aktif, user_id')
-            .ilike('email', email)
-            .limit(5)
-        
-
-        matchedPersonel =
-          (emailRows || []).find((row) => row.email?.trim().toLocaleLowerCase('tr-TR') === email && row.aktif) ??
-          (emailRows || []).find((row) => row.email?.trim().toLocaleLowerCase('tr-TR') === email) ??
-          null
+      if (matchedPersonel && !staffMembership?.role) {
+        await supabase.auth.signOut()
+        clearSnapshot(remembered)
+        return
       }
 
-      if (matchedPersonel) {
-        const normalizedRole = normalizeRole(matchedPersonel.rol)
-        if (!normalizedRole) {
-          await supabase.auth.signOut()
-          clearSnapshot(remembered)
-          return
-        }
-
-        const { data: okulData } = await supabase
-            .from('okullar')
-            .select('id, ad, slug, logo_url, plan, plan_bitis')
-            .eq('id', matchedPersonel.okul_id)
-            .maybeSingle()
-
-        const resolvedSchool =
-          okulData ??
-          (nextSession?.access_token ? (await fetchSessionContext(nextSession.access_token))?.activeSchool ?? null : null)
-
+      if (matchedPersonel && staffMembership) {
         commitSnapshot({
           session: nextSession,
-          role: normalizedRole,
-          okul: resolvedSchool,
+          role: staffMembership.role,
+          okul: staffMembership.okul,
           personel: matchedPersonel,
           remember: remembered,
         })
         return
       }
 
-      const { data: veli } = await supabase
-          .from('veliler')
-          .select('okul_id')
-          .eq('user_id', user.id)
-          .eq('aktif', true)
-          .maybeSingle()
-      
-
-      if (veli) {
-        const { data: okulData } = await supabase
-            .from('okullar')
-            .select('id, ad, slug, logo_url, plan, plan_bitis')
-            .eq('id', veli.okul_id)
-            .maybeSingle()
-
-        const resolvedSchool =
-          okulData ??
-          (nextSession?.access_token ? (await fetchSessionContext(nextSession.access_token))?.activeSchool ?? null : null)
-
+      const parentMembership = await resolveParentMembership(user.id, nextSession)
+      if (parentMembership) {
         commitSnapshot({
           session: nextSession,
-          role: 'veli',
-          okul: resolvedSchool,
+          role: parentMembership.role,
+          okul: parentMembership.okul,
           personel: null,
           remember: remembered,
         })
@@ -390,6 +429,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let active = true
     let restoreTimeout: number | null = null
+    let bootstrapTimeout: number | null = null
     if (!hasSupabaseEnv) {
       return () => {
         active = false
@@ -443,11 +483,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    bootstrapTimeout = window.setTimeout(() => {
+      if (!active) return
+      const preservedSnapshot = lastValidSnapshotRef.current ?? _memCache?.snapshot ?? readCachedSnapshot()
+      if (preservedSnapshot?.session?.user && preservedSnapshot.okul) {
+        commitSnapshot({
+          ...preservedSnapshot,
+          remember,
+        })
+        return
+      }
+      setLoading(false)
+    }, 4000)
+
     void hydrateSession()
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!active) return
 
       listenerHandledInitial = true
@@ -460,7 +513,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!rememberCurrent && typeof window !== 'undefined') {
           window.sessionStorage.setItem(AUTH_SESSION_MARKER, '1')
         }
-        await fetchRole(nextSession.user, rememberCurrent, nextSession)
+        window.setTimeout(() => {
+          if (!active) return
+          void fetchRole(nextSession.user, rememberCurrent, nextSession)
+        }, 0)
       } else {
         handleSignedOutLikeState(event, rememberCurrent)
       }
@@ -470,6 +526,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       active = false
       if (restoreTimeout) {
         window.clearTimeout(restoreTimeout)
+      }
+      if (bootstrapTimeout) {
+        window.clearTimeout(bootstrapTimeout)
       }
       subscription.unsubscribe()
     }

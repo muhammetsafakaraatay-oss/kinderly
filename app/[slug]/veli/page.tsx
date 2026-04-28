@@ -8,6 +8,7 @@ import { Instrument_Serif, DM_Sans } from 'next/font/google'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { ParentTeslimPanel } from '@/components/veli/teslim-panel'
 import { getContactType } from '@/lib/contact-utils'
+import { buildDailyReportHighlights, buildDailyReportQualityTips, type DailyReportRow as ParentDailyReportRow } from '@/lib/daily-report'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
@@ -134,7 +135,7 @@ function activitySummary(row: ActivityRow) {
 }
 
 function activityPhotoUrl(row: ActivityRow) {
-  return row.tur === 'photo' && typeof row.detay?.url === 'string' ? row.detay.url : null
+  return (row.tur === 'photo' || row.tur === 'video') && typeof row.detay?.url === 'string' ? row.detay.url : null
 }
 
 function ageFromBirthDate(value?: string | null) {
@@ -163,6 +164,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
   const [selectedChildId, setSelectedChildId] = useState<number | null>(null)
   const [attendanceStatus, setAttendanceStatus] = useState('')
   const [activities, setActivities] = useState<ActivityRow[]>([])
+  const [dailyReport, setDailyReport] = useState<ParentDailyReportRow | null>(null)
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([])
   const [fees, setFees] = useState<Aidat[]>([])
   const [contacts, setContacts] = useState<VeliRecord[]>([])
@@ -313,7 +315,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
     async function loadData() {
       if (isFirstLoad) setPageLoading(true)
       try {
-        const [activityQuery, attendanceQuery, announcementQuery, feeQuery, messageQuery] = await Promise.all([
+        const [activityQuery, attendanceQuery, reportQuery, announcementQuery, feeQuery, messageQuery] = await Promise.all([
           supabase
             .from('aktiviteler')
             .select('id,tur,detay,kaydeden,olusturuldu')
@@ -329,6 +331,15 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
             .eq('okul_id', currentOkul.id)
             .eq('ogrenci_id', currentChildId)
             .eq('tarih', today())
+            .maybeSingle(),
+          supabase
+            .from('gun_sonu_raporlari')
+            .select('id,baslik,icerik,tarih,created_at,ozet')
+            .eq('okul_id', currentOkul.id)
+            .eq('ogrenci_id', currentChildId)
+            .eq('tarih', today())
+            .order('created_at', { ascending: false })
+            .limit(1)
             .maybeSingle(),
           loadAnnouncementsCompat(currentOkul.id, 30),
           supabase
@@ -346,6 +357,7 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
 
         setActivities(signedActivities)
         setAttendanceStatus(attendanceQuery.data?.durum || '')
+        setDailyReport((reportQuery.data as ParentDailyReportRow | null) || null)
         setAnnouncements(announcementQuery.data || [])
         setFees((feeQuery.data || []) as Aidat[])
         setMessages(messageQuery.data || [])
@@ -389,6 +401,18 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
           .maybeSingle()
         setAttendanceStatus(data?.durum || '')
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'gun_sonu_raporlari', filter: `okul_id=eq.${currentOkul.id}` }, async () => {
+        const { data } = await supabase
+          .from('gun_sonu_raporlari')
+          .select('id,baslik,icerik,tarih,created_at,ozet')
+          .eq('okul_id', currentOkul.id)
+          .eq('ogrenci_id', currentChildId)
+          .eq('tarih', today())
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        setDailyReport((data as ParentDailyReportRow | null) || null)
+      })
       .subscribe()
 
     return () => {
@@ -421,6 +445,21 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
   const totalPending = useMemo(
     () => fees.filter((item) => !item.odendi).reduce((sum, item) => sum + Number(item.tutar || 0), 0),
     [fees]
+  )
+
+  const activityHighlights = useMemo(
+    () => buildDailyReportHighlights(activities),
+    [activities]
+  )
+
+  const activityQualityTips = useMemo(
+    () => buildDailyReportQualityTips(activities),
+    [activities]
+  )
+
+  const mediaActivities = useMemo(
+    () => activities.filter((activity) => activityPhotoUrl(activity)),
+    [activities]
   )
 
   async function sendMessage() {
@@ -603,34 +642,121 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
           )}
 
           {activeTab === 'bugun' && (
-            <section className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-              <PanelCard className="bg-[linear-gradient(135deg,#fff7ed,white)]">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-xl font-semibold text-slate-900">{selectedChild?.ad_soyad || 'Çocuk seçin'}</h2>
-                    <p className="mt-1 text-sm text-slate-500">{selectedChild?.sinif || 'Sınıf bilgisi'}</p>
+            <section className="mt-6 space-y-6">
+              <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+                <PanelCard className="bg-[linear-gradient(135deg,#fff7ed,white)]">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-semibold text-slate-900">{selectedChild?.ad_soyad || 'Çocuk seçin'}</h2>
+                      <p className="mt-1 text-sm text-slate-500">{selectedChild?.sinif || 'Sınıf bilgisi'}</p>
+                    </div>
+                    <span className={cx(
+                      'rounded-full px-4 py-2 text-sm font-semibold',
+                      attendanceStatus === 'geldi' ? 'bg-emerald-50 text-emerald-700' :
+                        attendanceStatus === 'gelmedi' ? 'bg-rose-50 text-rose-700' :
+                          attendanceStatus === 'izinli' ? 'bg-amber-50 text-amber-700' :
+                            'bg-slate-100 text-slate-600'
+                    )}>
+                      {attendanceStatus === 'geldi' ? '✅ Geldi' : attendanceStatus === 'gelmedi' ? '❌ Gelmedi' : attendanceStatus === 'izinli' ? '🏖️ İzinli' : '⏳ Bekleniyor'}
+                    </span>
                   </div>
-                  <span className={cx(
-                    'rounded-full px-4 py-2 text-sm font-semibold',
-                    attendanceStatus === 'geldi' ? 'bg-emerald-50 text-emerald-700' :
-                      attendanceStatus === 'gelmedi' ? 'bg-rose-50 text-rose-700' :
-                        attendanceStatus === 'izinli' ? 'bg-amber-50 text-amber-700' :
-                          'bg-slate-100 text-slate-600'
-                  )}>
-                    {attendanceStatus === 'geldi' ? '✅ Geldi' : attendanceStatus === 'gelmedi' ? '❌ Gelmedi' : attendanceStatus === 'izinli' ? '🏖️ İzinli' : '⏳ Bekleniyor'}
-                  </span>
-                </div>
 
-                <div className="mt-6 grid gap-4 md:grid-cols-3">
-                  <MetricCard label="Aktivite" value={String(activities.length)} />
-                  <MetricCard label="Bekleyen aidat" value={String(fees.filter((item) => !item.odendi).length)} />
-                  <MetricCard label="Toplam borç" value={formatCurrency(totalPending)} />
-                </div>
-              </PanelCard>
+                  <div className="mt-6 grid gap-4 md:grid-cols-3">
+                    <MetricCard label="Aktivite" value={String(activities.length)} />
+                    <MetricCard label="Bekleyen aidat" value={String(fees.filter((item) => !item.odendi).length)} />
+                    <MetricCard label="Toplam borç" value={formatCurrency(totalPending)} />
+                  </div>
+
+                  <div className="mt-6 grid gap-3 md:grid-cols-2">
+                    {(dailyReport?.ozet?.highlights?.length ? dailyReport.ozet.highlights : activityHighlights.highlights.length ? activityHighlights.highlights : ['Bugünkü kayıtlar burada canlı olarak güncellenir.']).slice(0, 4).map((item) => (
+                      <div key={item} className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm text-slate-700 shadow-sm">
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </PanelCard>
+
+                <PanelCard>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900">Bugünün gün sonu raporu</h2>
+                      <p className="mt-1 text-sm text-slate-500">Öğretmenin gün sonunda oluşturduğu okunabilir özet.</p>
+                    </div>
+                    {dailyReport?.created_at ? (
+                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                        {formatDateTime(dailyReport.created_at)}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {dailyReport ? (
+                    <div className="mt-5 rounded-[24px] border border-amber-200 bg-amber-50/70 p-5">
+                      <div className="text-lg font-semibold text-slate-900">{dailyReport.baslik}</div>
+                      <div className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{dailyReport.icerik}</div>
+                    </div>
+                  ) : (
+                    <div className="mt-5 rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-sm text-slate-500">
+                      Henüz gün sonu raporu hazırlanmadı. Öğretmen gün sonunda raporu oluşturduğunda burada görünecek.
+                    </div>
+                  )}
+
+                  {activityQualityTips.length ? (
+                    <div className="mt-5 rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-4">
+                      <div className="text-sm font-semibold text-amber-800">Bugünkü akışta eksik görünebilecek alanlar</div>
+                      <div className="mt-3 space-y-2 text-sm text-amber-700">
+                        {activityQualityTips.map((tip) => (
+                          <div key={tip}>• {tip}</div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </PanelCard>
+              </div>
+
+              {mediaActivities.length ? (
+                <PanelCard>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900">Bugünün galerisi</h2>
+                      <p className="mt-1 text-sm text-slate-500">Paylaşılan fotoğraf ve videoları tek bakışta görün.</p>
+                    </div>
+                    <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">
+                      {mediaActivities.length} medya
+                    </span>
+                  </div>
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    {mediaActivities.slice(0, 4).map((activity) => {
+                      const mediaUrl = activityPhotoUrl(activity)
+                      if (!mediaUrl) return null
+                      return (
+                        <a key={activity.id} href={mediaUrl} target="_blank" rel="noreferrer" className="overflow-hidden rounded-[22px] border border-slate-200 bg-slate-50">
+                          {activity.tur === 'video' ? (
+                            <video src={mediaUrl} controls preload="metadata" className="h-48 w-full bg-slate-950 object-cover" />
+                          ) : (
+                            <img src={mediaUrl} alt={activitySummary(activity)} className="h-48 w-full object-cover" />
+                          )}
+                          <div className="space-y-2 p-4">
+                            <div className="text-sm font-semibold text-slate-900">{activityTypes[activity.tur]?.label || 'Medya'}</div>
+                            <div className="text-sm text-slate-600">{activitySummary(activity)}</div>
+                            <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{formatDateTime(activity.created_at || activity.olusturuldu)}</div>
+                          </div>
+                        </a>
+                      )
+                    })}
+                  </div>
+                </PanelCard>
+              ) : null}
 
               <PanelCard>
-                <h2 className="text-lg font-semibold text-slate-900">Aktivite feed</h2>
-                <p className="mt-1 text-sm text-slate-500">Supabase realtime ile anlık güncellenir.</p>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Aktivite feed</h2>
+                    <p className="mt-1 text-sm text-slate-500">Supabase realtime ile anlık güncellenir.</p>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                    {activityHighlights.counts.photo || activityHighlights.counts.video ? 'Medya var' : 'Metin ağırlıklı gün'}
+                  </span>
+                </div>
                 <div className="mt-6 space-y-3">
                   {activities.length ? activities.map((activity) => {
                     const meta = activityTypes[activity.tur] || { emoji: '📋', label: activity.tur, color: '#64748b' }
@@ -648,12 +774,16 @@ export default function VeliPage({ params }: { params: Promise<{ slug: string }>
                           <div className="mt-2 text-sm text-slate-600">{activitySummary(activity)}</div>
                           {photoUrl ? (
                             <a href={photoUrl} target="_blank" rel="noreferrer" className="mt-3 block overflow-hidden rounded-[18px] border border-slate-200 bg-slate-50">
-                              <img src={photoUrl} alt="Aktivite fotoğrafı" className="h-56 w-full object-cover" />
+                              {activity.tur === 'video' ? (
+                                <video src={photoUrl} controls preload="metadata" className="h-56 w-full bg-slate-950 object-cover" />
+                              ) : (
+                                <img src={photoUrl} alt="Aktivite fotoğrafı" className="h-56 w-full object-cover" />
+                              )}
                             </a>
                           ) : null}
-                          {activity.tur === 'photo' && !photoUrl ? (
+                          {(activity.tur === 'photo' || activity.tur === 'video') && !photoUrl ? (
                             <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                              Fotoğraf yükleniyor veya erişim izni bekleniyor.
+                              Medya yükleniyor veya erişim izni bekleniyor.
                             </div>
                           ) : null}
                         </div>

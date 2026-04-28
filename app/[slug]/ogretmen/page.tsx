@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { rolePath } from '@/lib/auth-helpers'
 import { todayLocalKey } from '@/lib/date-utils'
+import { buildDailyReport, buildDailyReportQualityTips, type DailyReportRow as GeneratedDailyReportRow } from '@/lib/daily-report'
 import {
   getUserFacingErrorMessage,
   getSupabaseErrorMessage,
@@ -220,8 +221,10 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
   const [announcementModalOpen, setAnnouncementModalOpen] = useState(false)
   const [galleryUpload, setGalleryUpload] = useState<File | null>(null)
   const [galleryNote, setGalleryNote] = useState('')
+  const [generatedReport, setGeneratedReport] = useState<GeneratedDailyReportRow | null>(null)
   const [savingAttendance, setSavingAttendance] = useState(false)
   const [savingActivity, setSavingActivity] = useState(false)
+  const [savingReport, setSavingReport] = useState(false)
   const [sendingThread, setSendingThread] = useState(false)
   const [sendingBulk, setSendingBulk] = useState(false)
   const [savingAnnouncement, setSavingAnnouncement] = useState(false)
@@ -521,10 +524,57 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
     [activities, selectedReportStudentId]
   )
 
+  const reportQualityTips = useMemo(
+    () => buildDailyReportQualityTips(reportActivities),
+    [reportActivities]
+  )
+
+  const reportMediaItems = useMemo(
+    () => reportActivities.filter((activity) => activityMediaUrl(activity)),
+    [reportActivities]
+  )
+
   const galleryItems = useMemo(
     () => selectedPhotoStudentId ? photoCards.filter((item) => item.ogrenci_id === selectedPhotoStudentId) : photoCards,
     [photoCards, selectedPhotoStudentId]
   )
+
+  useEffect(() => {
+    if (!okul || !selectedReportStudentId) {
+      setGeneratedReport(null)
+      return
+    }
+
+    let alive = true
+    const currentOkul = okul
+
+    async function loadGeneratedReport() {
+      const { data, error } = await supabase
+        .from('gun_sonu_raporlari')
+        .select('id,baslik,icerik,tarih,created_at,ozet')
+        .eq('okul_id', currentOkul.id)
+        .eq('ogrenci_id', selectedReportStudentId)
+        .eq('tarih', today())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (!alive) return
+
+      if (error) {
+        setStatusMessage(getSupabaseErrorMessage(error, 'Gün sonu raporu yüklenemedi.'))
+        return
+      }
+
+      setGeneratedReport((data as GeneratedDailyReportRow | null) || null)
+    }
+
+    void loadGeneratedReport()
+
+    return () => {
+      alive = false
+    }
+  }, [okul, selectedReportStudentId])
 
   useEffect(() => {
     if (!okul || !selectedMessageStudentId || !teacher) return
@@ -722,6 +772,43 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
       setUploadingGallery(false)
       setStatusMessage(getSupabaseErrorMessage(error as { message?: string }, 'Medya yüklenemedi.'))
     }
+  }
+
+  async function handleGenerateDailyReport() {
+    if (!okul || !selectedReportStudent) return
+
+    setSavingReport(true)
+    const report = buildDailyReport({
+      studentName: selectedReportStudent.ad_soyad,
+      date: today(),
+      attendance: attendance[selectedReportStudent.id] || null,
+      activities: reportActivities,
+    })
+
+    const { data, error } = await supabase
+      .from('gun_sonu_raporlari')
+      .upsert({
+        okul_id: okul.id,
+        ogrenci_id: selectedReportStudent.id,
+        tarih: today(),
+        baslik: report.title,
+        icerik: report.body,
+        ozet: report.summary,
+        created_by: session?.user.id || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'okul_id,ogrenci_id,tarih' })
+      .select('id,baslik,icerik,tarih,created_at,ozet')
+      .single()
+
+    setSavingReport(false)
+
+    if (error) {
+      setStatusMessage(getSupabaseErrorMessage(error, 'Gün sonu raporu oluşturulamadı.'))
+      return
+    }
+
+    setGeneratedReport((data as GeneratedDailyReportRow | null) || null)
+    setStatusMessage('Gün sonu raporu oluşturuldu ve veli akışına hazırlandı.')
   }
 
   async function handlePasswordChange() {
@@ -1316,7 +1403,15 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
           {activeTab === 'gunluk' && (
             <section className="mt-6 grid gap-6 xl:grid-cols-[320px_1fr]">
               <PanelCard>
-                <h2 className="text-lg font-semibold text-slate-900">Öğrenci seç</h2>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Öğrenci seç</h2>
+                    <p className="mt-1 text-sm text-slate-500">Rapor, seçili öğrencinin bugünkü verilerinden hazırlanır.</p>
+                  </div>
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    {reportActivities.length} kayıt
+                  </span>
+                </div>
                 <div className="mt-5 space-y-2">
                   {students.map((student) => (
                     <button
@@ -1339,52 +1434,151 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
                 </div>
               </PanelCard>
 
-              <PanelCard>
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-lg font-semibold text-slate-900">{selectedReportStudent?.ad_soyad || 'Öğrenci seçin'}</h2>
-                    <p className="mt-1 text-sm text-slate-500">{selectedReportStudent?.sinif || 'Bugünkü timeline'}</p>
+              <div className="space-y-6">
+                <PanelCard className="bg-[linear-gradient(135deg,#ecfdf5,white)]">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900">{selectedReportStudent?.ad_soyad || 'Öğrenci seçin'}</h2>
+                      <p className="mt-1 text-sm text-slate-500">{selectedReportStudent?.sinif || 'Bugünkü günlük rapor merkezi'}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className={cx(
+                        'rounded-full px-4 py-2 text-sm font-semibold',
+                        attendance[selectedReportStudentId || 0] === 'geldi' ? 'bg-emerald-50 text-emerald-700' :
+                          attendance[selectedReportStudentId || 0] === 'gelmedi' ? 'bg-rose-50 text-rose-700' :
+                            attendance[selectedReportStudentId || 0] === 'izinli' ? 'bg-amber-50 text-amber-700' :
+                              'bg-slate-100 text-slate-600'
+                      )}>
+                        {attendance[selectedReportStudentId || 0] || 'bekleniyor'}
+                      </span>
+                      <button
+                        onClick={handleGenerateDailyReport}
+                        disabled={savingReport || !selectedReportStudent}
+                        className="rounded-2xl bg-[#10b981] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
+                      >
+                        {savingReport ? 'Rapor hazırlanıyor...' : generatedReport ? 'Raporu yenile' : 'Gün sonu raporu oluştur'}
+                      </button>
+                    </div>
                   </div>
-                  <span className={cx(
-                    'rounded-full px-4 py-2 text-sm font-semibold',
-                    attendance[selectedReportStudentId || 0] === 'geldi' ? 'bg-emerald-50 text-emerald-700' :
-                      attendance[selectedReportStudentId || 0] === 'gelmedi' ? 'bg-rose-50 text-rose-700' :
-                        attendance[selectedReportStudentId || 0] === 'izinli' ? 'bg-amber-50 text-amber-700' :
-                          'bg-slate-100 text-slate-600'
-                  )}>
-                    {attendance[selectedReportStudentId || 0] || 'bekleniyor'}
-                  </span>
-                </div>
-                <div className="mt-6 space-y-4">
-                  {reportActivities.map((activity, index) => {
-                    const meta = activityMeta(activity.tur)
-                    const mediaUrl = activityMediaUrl(activity)
-                    return (
-                      <div key={activity.id} className="flex gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: meta.bg }}>
-                            <span className="text-xl">{meta.emoji}</span>
-                          </div>
-                          {index !== reportActivities.length - 1 && <div className="mt-2 h-full w-px bg-slate-200" />}
+
+                  <div className="mt-6 grid gap-4 md:grid-cols-4">
+                    <StatCard label="Toplam Aktivite" value={String(reportActivities.length)} icon="📋" accent="#059669" bg="#d1fae5" />
+                    <StatCard label="Foto / Video" value={String(reportMediaItems.length)} icon="📷" accent="#db2777" bg="#fce7f3" />
+                    <StatCard label="Not / Tebrik" value={String(reportActivities.filter((activity) => activity.tur === 'note' || activity.tur === 'kudos').length)} icon="✨" accent="#7c3aed" bg="#f3e8ff" />
+                    <StatCard label="Sağlık / İlaç" value={String(reportActivities.filter((activity) => activity.tur === 'health' || activity.tur === 'meds' || activity.tur === 'incident').length)} icon="🩺" accent="#ea580c" bg="#ffedd5" />
+                  </div>
+                </PanelCard>
+
+                <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+                  <PanelCard>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h2 className="text-lg font-semibold text-slate-900">Rapor önizlemesi</h2>
+                        <p className="mt-1 text-sm text-slate-500">Veliye gidecek okunabilir özet burada görünür.</p>
+                      </div>
+                      {generatedReport?.created_at ? (
+                        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                          {formatDateTime(generatedReport.created_at)}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {generatedReport ? (
+                      <div className="mt-5 rounded-[24px] border border-emerald-200 bg-emerald-50/70 p-5">
+                        <div className="text-lg font-semibold text-slate-900">{generatedReport.baslik}</div>
+                        <div className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700">{generatedReport.icerik}</div>
+                      </div>
+                    ) : (
+                      <div className="mt-5 rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-sm text-slate-500">
+                        Henüz gün sonu raporu oluşturulmadı. Aktivite kayıtları hazır olduğunda tek tıkla özet oluşturabilirsiniz.
+                      </div>
+                    )}
+                  </PanelCard>
+
+                  <PanelCard>
+                    <h2 className="text-lg font-semibold text-slate-900">Kalite rehberi</h2>
+                    <div className="mt-5 space-y-3">
+                      {(generatedReport?.ozet?.highlights?.length ? generatedReport.ozet.highlights : [
+                        reportActivities.length ? 'Bugünkü kayıtlar rapor üretmeye uygun.' : 'Henüz aktivite girilmedi.',
+                      ]).map((item) => (
+                        <div key={item} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                          {item}
                         </div>
-                        <div className="flex-1 rounded-[22px] border border-slate-200 px-4 py-4">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="text-sm font-semibold text-slate-900">{meta.label}</div>
-                            <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{formatTime(activity.created_at || activity.olusturuldu)}</div>
-                          </div>
-                          <div className="mt-2 text-sm text-slate-600">{activitySummary(activity)}</div>
-                          {mediaUrl ? <ActivityMediaCard url={mediaUrl} mediaType={activity.tur === 'video' ? 'video' : 'photo'} className="h-56 w-full object-cover" /> : null}
-                          {(activity.tur === 'photo' || activity.tur === 'video') && !mediaUrl ? (
-                            <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                              Medya yükleniyor veya erişim izni bekleniyor.
-                            </div>
-                          ) : null}
+                      ))}
+                    </div>
+                    {reportQualityTips.length ? (
+                      <div className="mt-5 rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-4">
+                        <div className="text-sm font-semibold text-amber-800">Eksik görünen alanlar</div>
+                        <div className="mt-3 space-y-2 text-sm text-amber-700">
+                          {reportQualityTips.map((tip) => (
+                            <div key={tip}>• {tip}</div>
+                          ))}
                         </div>
                       </div>
-                    )
-                  })}
+                    ) : null}
+
+                    {reportMediaItems.length ? (
+                      <div className="mt-5">
+                        <div className="text-sm font-semibold text-slate-900">Rapor galerisi</div>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          {reportMediaItems.slice(0, 4).map((activity) => {
+                            const mediaUrl = activityMediaUrl(activity)
+                            if (!mediaUrl) return null
+                            return (
+                              <ActivityMediaCard
+                                key={activity.id}
+                                url={mediaUrl}
+                                mediaType={activity.tur === 'video' ? 'video' : 'photo'}
+                                className="h-36 w-full object-cover"
+                              />
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+                  </PanelCard>
                 </div>
-              </PanelCard>
+
+                <PanelCard>
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">Bugünkü zaman akışı</h2>
+                    <p className="mt-1 text-sm text-slate-500">Aynı günün bütün aktiviteleri sırayla gösterilir.</p>
+                  </div>
+                  <div className="mt-6 space-y-4">
+                    {reportActivities.length ? reportActivities.map((activity, index) => {
+                      const meta = activityMeta(activity.tur)
+                      const mediaUrl = activityMediaUrl(activity)
+                      return (
+                        <div key={activity.id} className="flex gap-4">
+                          <div className="flex flex-col items-center">
+                            <div className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: meta.bg }}>
+                              <span className="text-xl">{meta.emoji}</span>
+                            </div>
+                            {index !== reportActivities.length - 1 && <div className="mt-2 h-full w-px bg-slate-200" />}
+                          </div>
+                          <div className="flex-1 rounded-[22px] border border-slate-200 px-4 py-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="text-sm font-semibold text-slate-900">{meta.label}</div>
+                              <div className="text-xs uppercase tracking-[0.14em] text-slate-400">{formatTime(activity.created_at || activity.olusturuldu)}</div>
+                            </div>
+                            <div className="mt-2 text-sm text-slate-600">{activitySummary(activity)}</div>
+                            {mediaUrl ? <ActivityMediaCard url={mediaUrl} mediaType={activity.tur === 'video' ? 'video' : 'photo'} className="h-56 w-full object-cover" /> : null}
+                            {(activity.tur === 'photo' || activity.tur === 'video') && !mediaUrl ? (
+                              <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                                Medya yükleniyor veya erişim izni bekleniyor.
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      )
+                    }) : (
+                      <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-sm text-slate-500">
+                        Bugün için henüz aktivite kaydı yok. Kayıt geldikçe zaman akışı burada oluşur.
+                      </div>
+                    )}
+                  </div>
+                </PanelCard>
+              </div>
             </section>
           )}
           {activeTab === 'ayarlar' && (
@@ -1469,8 +1663,8 @@ export default function OgretmenPage({ params }: { params: Promise<{ slug: strin
   )
 }
 
-function PanelCard({ children }: { children: React.ReactNode }) {
-  return <section className="rounded-[24px] border border-[var(--border-subtle)] bg-[var(--card)] p-5 shadow-sm">{children}</section>
+function PanelCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <section className={cx('rounded-[24px] border border-[var(--border-subtle)] bg-[var(--card)] p-5 shadow-sm', className)}>{children}</section>
 }
 
 function StatCard({ label, value, icon, accent, bg }: { label: string; value: string; icon: string; accent: string; bg: string }) {
