@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
 import { hasSupabaseEnv, supabase } from '@/lib/supabase'
+import { buildEntitlementSnapshot, type EntitlementSnapshot } from '@/lib/entitlements'
 import { normalizeRole } from '@/lib/role-utils'
 
 export type Role = 'admin' | 'ogretmen' | 'veli' | null
@@ -12,6 +13,8 @@ type OkulInfo = {
   ad: string
   slug: string
   logo_url?: string | null
+  plan?: string | null
+  plan_bitis?: string | null
 }
 
 type PersonelInfo = {
@@ -39,6 +42,7 @@ type AuthContextValue = {
   role: Role
   okul: OkulInfo | null
   personel: PersonelInfo | null
+  entitlements: EntitlementSnapshot
   loading: boolean
   hasValidSession: boolean
   signOut: () => Promise<void>
@@ -279,7 +283,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const { data: okulData } = await supabase
             .from('okullar')
-            .select('id, ad, slug, logo_url')
+            .select('id, ad, slug, logo_url, plan, plan_bitis')
             .eq('id', matchedPersonel.okul_id)
             .maybeSingle()
         
@@ -305,7 +309,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (veli) {
         const { data: okulData } = await supabase
             .from('okullar')
-            .select('id, ad, slug, logo_url')
+            .select('id, ad, slug, logo_url, plan, plan_bitis')
             .eq('id', veli.okul_id)
             .maybeSingle()
         
@@ -429,6 +433,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role,
         okul,
         personel,
+        entitlements: buildEntitlementSnapshot(okul),
         loading,
         hasValidSession,
         signOut: async () => {

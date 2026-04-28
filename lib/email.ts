@@ -93,3 +93,64 @@ export async function sendPersonelWelcomeEmail({
     return { success: false, error: err }
   }
 }
+
+export async function sendJoinInviteEmail({
+  email,
+  adSoyad,
+  okulAd,
+  inviteUrl,
+  roleLabel,
+}: {
+  email: string
+  adSoyad: string
+  okulAd: string
+  inviteUrl: string
+  roleLabel: string
+}): Promise<{ success: boolean; error?: unknown }> {
+  try {
+    const resend = new Resend(process.env.RESEND_API_KEY)
+    const { error } = await resend.emails.send({
+      from: process.env.EMAIL_FROM || 'KinderX <noreply@kinderx.app>',
+      to: email,
+      subject: `${okulAd} - KinderX davetiniz hazır`,
+      html: `<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0;background:#f9fafb;">
+  <div style="max-width:520px;margin:40px auto;background:#fff;border-radius:24px;box-shadow:0 4px 12px rgba(0,0,0,0.06);overflow:hidden;">
+    <div style="background:#4f46e5;padding:32px 28px;text-align:center;">
+      <h1 style="color:#fff;margin:0;font-size:26px;font-weight:700;">${okulAd}</h1>
+      <p style="color:rgba(255,255,255,0.9);margin:8px 0 0;font-size:15px;">KinderX daveti</p>
+    </div>
+    <div style="padding:32px 28px;">
+      <p style="font-size:16px;color:#111827;margin:0 0 18px;">Merhaba <strong>${adSoyad}</strong>,</p>
+      <p style="font-size:15px;color:#4b5563;line-height:1.6;margin:0 0 24px;">
+        <strong>${okulAd}</strong> sizi KinderX üzerinde <strong>${roleLabel}</strong> olarak davet etti.
+      </p>
+      <a href="${inviteUrl}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 22px;border-radius:14px;font-weight:700;">
+        Daveti kabul et
+      </a>
+      <p style="font-size:13px;color:#6b7280;line-height:1.6;margin:22px 0 0;">
+        Buton çalışmazsa bu bağlantıyı tarayıcınıza yapıştırın:<br>
+        <a href="${inviteUrl}" style="color:#4f46e5;word-break:break-all;">${inviteUrl}</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>`,
+    })
+
+    if (error) {
+      console.error('[email] Invite gönderme hatası:', error)
+      return { success: false, error }
+    }
+
+    return { success: true }
+  } catch (err) {
+    console.error('[email] Invite beklenmeyen hata:', err)
+    return { success: false, error: err }
+  }
+}

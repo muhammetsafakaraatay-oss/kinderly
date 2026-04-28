@@ -30,6 +30,14 @@ const SIGNIN_SLOW_HINT_MS = 8000
 const SIGNIN_TIMEOUT_MS = 35000
 const PREPARE_OVERLAY_MAX_MS = 30000
 
+async function getAccessToken() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  return session?.access_token ?? ''
+}
+
 export default function GirisPage() {
   return (
     <Suspense fallback={<GirisFallback />}>
@@ -58,6 +66,8 @@ function GirisContent() {
   const [loadingStage, setLoadingStage] = useState(0)
   const [prepareOverlayTimedOut, setPrepareOverlayTimedOut] = useState(false)
   const redirectTarget = searchParams.get('redirect') || ''
+  const joinToken = searchParams.get('join_token') || ''
+  const [joinProcessing, setJoinProcessing] = useState(false)
 
   const normalizedEmail = email.trim().toLowerCase()
   const canSubmit = normalizedEmail.length > 0 && password.trim().length > 0 && !submitting && !(authLoading && !hasValidSession)
@@ -65,7 +75,7 @@ function GirisContent() {
   const roleResolutionError =
     redirectIssue ||
     (( !authLoading || hasValidSession) && session && !redirectPath
-      ? 'Giriş tamamlandı fakat bu hesap için panel rolü bulunamadı. Ana sayfaya yönlendiriliyorsunuz.'
+      ? 'Giriş tamamlandı fakat bu hesap henüz bir kuruma bağlanmamış görünüyor.'
       : '')
 
   const buttonLabel =
@@ -91,6 +101,51 @@ function GirisContent() {
   }, [authLoading, hasValidSession, okul?.slug, redirectPath, redirectTarget, router, session])
 
   useEffect(() => {
+    if (authLoading || !session || !joinToken || joinProcessing || okul?.slug) return
+
+    let cancelled = false
+
+    async function acceptJoinInvite() {
+      setJoinProcessing(true)
+      setError('')
+      setRedirectIssue('')
+
+      const accessToken = await getAccessToken()
+      if (!accessToken || cancelled) {
+        setJoinProcessing(false)
+        return
+      }
+
+      const res = await fetch('/api/join/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ token: joinToken }),
+      })
+
+      const data = await res.json().catch(() => null)
+      if (cancelled) return
+
+      if (!res.ok) {
+        setError(data?.error ?? 'Davet kabul edilemedi.')
+        setJoinProcessing(false)
+        router.replace('/kuruma-katil')
+        return
+      }
+
+      window.location.href = '/giris'
+    }
+
+    void acceptJoinInvite()
+
+    return () => {
+      cancelled = true
+    }
+  }, [authLoading, joinProcessing, joinToken, okul?.slug, router, session])
+
+  useEffect(() => {
     if (!session || (authLoading && !hasValidSession)) return
 
     if (okul?.slug && redirectPath) {
@@ -104,8 +159,8 @@ function GirisContent() {
         slug: okul?.slug ?? null,
       }
       console.error('Giriş yönlendirmesi çözülemedi.', details)
-      setRedirectIssue('Rol veya okul slug bilgisi çözülemedi. Ana sayfaya yönlendiriliyorsunuz.')
-      router.replace('/')
+      setRedirectIssue('Hesap bulundu ama henüz bir kuruma bağlanmadı. Kuruma katıl ekranına yönlendiriliyorsunuz.')
+      router.replace('/kuruma-katil')
     }, REDIRECT_RESOLUTION_TIMEOUT_MS)
 
     return () => window.clearTimeout(timeout)
