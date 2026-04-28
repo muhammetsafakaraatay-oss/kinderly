@@ -133,6 +133,28 @@ function readCachedSnapshot() {
   }
 }
 
+type SessionContextResponse = {
+  activeSchool?: OkulInfo | null
+  role?: Role
+}
+
+async function fetchSessionContext(accessToken: string): Promise<SessionContextResponse | null> {
+  if (!accessToken) return null
+
+  try {
+    const response = await fetch('/api/auth/session-context', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+
+    if (!response.ok) return null
+    return (await response.json()) as SessionContextResponse
+  } catch {
+    return null
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [role, setRole] = useState<Role>(null)
@@ -286,12 +308,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .select('id, ad, slug, logo_url, plan, plan_bitis')
             .eq('id', matchedPersonel.okul_id)
             .maybeSingle()
-        
+
+        const resolvedSchool =
+          okulData ??
+          (nextSession?.access_token ? (await fetchSessionContext(nextSession.access_token))?.activeSchool ?? null : null)
 
         commitSnapshot({
           session: nextSession,
           role: normalizedRole,
-          okul: okulData ?? null,
+          okul: resolvedSchool,
           personel: matchedPersonel,
           remember: remembered,
         })
@@ -312,12 +337,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .select('id, ad, slug, logo_url, plan, plan_bitis')
             .eq('id', veli.okul_id)
             .maybeSingle()
-        
+
+        const resolvedSchool =
+          okulData ??
+          (nextSession?.access_token ? (await fetchSessionContext(nextSession.access_token))?.activeSchool ?? null : null)
 
         commitSnapshot({
           session: nextSession,
           role: 'veli',
-          okul: okulData ?? null,
+          okul: resolvedSchool,
           personel: null,
           remember: remembered,
         })

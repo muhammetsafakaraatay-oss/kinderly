@@ -146,7 +146,7 @@ function GirisContent() {
   }, [authLoading, joinProcessing, joinToken, okul?.slug, router, session])
 
   useEffect(() => {
-    if (!session || (authLoading && !hasValidSession)) return
+    if (!session || joinProcessing || (authLoading && !hasValidSession)) return
 
     if (okul?.slug && redirectPath) {
       return
@@ -164,7 +164,7 @@ function GirisContent() {
     }, REDIRECT_RESOLUTION_TIMEOUT_MS)
 
     return () => window.clearTimeout(timeout)
-  }, [authLoading, hasValidSession, okul?.slug, redirectPath, role, router, session])
+  }, [authLoading, hasValidSession, joinProcessing, okul?.slug, redirectPath, role, router, session])
 
   useEffect(() => {
     if (!session || !authLoading || hasValidSession) {
