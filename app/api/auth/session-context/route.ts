@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server'
 import { authenticateRequest, createAdminClient } from '@/lib/server-auth'
 import { normalizeRole } from '@/lib/role-utils'
 
+type SchoolRow = {
+  id: number | string
+  ad: string
+  slug: string
+  plan?: string | null
+  plan_bitis?: string | null
+}
+
 export async function GET(request: Request) {
   try {
     const { user } = await authenticateRequest(request)
@@ -11,12 +19,12 @@ export async function GET(request: Request) {
     const [{ data: personelRowsByUserId }, { data: veliRowsByUserId }] = await Promise.all([
       admin
         .from('personel')
-        .select('okul_id, rol, aktif, okullar(id, ad, slug, plan, plan_bitis)')
+        .select('okul_id, rol, aktif')
         .eq('user_id', user.id)
         .eq('aktif', true),
       admin
         .from('veliler')
-        .select('okul_id, iliski_tipi, aktif, okullar(id, ad, slug, plan, plan_bitis)')
+        .select('okul_id, iliski_tipi, aktif')
         .eq('user_id', user.id)
         .eq('aktif', true),
     ])
@@ -26,13 +34,13 @@ export async function GET(request: Request) {
         ? await Promise.all([
             admin
               .from('personel')
-              .select('okul_id, rol, aktif, okullar(id, ad, slug, plan, plan_bitis)')
+              .select('okul_id, rol, aktif')
               .ilike('email', normalizedEmail)
               .eq('aktif', true)
               .then(({ data }) => data ?? []),
             admin
               .from('veliler')
-              .select('okul_id, iliski_tipi, aktif, okullar(id, ad, slug, plan, plan_bitis)')
+              .select('okul_id, iliski_tipi, aktif')
               .ilike('email', normalizedEmail)
               .eq('aktif', true)
               .then(({ data }) => data ?? []),
@@ -41,9 +49,27 @@ export async function GET(request: Request) {
 
     const personelRows = (personelRowsByUserId?.length ? personelRowsByUserId : personelRowsByEmail) ?? []
     const veliRows = (veliRowsByUserId?.length ? veliRowsByUserId : veliRowsByEmail) ?? []
+    const schoolIds = Array.from(new Set(
+      [...personelRows, ...veliRows]
+        .map((row) => row.okul_id)
+        .filter((value): value is number | string => value !== null && value !== undefined)
+    ))
+
+    const schoolMap = new Map<string, SchoolRow>()
+
+    if (schoolIds.length) {
+      const { data: schools } = await admin
+        .from('okullar')
+        .select('id, ad, slug, plan, plan_bitis')
+        .in('id', schoolIds)
+
+      for (const school of schools ?? []) {
+        schoolMap.set(String(school.id), school)
+      }
+    }
 
     const staffMemberships = personelRows.flatMap((row) => {
-      const okul = Array.isArray(row.okullar) ? row.okullar[0] : row.okullar
+      const okul = schoolMap.get(String(row.okul_id))
       const role = normalizeRole(row.rol)
 
       if (!okul || !role) return []
@@ -58,7 +84,7 @@ export async function GET(request: Request) {
     })
 
     const parentMemberships = veliRows.flatMap((row) => {
-      const okul = Array.isArray(row.okullar) ? row.okullar[0] : row.okullar
+      const okul = schoolMap.get(String(row.okul_id))
       if (!okul) return []
 
       return [{

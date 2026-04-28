@@ -352,6 +352,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
+      if (nextSession?.access_token) {
+        const sessionContext = await fetchSessionContext(nextSession.access_token)
+
+        if (sessionContext?.activeSchool && sessionContext.role) {
+          commitSnapshot({
+            session: nextSession,
+            role: sessionContext.role,
+            okul: sessionContext.activeSchool,
+            personel: null,
+            remember: remembered,
+          })
+          return
+        }
+      }
+
       if (restoreExistingSnapshot(user, remembered, nextSession)) {
         return
       }
