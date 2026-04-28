@@ -101,6 +101,12 @@ function clearCachedAuth() {
 function persistSnapshot(snapshot: AuthSnapshot) {
   if (typeof window === 'undefined') return
 
+  if (!snapshot.session?.user || !snapshot.okul) {
+    window.localStorage.removeItem(AUTH_CACHE_KEY)
+    window.sessionStorage.removeItem(AUTH_CACHE_KEY)
+    return
+  }
+
   const remember = snapshot.remember
   const storage = getStorageTarget(remember)
   if (!storage) return
@@ -122,7 +128,7 @@ function readCachedSnapshot() {
 
   try {
     const parsed = JSON.parse(raw) as AuthSnapshot
-    if (parsed.expiresAt && parsed.expiresAt < Date.now()) {
+    if (!parsed.session?.user || !parsed.okul || (parsed.expiresAt && parsed.expiresAt < Date.now())) {
       clearCachedAuth()
       return null
     }
