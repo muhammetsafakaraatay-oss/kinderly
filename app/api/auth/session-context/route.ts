@@ -6,8 +6,9 @@ export async function GET(request: Request) {
   try {
     const { user } = await authenticateRequest(request)
     const admin = createAdminClient()
+    const normalizedEmail = user.email?.trim().toLocaleLowerCase('tr-TR') ?? ''
 
-    const [{ data: personelRows }, { data: veliRows }] = await Promise.all([
+    const [{ data: personelRowsByUserId }, { data: veliRowsByUserId }] = await Promise.all([
       admin
         .from('personel')
         .select('okul_id, rol, aktif, okullar(id, ad, slug, plan, plan_bitis)')
@@ -20,7 +21,28 @@ export async function GET(request: Request) {
         .eq('aktif', true),
     ])
 
-    const staffMemberships = (personelRows ?? []).flatMap((row) => {
+    const [personelRowsByEmail, veliRowsByEmail] =
+      !personelRowsByUserId?.length && !veliRowsByUserId?.length && normalizedEmail
+        ? await Promise.all([
+            admin
+              .from('personel')
+              .select('okul_id, rol, aktif, okullar(id, ad, slug, plan, plan_bitis)')
+              .ilike('email', normalizedEmail)
+              .eq('aktif', true)
+              .then(({ data }) => data ?? []),
+            admin
+              .from('veliler')
+              .select('okul_id, iliski_tipi, aktif, okullar(id, ad, slug, plan, plan_bitis)')
+              .ilike('email', normalizedEmail)
+              .eq('aktif', true)
+              .then(({ data }) => data ?? []),
+          ])
+        : [[], []]
+
+    const personelRows = (personelRowsByUserId?.length ? personelRowsByUserId : personelRowsByEmail) ?? []
+    const veliRows = (veliRowsByUserId?.length ? veliRowsByUserId : veliRowsByEmail) ?? []
+
+    const staffMemberships = personelRows.flatMap((row) => {
       const okul = Array.isArray(row.okullar) ? row.okullar[0] : row.okullar
       const role = normalizeRole(row.rol)
 
@@ -35,7 +57,7 @@ export async function GET(request: Request) {
       }]
     })
 
-    const parentMemberships = (veliRows ?? []).flatMap((row) => {
+    const parentMemberships = veliRows.flatMap((row) => {
       const okul = Array.isArray(row.okullar) ? row.okullar[0] : row.okullar
       if (!okul) return []
 
