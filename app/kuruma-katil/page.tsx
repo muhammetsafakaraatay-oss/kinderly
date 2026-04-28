@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Instrument_Serif, DM_Sans } from 'next/font/google'
 import { supabase } from '@/lib/supabase'
@@ -22,6 +22,18 @@ async function getAccessToken() {
 }
 
 export default function KurumaKatilPage() {
+  return (
+    <Suspense fallback={<KurumaKatilFallback />}>
+      <KurumaKatilContent />
+    </Suspense>
+  )
+}
+
+function KurumaKatilFallback() {
+  return <main className="min-h-screen bg-[#060a06]" />
+}
+
+function KurumaKatilContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { session, role, okul, loading } = useAuth()
